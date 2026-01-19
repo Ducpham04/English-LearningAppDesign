@@ -1,0 +1,255 @@
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  --font-size: 16px;
+  
+  /* Duolingo-inspired Green Color System */
+  --background: #ffffff;
+  --foreground: #3c3c3c;
+  
+  --card: #ffffff;
+  --card-foreground: #3c3c3c;
+  
+  --popover: #ffffff;
+  --popover-foreground: #3c3c3c;
+  
+  /* Primary - Green (Duolingo style) */
+  --primary: #58cc02;
+  --primary-foreground: #ffffff;
+  --primary-hover: #4bad00;
+  
+  /* Secondary - Soft gray */
+  --secondary: #f7f7f7;
+  --secondary-foreground: #3c3c3c;
+  
+  /* Muted - Very light gray */
+  --muted: #f7f7f7;
+  --muted-foreground: #777777;
+  
+  /* Accent - Light green tint */
+  --accent: #e9f9e0;
+  --accent-foreground: #58cc02;
+  
+  /* Success - Green variations */
+  --success: #58cc02;
+  --success-foreground: #ffffff;
+  
+  /* Warning - Soft yellow */
+  --warning: #ffc800;
+  --warning-foreground: #3c3c3c;
+  
+  /* Destructive - Soft red */
+  --destructive: #ff4b4b;
+  --destructive-foreground: #ffffff;
+  
+  /* Borders and inputs */
+  --border: #e5e5e5;
+  --input: transparent;
+  --input-background: #f7f7f7;
+  --switch-background: #e5e5e5;
+  
+  --font-weight-medium: 500;
+  --font-weight-normal: 400;
+  
+  --ring: #58cc02;
+  
+  /* Rounded corners - larger for friendly feel */
+  --radius: 1rem;
+  
+  /* Chart colors - green variations */
+  --chart-1: #58cc02;
+  --chart-2: #7ed321;
+  --chart-3: #a3e635;
+  --chart-4: #4bad00;
+  --chart-5: #36a100;
+  
+  /* Sidebar */
+  --sidebar: #ffffff;
+  --sidebar-foreground: #3c3c3c;
+  --sidebar-primary: #58cc02;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #f7f7f7;
+  --sidebar-accent-foreground: #3c3c3c;
+  --sidebar-border: #e5e5e5;
+  --sidebar-ring: #58cc02;
+}
+
+.dark {
+  --background: #1f1f1f;
+  --foreground: #f7f7f7;
+  
+  --card: #2b2b2b;
+  --card-foreground: #f7f7f7;
+  
+  --popover: #2b2b2b;
+  --popover-foreground: #f7f7f7;
+  
+  --primary: #58cc02;
+  --primary-foreground: #ffffff;
+  --primary-hover: #4bad00;
+  
+  --secondary: #3c3c3c;
+  --secondary-foreground: #f7f7f7;
+  
+  --muted: #3c3c3c;
+  --muted-foreground: #999999;
+  
+  --accent: #2d4a1f;
+  --accent-foreground: #7ed321;
+  
+  --success: #58cc02;
+  --success-foreground: #ffffff;
+  
+  --warning: #ffc800;
+  --warning-foreground: #1f1f1f;
+  
+  --destructive: #ff4b4b;
+  --destructive-foreground: #ffffff;
+  
+  --border: #3c3c3c;
+  --input: #3c3c3c;
+  --ring: #58cc02;
+  
+  --font-weight-medium: 500;
+  --font-weight-normal: 400;
+  
+  --chart-1: #58cc02;
+  --chart-2: #7ed321;
+  --chart-3: #a3e635;
+  --chart-4: #4bad00;
+  --chart-5: #36a100;
+  
+  --sidebar: #2b2b2b;
+  --sidebar-foreground: #f7f7f7;
+  --sidebar-primary: #58cc02;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #3c3c3c;
+  --sidebar-accent-foreground: #f7f7f7;
+  --sidebar-border: #3c3c3c;
+  --sidebar-ring: #58cc02;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary-hover: var(--primary-hover);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-input-background: var(--input-background);
+  --color-switch-background: var(--switch-background);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  
+  /* Larger rounded corners for friendly feel */
+  --radius-sm: calc(var(--radius) - 0.25rem);
+  --radius-md: var(--radius);
+  --radius-lg: calc(var(--radius) + 0.25rem);
+  --radius-xl: calc(var(--radius) + 0.5rem);
+  
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+    letter-spacing: -0.01em; /* Improved letter spacing for Inter */
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    letter-spacing: -0.011em;
+    line-height: 1.6; /* Better readability */
+  }
+
+  /**
+  * Default typography styles for HTML elements (h1-h4, p, label, button, input).
+  * These are in @layer base, so Tailwind utility classes (like text-sm, text-lg) automatically override them.
+  */
+
+  html {
+    font-size: var(--font-size);
+  }
+
+  h1 {
+    font-size: var(--text-2xl);
+    font-weight: 700; /* Bolder for Inter */
+    line-height: 1.2;
+    letter-spacing: -0.025em;
+  }
+
+  h2 {
+    font-size: var(--text-xl);
+    font-weight: 600;
+    line-height: 1.3;
+    letter-spacing: -0.02em;
+  }
+
+  h3 {
+    font-size: var(--text-lg);
+    font-weight: 600;
+    line-height: 1.4;
+    letter-spacing: -0.015em;
+  }
+
+  h4 {
+    font-size: var(--text-base);
+    font-weight: 600;
+    line-height: 1.5;
+    letter-spacing: -0.01em;
+  }
+
+  p {
+    line-height: 1.6;
+    letter-spacing: -0.011em;
+  }
+
+  label {
+    font-size: var(--text-base);
+    font-weight: 500;
+    line-height: 1.5;
+    letter-spacing: -0.01em;
+  }
+
+  button {
+    font-size: var(--text-base);
+    font-weight: 500;
+    line-height: 1.5;
+    letter-spacing: -0.01em;
+  }
+
+  input {
+    font-size: var(--text-base);
+    font-weight: var(--font-weight-normal);
+    line-height: 1.5;
+    letter-spacing: -0.011em;
+  }
+}
