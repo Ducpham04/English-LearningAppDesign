@@ -1,0 +1,26 @@
+version: '3.8'
+services:
+  # --- Dịch vụ 1 : Database (PostgreSQL) ---
+    db:
+        image: postgres:16-alpine
+        container_name : lms_postgres
+        ports:
+          - "5432:5432"
+        environment:
+          POSTGRES_USER: admin
+          POSTGRES_PASSWORD: password123
+          POSTGRES_DB : lms_database
+        volumes:
+          - postgres_data:/var/lib/postgresql/data # nơi lưu trữ dữ liệu vĩnh viễn
+        restart: always                             # Tự động khởi động lại nếu bị crash
+        # --- Dịch vụ 2 : Cache (Redis ---)
+
+    redis:
+      image: redis:7-alpine
+      container_name: lms_redis
+      ports:
+        - "6379:6379"
+      restart: always
+
+volumes:
+    postgres_data:

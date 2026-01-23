@@ -1,0 +1,11 @@
+target/
+*.log
+*.tmp
+.DS_Store
+.git/
+.gitignore
+README.md
+HELP.md
+mvnw
+mvnw.cmd
+.mvn/
