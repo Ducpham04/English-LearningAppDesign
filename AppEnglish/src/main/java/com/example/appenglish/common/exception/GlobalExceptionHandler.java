@@ -49,4 +49,3 @@ public class GlobalExceptionHandler {
                 .body(BaseResponse.error("Internal server error", "INTERNAL_ERROR", request.getRequestURI()));
     }
 }
-

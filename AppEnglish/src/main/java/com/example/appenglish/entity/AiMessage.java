@@ -14,7 +14,7 @@ import java.util.Map;
 @Entity
 @Table(name = "ai_messages")
 @Getter @Setter
-public class AIMessage extends BaseEntity {
+public class AiMessage extends BaseEntity {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id")
@@ -30,4 +30,6 @@ public class AIMessage extends BaseEntity {
     @Column(columnDefinition = "jsonb")
     private Map<String, Object> metadata; // { "tokens": 150, "model": "gpt-4" }
 }
+
 enum SenderRole { USER, AI }
+

@@ -29,6 +29,8 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         // Auth
                         .requestMatchers("/api/auth/**").permitAll()
+                        .requestMatchers("/upload/**").permitAll()
+                        .requestMatchers("/youtube/**").permitAll()
 
                         // Swagger
                         .requestMatchers(
