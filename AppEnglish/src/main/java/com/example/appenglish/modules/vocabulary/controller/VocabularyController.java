@@ -26,9 +26,9 @@ import java.util.Optional;
  * Controller cho Vocabulary API.
  */
 @RestController
-@RequestMapping("/api/v1/vocabularies")
+@RequestMapping("/api/vocabularies")
 @RequiredArgsConstructor
-@Tag(name = "Vocabulary", description = "API quản lý từ vựng")
+@Tag(name = "Vocabulary")
 public class VocabularyController {
 
     private final VocabularyService vocabularyService;
@@ -40,10 +40,7 @@ public class VocabularyController {
      * @return Danh sách từ vựng có phân trang
      */
     @GetMapping
-    @Operation(
-        summary = "Lấy danh sách từ vựng",
-        description = "Lấy danh sách từ vựng với phân trang, sắp xếp. Mặc định: trang 0, 20 bản ghi"
-    )
+    @Operation(    )
     public ResponseEntity<Page<VocabularyResponse>> getAllVocabularies(
             @PageableDefault(size = 20, page = 0, sort = "createdAt", direction = Sort.Direction.DESC)
             @Parameter(description = "Phân trang (page=0, size=20, sort=createdAt,desc)")
@@ -59,10 +56,7 @@ public class VocabularyController {
      * @return Danh sách từ vựng phù hợp
      */
     @GetMapping("/search")
-    @Operation(
-        summary = "Tìm kiếm từ vựng",
-        description = "Tìm kiếm từ vựng theo từ khóa (không phân biệt hoa thường)"
-    )
+    @Operation(    )
     public ResponseEntity<Page<VocabularyResponse>> searchVocabularies(
             @RequestParam(value = "q", required = true)
             @Parameter(description = "Từ khóa tìm kiếm", example = "hello")
@@ -75,16 +69,57 @@ public class VocabularyController {
     }
 
     /**
+     * Lấy các từ vựng cần ôn tập ngay bây giờ (nextReviewAt <= now).
+     * 
+     * @return Danh sách từ vựng cần ôn tập
+     */
+    @GetMapping("/review")
+    @Operation(    )
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Thành công"),
+        @ApiResponse(responseCode = "204", description = "Không có từ nào cần ôn tập")
+    })
+    public ResponseEntity<?> getVocabulariesForReview() {
+        var reviews = vocabularyService.getVocabulariesForReview();
+        
+        if (reviews.isEmpty()) {
+            return ResponseEntity.noContent().build();
+        }
+        return ResponseEntity.ok(reviews);
+    }
+
+    /**
+     * Lấy từ vựng cần ôn tập của người dùng cụ thể.
+     * 
+     * @param userId ID người dùng
+     * @return Danh sách từ vựng cần ôn tập
+     */
+    @GetMapping("/review/user/{userId}")
+    @Operation(    )
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Thành công"),
+        @ApiResponse(responseCode = "204", description = "Không có từ nào cần ôn tập")
+    })
+    public ResponseEntity<?> getVocabulariesForReviewByUser(
+            @PathVariable
+            @Parameter(description = "ID người dùng", example = "1")
+            Long userId) {
+        var reviews = vocabularyService.getVocabulariesForReviewByUserId(userId);
+        
+        if (reviews.isEmpty()) {
+            return ResponseEntity.noContent().build();
+        }
+        return ResponseEntity.ok(reviews);
+    }
+
+    /**
      * Tìm từ vựng theo từ chính xác.
      * 
      * @param word Từ cần tìm
      * @return Thông tin chi tiết từ vựng hoặc 404 nếu không tìm thấy
      */
     @GetMapping("/{word}")
-    @Operation(
-        summary = "Lấy chi tiết từ vựng",
-        description = "Lấy thông tin chi tiết của một từ vựng theo từ khóa chính xác"
-    )
+    @Operation(    )
     public ResponseEntity<?> getVocabularyByWord(
             @PathVariable
             @Parameter(description = "Từ vựng cần tìm", example = "hello")
@@ -106,10 +141,7 @@ public class VocabularyController {
      * @return Thông tin chi tiết từ vựng
      */
     @GetMapping("/id/{id}")
-    @Operation(
-        summary = "Lấy từ vựng theo ID",
-        description = "Lấy thông tin chi tiết của một từ vựng theo ID"
-    )
+    @Operation(    )
     @ApiResponses(value = {
         @ApiResponse(responseCode = "200", description = "Thành công"),
         @ApiResponse(responseCode = "404", description = "Từ vựng không tồn tại")
@@ -133,10 +165,7 @@ public class VocabularyController {
      * @return Từ vựng được tạo
      */
     @PostMapping
-    @Operation(
-        summary = "Tạo từ vựng mới",
-        description = "Tạo một từ vựng mới trong hệ thống"
-    )
+    @Operation(    )
     @ApiResponses(value = {
         @ApiResponse(responseCode = "201", description = "Tạo thành công"),
         @ApiResponse(responseCode = "400", description = "Dữ liệu không hợp lệ")
@@ -157,10 +186,7 @@ public class VocabularyController {
      * @return Từ vựng đã cập nhật
      */
     @PutMapping("/{id}")
-    @Operation(
-        summary = "Cập nhật từ vựng",
-        description = "Cập nhật thông tin của một từ vựng"
-    )
+    @Operation(    )
     @ApiResponses(value = {
         @ApiResponse(responseCode = "200", description = "Cập nhật thành công"),
         @ApiResponse(responseCode = "404", description = "Từ vựng không tồn tại")
@@ -189,8 +215,6 @@ public class VocabularyController {
      */
     @DeleteMapping("/{id}")
     @Operation(
-        summary = "Xóa từ vựng",
-        description = "Xóa một từ vựng khỏi hệ thống"
     )
     @ApiResponses(value = {
         @ApiResponse(responseCode = "204", description = "Xóa thành công"),

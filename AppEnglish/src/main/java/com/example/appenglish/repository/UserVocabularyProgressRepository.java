@@ -45,15 +45,10 @@ public interface UserVocabularyProgressRepository extends JpaRepository<UserVoca
     Optional<UserVocabularyProgress> findByUserIdAndVocabularyId(Long userId, Long vocabularyId);
 
     /**
-     * Kiểm tra người dùng đã học từ vựng này hay chưa.
+     * Tìm các từ vựng cần ôn tập ngay bây giờ - không cần user ID.
      */
-    boolean existsByUserIdAndVocabularyId(Long userId, Long vocabularyId);
-
-    /**
-     * Tìm các từ vựng sắp được ôn tập.
-     */
-    @Query("SELECT uvp FROM UserVocabularyProgress uvp WHERE uvp.user.id = :userId AND uvp.nextReviewAt > :now ORDER BY uvp.nextReviewAt ASC LIMIT :limit")
-    List<UserVocabularyProgress> findUpcomingReviews(@Param("userId") Long userId, @Param("now") LocalDateTime now, @Param("limit") int limit);
+    @Query("SELECT uvp FROM UserVocabularyProgress uvp WHERE uvp.nextReviewAt <= :now ORDER BY uvp.nextReviewAt ASC")
+    List<UserVocabularyProgress> findAllDueForReview(@Param("now") LocalDateTime now);
 
     /**
      * Tìm các từ vựng theo trạng thái, sắp xếp theo ngày ôn tiếp.
