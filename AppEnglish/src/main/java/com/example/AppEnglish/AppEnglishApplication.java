@@ -10,7 +10,8 @@ import org.springframework.data.jpa.repository.config.EnableJpaAuditing;
 @ComponentScan(basePackages = {
     "com.example.appenglish",
     "com.example.appenglish.modules",
-    "com.example.appenglish.modules.vocabulary"
+    "com.example.appenglish.modules.vocabulary",
+    "com.example.appenglish.modules.classroom"
 })
 public class AppEnglishApplication {
 

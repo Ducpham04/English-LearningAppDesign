@@ -22,11 +22,5 @@ public class ClassStudent {
 
     private LocalDateTime joinedAt;
     private Boolean isFaceVerified;
-}
-
-@Embeddable
-@Getter @Setter @EqualsAndHashCode
-class ClassStudentId implements Serializable {
-    private Long classId;
-    private Long studentId;
+    private String status;  // ACTIVE, COMPLETED, INACTIVE
 }
