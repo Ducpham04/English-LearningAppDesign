@@ -1,13 +1,14 @@
 package com.example.appenglish.entity;
 
-import com.example.appenglish.entity.BaseEntity;
+import com.example.appenglish.enums.AuthProvider;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.SQLDelete;
-import org.hibernate.annotations.Where;
-
+import org.hibernate.annotations.FilterDef;
+import org.hibernate.annotations.Filter;
 
 import java.time.LocalDateTime;
+
 /**
  * Entity Người dùng trung tâm.
  * ĐIỂM KỸ THUẬT:
@@ -20,7 +21,8 @@ import java.time.LocalDateTime;
         @Index(name = "idx_user_provider", columnList = "provider_id") // Tìm nhanh user MXH
 })
 @SQLDelete(sql = "UPDATE users SET deleted_at = NOW() WHERE id = ?")
-@Where(clause = "deleted_at IS NULL") // Mặc định lọc bỏ user đã xóa
+@FilterDef(name = "deletedFilter", defaultCondition = "deleted_at IS NULL")
+@Filter(name = "deletedFilter")
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
 public class User extends BaseEntity {
 
@@ -51,6 +53,3 @@ public class User extends BaseEntity {
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt; // Cờ đánh dấu đã xóa (Soft Delete)
 }
-
-
-enum AuthProvider { LOCAL, GOOGLE, FACEBOOK }

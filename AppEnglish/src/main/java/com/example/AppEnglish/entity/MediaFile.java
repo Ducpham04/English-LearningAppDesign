@@ -3,12 +3,8 @@ package com.example.appenglish.entity;
 
 
 
-import io.hypersistence.utils.hibernate.type.json.JsonType;
 import jakarta.persistence.*;
 import lombok.*;
-import org.hibernate.annotations.Type;
-import java.time.LocalDateTime;
-import java.util.Map;
 
 @Entity
 @Table(name = "media_files")

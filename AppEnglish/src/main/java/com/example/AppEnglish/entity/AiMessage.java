@@ -1,6 +1,6 @@
 package com.example.appenglish.entity;
 
-import com.example.appenglish.entity.BaseEntity;
+import com.example.appenglish.enums.SenderRole;
 import io.hypersistence.utils.hibernate.type.json.JsonType;
 import jakarta.persistence.*;
 import lombok.*;
@@ -30,4 +30,3 @@ public class AIMessage extends BaseEntity {
     @Column(columnDefinition = "jsonb")
     private Map<String, Object> metadata; // { "tokens": 150, "model": "gpt-4" }
 }
-enum SenderRole { USER, AI }

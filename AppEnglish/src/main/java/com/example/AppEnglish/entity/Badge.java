@@ -4,8 +4,7 @@ import io.hypersistence.utils.hibernate.type.json.JsonType;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.Type;
-import java.io.Serializable;
-import java.time.LocalDateTime;
+
 import java.util.Map;
 
 @Entity

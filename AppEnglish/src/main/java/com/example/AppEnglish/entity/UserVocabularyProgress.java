@@ -1,8 +1,8 @@
 package com.example.appenglish.entity;
 
+import com.example.appenglish.enums.LearningStatus;
 import jakarta.persistence.*;
 import lombok.*;
-import java.io.Serializable;
 import java.time.LocalDateTime;
 
 /**
@@ -39,12 +39,3 @@ public class UserVocabularyProgress {
     @Column(name = "next_review_at")
     private LocalDateTime nextReviewAt; // Ngày giờ chính xác phải ôn tập
 }
-
-@Embeddable
-@Getter @Setter @EqualsAndHashCode
-class UserVocabId implements Serializable {
-    private Long userId;
-    private Long vocabId;
-}
-
-enum LearningStatus { NEW, LEARNING, REVIEW, MASTERED }

@@ -1,0 +1,21 @@
+{
+  "groups": [
+    {
+      "name": "app.jwt",
+      "type": "com.example.appenglish.config.JwtProperties",
+      "sourceType": "com.example.appenglish.config.JwtProperties"
+    }
+  ],
+  "properties": [
+    {
+      "name": "app.jwt.secret",
+      "type": "java.lang.String",
+      "description": "JWT Secret Key for signing tokens"
+    },
+    {
+      "name": "app.jwt.expiration",
+      "type": "java.lang.Long",
+      "description": "JWT Token Expiration Time in milliseconds"
+    }
+  ]
+}
