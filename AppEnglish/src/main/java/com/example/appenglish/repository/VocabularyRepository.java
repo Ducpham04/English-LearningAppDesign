@@ -23,9 +23,9 @@ public interface VocabularyRepository extends JpaRepository<Vocabulary, Long> {
     Optional<Vocabulary> findByWordIgnoreCase(String word);
 
     /**
-     * Tìm các từ vựng chứa từ khóa (tìm kiếm).
+     * Tìm các từ vựng chứa từ khóa (tìm kiếm) với phân trang.
      */
-    List<Vocabulary> findByWordContainingIgnoreCase(String word);
+    Page<Vocabulary> findByWordContainingIgnoreCase(String word, Pageable pageable);
 
     /**
      * Tìm các từ vựng theo thẻ (tag).
