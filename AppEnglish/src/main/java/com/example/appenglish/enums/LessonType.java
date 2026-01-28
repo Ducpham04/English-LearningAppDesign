@@ -1,6 +1,7 @@
 package com.example.appenglish.enums;
 
-public enum LessonType {
+public enum
+LessonType {
     VIDEO,
     QUIZ,
     VOCAB,

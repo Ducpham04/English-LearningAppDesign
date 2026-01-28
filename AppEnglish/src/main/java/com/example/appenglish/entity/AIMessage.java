@@ -38,4 +38,6 @@ public class AIMessage extends BaseEntity {
     @Column(columnDefinition = "jsonb")
     private Map<String, Object> metadata; // { "tokens": 150, "model": "gpt-4" }
 }
+
 enum SenderRole { USER, AI }
+
