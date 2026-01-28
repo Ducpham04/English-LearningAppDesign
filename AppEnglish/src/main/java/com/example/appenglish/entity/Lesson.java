@@ -6,6 +6,8 @@ import lombok.*;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -43,4 +45,8 @@ public class Lesson extends BaseEntity {
     
     @OneToOne(mappedBy = "lesson", cascade = CascadeType.ALL)
     private LessonVideo video;
+
+    @OneToMany(mappedBy = "lesson", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderBy("orderIndex ASC")
+    private List<LessonVocabulary> lessonVocabularies = new ArrayList<>();
 }

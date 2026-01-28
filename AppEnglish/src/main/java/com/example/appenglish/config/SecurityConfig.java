@@ -28,6 +28,8 @@ public class SecurityConfig {
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         // Auth
+                        .requestMatchers("/v1/auth/**",
+                                    "/v1/auth/register/**").permitAll()
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers("/upload/**").permitAll()
                         .requestMatchers("/youtube/**").permitAll()
