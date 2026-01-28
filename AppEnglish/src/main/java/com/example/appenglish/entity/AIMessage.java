@@ -18,7 +18,7 @@ import java.util.Map;
         @Index(name = "idx_ai_msg_user", columnList = "user_id")
 })
 @Getter @Setter
-public class AiMessage extends BaseEntity {
+public class AIMessage extends BaseEntity {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "conversation_id")
