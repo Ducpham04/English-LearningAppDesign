@@ -21,4 +21,11 @@ public class RegisterRequest {
 
     @NotBlank (message = "Vai trò không được để trống")
     private String  role ;
+
+    @NotBlank (message ="Mục đích học tập không được để trống")
+    private String learningGoal ;
+
+    @NotBlank (message ="Level học tiếng anh không được để trống")
+    private String levelSelection ;
+
 }

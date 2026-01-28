@@ -30,4 +30,11 @@ public class UserProfile extends BaseEntity {
 
     @Column(name = "learning_goal", columnDefinition = "TEXT")
     private String learningGoal; // Mục tiêu học tập
+
+    @Enumerated(EnumType.STRING)
+    @Column(name ="level")
+    private Level  level;
+
+    public enum Level {Beginner,Elementary, Intermediate, Upper_Intermediate , Advanced ,Proficient}
+
 }

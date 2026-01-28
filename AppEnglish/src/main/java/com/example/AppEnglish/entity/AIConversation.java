@@ -2,11 +2,15 @@ package com.example.appenglish.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(name = "ai_conversations", indexes = {
-        @Index(name = "idx_ai_conv_user", columnList = "user_id") // Tìm lịch sử chat của user nhanh
+        @Index(name = "idx_ai_conv_user", columnList = "user_id"),
+        @Index(name = "idx_ai_conv_started", columnList = "started_at")
 })
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
 public class AIConversation extends BaseEntity {
@@ -24,4 +28,9 @@ public class AIConversation extends BaseEntity {
 
     private LocalDateTime startedAt;
     private LocalDateTime endedAt;
+
+    @OneToMany(mappedBy = "conversation", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderBy("id ASC")
+    @Builder.Default
+    private List<AIMessage> messages = new ArrayList<>();
 }

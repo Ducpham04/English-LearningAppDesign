@@ -38,53 +38,39 @@ public class AuthController {
             @Valid @RequestBody LoginRequest req,
             HttpServletRequest httpReq) {
 
-        try {
-            Authentication authentication = authenticationManager.authenticate(
-                    new UsernamePasswordAuthenticationToken(
-                            req.getEmail(),
-                            req.getPassword()
-                    )
-            );
+        Authentication authentication = authenticationManager.authenticate(
+                new UsernamePasswordAuthenticationToken(
+                        req.getEmail(),
+                        req.getPassword()
+                )
+        );
 
-            SecurityContextHolder.getContext().setAuthentication(authentication);
+        SecurityContextHolder.getContext().setAuthentication(authentication);
 
-            String token = jwtUtils.generateToken(authentication);
+        String token = jwtUtils.generateToken(authentication);
 
-            UserDetails userDetails = (UserDetails) authentication.getPrincipal();
+        UserDetails userDetails = (UserDetails) authentication.getPrincipal();
 
-            Set<String> authorities = authentication.getAuthorities()
-                    .stream()
-                    .map(GrantedAuthority::getAuthority)
-                    .collect(Collectors.toSet());
+        Set<String> authorities = authentication.getAuthorities()
+                .stream()
+                .map(GrantedAuthority::getAuthority)
+                .collect(Collectors.toSet());
 
-            LoginResponse data = new LoginResponse(
-                    "Bearer",
-                    token,
-                    userDetails.getUsername(),
-                    authorities
-            );
+        LoginResponse data = new LoginResponse(
+                "Bearer",
+                token,
+                userDetails.getUsername(),
+                authorities
+        );
 
-            return ResponseEntity.ok(
-                    BaseResponse.ok(
-                            data,
-                            "Login successful",
-                            httpReq.getRequestURI()
-                    )
-            );
-
-        } catch (org.springframework.security.authentication.BadCredentialsException ex) {
-
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(
-                            BaseResponse.error(
-                                    "Email hoặc mật khẩu không đúng",
-                                    "INVALID_CREDENTIALS",
-                                    httpReq.getRequestURI()
-                            )
-                    );
-        }
+        return ResponseEntity.ok(
+                BaseResponse.ok(
+                        data,
+                        "Login successful",
+                        httpReq.getRequestURI()
+                )
+        );
     }
-
 
     // ========================= REGISTER =========================
     @PostMapping("/register/local")
@@ -118,25 +104,6 @@ public class AuthController {
     // ========================= GET ALL USERS =========================
     @GetMapping("/users")
     public ResponseEntity<BaseResponse<List<?>>> getAllUsers(HttpServletRequest httpReq) {
-        // TODO: Thêm kiểm tra quyền admin sau khi test xong
-        /*
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        
-        boolean isAdmin = authentication.getAuthorities()
-                .stream()
-                .anyMatch(auth -> auth.getAuthority().equals("ROLE_ADMIN"));
-
-        if (!isAdmin) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                    .body(
-                            BaseResponse.error(
-                                    "Bạn không có quyền truy cập danh sách người dùng",
-                                    "FORBIDDEN",
-                                    httpReq.getRequestURI()
-                            )
-                    );
-        }
-        */
 
         List<?> users = userDetailsServiceImpl.getUsers();
 

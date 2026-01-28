@@ -49,26 +49,29 @@ public class UserDetailsServiceImpl implements UserDetailsService {
 
     // Sửa kiểu trả về từ void -> boolean
     public boolean register(RegisterRequest req) {
-        // 1. Kiểm tra email đã tồn tại
+        // 1. Nếu trùng email -> Trả về false luôn (Không ném lỗi)
         if (userRepository.existsByEmail(req.getEmail())) {
             return false;
         }
-        System.out.println(req.getRole());
-        // 2. Lấy role USER mặc định
-        Role userRole = roleRepository.findByName(req.getRole());
+        Role role = roleRepository.findByName("ROLE_USER") ;
+        if (role == null) {
+            return false;
+        }else
+        {
+            System.out.println("Đã có id " + role.getName());
+        }
 
-
-        // 3. Tạo user mới
+        // 2. Logic lưu user như cũ
         User newUser = new User();
         newUser.setEmail(req.getEmail());
         newUser.setFullName(req.getFullName());
         newUser.setPasswordHash(passwordEncoder.encode(req.getPassword()));
-        newUser.setRole(userRole);
+        newUser.setRole(roleRepository.findByName("ROLE_USER"));
         newUser.setProvider(User.AuthProvider.LOCAL);
 
-        // 4. Lưu user
         userRepository.save(newUser);
 
+        // 3. Trả về true báo thành công
         return true;
     }
 

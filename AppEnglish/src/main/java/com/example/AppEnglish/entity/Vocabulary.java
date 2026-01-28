@@ -1,14 +1,12 @@
 package com.example.appenglish.entity;
 
 import io.hypersistence.utils.hibernate.type.json.JsonType;
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.Index;
-import jakarta.persistence.Table;
+import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
 import org.hibernate.annotations.Type;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -39,4 +37,7 @@ public class Vocabulary extends BaseEntity {
     @Type(JsonType.class)
     @Column(columnDefinition = "jsonb")
     private List<String> tags;
+
+    @OneToMany(mappedBy = "vocabulary")
+    private List<LessonVocabulary> lessonVocabularies = new ArrayList<>();
 }
