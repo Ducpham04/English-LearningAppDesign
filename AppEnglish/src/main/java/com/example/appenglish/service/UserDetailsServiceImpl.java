@@ -5,7 +5,6 @@ import com.example.appenglish.entity.Role;
 import com.example.appenglish.entity.User;
 import com.example.appenglish.modules.auth.dto.RegisterRequest;
 import com.example.appenglish.repository.RoleRepository;
-import com.example.appenglish.repository.UserProfileRepository;
 import com.example.appenglish.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -27,7 +26,6 @@ public class UserDetailsServiceImpl implements UserDetailsService {
     private final UserRepository userRepository;
     private final PasswordEncoder  passwordEncoder;
     private final RoleRepository roleRepository;
-    private final UserProfileRepository userProfileRepository;
     @Override
     @Transactional(readOnly = true)
     public UserDetails loadUserByUsername(String email) throws UsernameNotFoundException {
@@ -57,13 +55,13 @@ public class UserDetailsServiceImpl implements UserDetailsService {
         }
         Role role = new Role() ;
         if(req.getRole().equals("STUDENT")) {
-             role = roleRepository.findByName("USER") ;
+            role = roleRepository.findByName("USER") ;
 
 
         }else if(req.getRole().equals("TEACHER")) {
             role = roleRepository.findByName("TEACHER") ;
-        }
 
+            }
 
         // 2. Logic lưu user như cũ
         User newUser = new User();

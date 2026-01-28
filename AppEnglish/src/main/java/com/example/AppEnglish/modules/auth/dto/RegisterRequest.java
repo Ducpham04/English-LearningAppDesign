@@ -7,25 +7,17 @@ import lombok.Data;
 
 @Data
 public class RegisterRequest {
-    @NotBlank(message = "Email không được để trống")
-    @Email(message = "Email không đúng định dạng")
+    @NotBlank(message = "email khônng được để trống")
+    @Email
     private String email ;
 
     @NotBlank(message = "Mật khẩu không được để trống")
-    @Size(min = 6, message = "Mật khẩu phải có ít nhất 6 ký tự")
+    @Size(min = 6 ,  message= "Mật khẩu phải có ít nhất 6 ký tự")
     private String password ;
 
     @NotBlank(message = "Tên không được để trống")
-    @Size(min = 2, max = 100, message = "Tên phải từ 2 đến 100 ký tự")
     private String fullName ;
 
     @NotBlank (message = "Vai trò không được để trống")
     private String  role ;
-
-    @NotBlank (message ="Mục đích học tập không được để trống")
-    private String learningGoal ;
-
-    @NotBlank (message ="Level học tiếng anh không được để trống")
-    private String levelSelection ;
-
 }
