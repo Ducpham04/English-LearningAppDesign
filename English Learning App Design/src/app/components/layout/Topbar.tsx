@@ -36,11 +36,7 @@ export function Topbar() {
     <header className="sticky top-0 z-40 border-b border-gray-200 dark:border-gray-800 bg-white/95 backdrop-blur-sm dark:bg-gray-900/95 shadow-sm">
       <div className="flex items-center justify-between h-16 px-6">
         {/* Left - Gamification for students */}
-        <div className="flex-1">
-          {user.role === 'student' && (
-            <GamificationBar />
-          )}
-        </div>
+      
 
         {/* Right - Notifications and User Menu */}
         <div className="flex items-center gap-4">

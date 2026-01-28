@@ -28,7 +28,8 @@ public class SecurityConfig {
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         // Auth
-                        .requestMatchers("/api/auth/**").permitAll()
+                        .requestMatchers("/v1/auth/**",
+                                    "/v1/auth/register/**").permitAll()
 
                         // Swagger
                         .requestMatchers(
@@ -45,14 +46,5 @@ public class SecurityConfig {
         return http.build();
     }
 
-    @Bean
-    public AuthenticationManager authenticationManager(AuthenticationConfiguration cfg) throws Exception {
-        return cfg.getAuthenticationManager();
-    }
-
-    @Bean
-    public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder();
-    }
 }
 
