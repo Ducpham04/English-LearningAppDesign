@@ -238,25 +238,19 @@ http://localhost:8080/api/swagger-ui/
 ## 📝 Data Model
 
 ```json
-## 📝 Data Model (Hệ thống học tập)
+# Vocabulary API (Simple Version)
 
-```json
-{
-  "vocabId": 101,
-  "word": "persistent",
-  "level": "HARD",
-  "phonetic": "/pəˈsɪs.tənt/",
-  "audioUrl": "[https://api.app/audio/persistent.mp3](https://api.app/audio/persistent.mp3)",
-  "meanings": [
-    {
-      "pos": "adjective",
-      "def": "kiên trì, bền bỉ",
-      "ex": "She is a persistent student."
-    }
-  ],
-  "tags": ["Tính cách"],
-  "createdAt": "2026-01-29 10:36:00"
-}
+## 📊 Data Model
+- `vocabId`: ID số để sắp xếp (Tăng dần/Giảm dần)
+- `word`: Từ vựng
+- `level`: EASY, MEDIUM, HARD
+- `meanings`: Danh sách nghĩa đơn giản
+
+## 🚀 Endpoints
+1. `GET /api/vocabularies`: Lấy danh sách (mặc định sắp xếp theo vocabId).
+2. `GET /api/vocabularies/search?q=...`: Tìm kiếm từ.
+3. `POST /api/vocabularies`: Thêm từ mới vào kho.
+4. `DELETE /api/vocabularies/{id}`: Xóa từ khỏi hệ thống.
 ```
 
 ---

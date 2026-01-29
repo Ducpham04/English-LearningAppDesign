@@ -4,169 +4,78 @@ import com.example.appenglish.entity.UserVocabularyProgress;
 import com.example.appenglish.entity.Vocabulary;
 import com.example.appenglish.modules.vocabulary.dto.VocabularyRequest;
 import com.example.appenglish.modules.vocabulary.dto.VocabularyResponse;
-import com.example.appenglish.modules.vocabulary.dto.VocabularyReviewResponse;
 import com.example.appenglish.repository.UserVocabularyProgressRepository;
 import com.example.appenglish.repository.VocabularyRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.List;
-import java.util.Optional;
 import java.util.stream.Collectors;
 
 /**
- * Service cho Vocabulary.
+ * Service xử lý logic cho Vocabulary và Spaced Repetition (SRS).
  */
 @Service
 @RequiredArgsConstructor
 public class VocabularyService {
 
-    private final VocabularyRepository vocabularyRepository;
+    private final VocabularyRepository repository;
     private final UserVocabularyProgressRepository userVocabProgressRepository;
-    private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     /**
-     * Tìm tất cả từ vựng với phân trang.
+     * Lấy danh sách từ vựng tích hợp Search (word), Filter (level, userId) và Phân trang.
+     *
      */
-    public Page<VocabularyResponse> getAllVocabularies(Pageable pageable) {
-        return vocabularyRepository.findAll(pageable)
+    public Page<VocabularyResponse> getAll(String word, String level, Long userId, Pageable pageable) {
+        return repository.findWithFilters(word, level, userId, pageable)
                 .map(this::toResponse);
     }
 
     /**
-     * Tìm kiếm từ vựng theo từ khóa.
+     * Tạo mới từ vựng với các thông tin chính (word, level, userId).
+     *
      */
-    public Page<VocabularyResponse> searchVocabularies(String searchTerm, Pageable pageable) {
-        return vocabularyRepository.findByWordContainingIgnoreCase(searchTerm, pageable)
-                .map(this::toResponse);
-    }
-
-    /**
-     * Tìm từ vựng theo từ chính xác.
-     */
-    public Optional<VocabularyResponse> findByWord(String word) {
-        return vocabularyRepository.findByWordIgnoreCase(word)
-                .map(this::toResponse);
-    }
-
-    /**
-     * Tạo từ vựng mới.
-     */
-    public VocabularyResponse createVocabulary(VocabularyRequest request) {
-        Vocabulary vocabulary = Vocabulary.builder()
-                .word(request.getWord().toLowerCase().trim())
-                .phonetic(request.getPhonetic())
-                .audioUrl(request.getAudioUrl())
-                .meanings(request.getMeanings())
-                .tags(request.getTags())
+    @Transactional
+    public VocabularyResponse create(VocabularyRequest req) {
+        Vocabulary v = Vocabulary.builder()
+                .word(req.getWord())
+                .level(req.getLevel())
+                .userId(req.getUserId())
                 .build();
         
-        Vocabulary saved = vocabularyRepository.save(vocabulary);
-        return toResponse(saved);
+        return toResponse(repository.save(v));
     }
 
     /**
-     * Cập nhật từ vựng theo ID.
+     * Lấy danh sách từ vựng cần ôn tập dựa trên logic Spaced Repetition (nextReviewAt <= Now).
+     *
      */
-    public VocabularyResponse updateVocabulary(Long id, VocabularyRequest request) {
-        Optional<Vocabulary> existingVocab = vocabularyRepository.findById(id);
+    public List<VocabularyResponse> getReviewList(Long userId) {
+        // Lấy thời điểm hiện tại để so sánh
+        LocalDateTime now = LocalDateTime.now(); 
         
-        if (existingVocab.isPresent()) {
-            Vocabulary vocabulary = existingVocab.get();
-            vocabulary.setWord(request.getWord().toLowerCase().trim());
-            vocabulary.setPhonetic(request.getPhonetic());
-            vocabulary.setAudioUrl(request.getAudioUrl());
-            vocabulary.setMeanings(request.getMeanings());
-            vocabulary.setTags(request.getTags());
-            
-            Vocabulary updated = vocabularyRepository.save(vocabulary);
-            return toResponse(updated);
-        }
-        throw new RuntimeException("Vocabulary not found with id: " + id);
-    }
-
-    /**
-     * Xóa từ vựng theo ID.
-     */
-    public void deleteVocabulary(Long id) {
-        if (!vocabularyRepository.existsById(id)) {
-            throw new RuntimeException("Vocabulary not found with id: " + id);
-        }
-        vocabularyRepository.deleteById(id);
-    }
-
-    /**
-     * Lấy chi tiết từ vựng theo ID.
-     */
-    public VocabularyResponse getVocabularyById(Long id) {
-        Optional<Vocabulary> vocabulary = vocabularyRepository.findById(id);
-        
-        if (vocabulary.isPresent()) {
-            return toResponse(vocabulary.get());
-        }
-        throw new RuntimeException("Vocabulary not found with id: " + id);
-    }
-
-    /**
-     * Convert Entity sang Response DTO.
-     */
-    private VocabularyResponse toResponse(Vocabulary vocabulary) {
-        return VocabularyResponse.builder()
-                .id(vocabulary.getId())
-                .word(vocabulary.getWord())
-                .phonetic(vocabulary.getPhonetic())
-                .audioUrl(vocabulary.getAudioUrl())
-                .meanings(vocabulary.getMeanings())
-                .tags(vocabulary.getTags())
-                .createdAt(vocabulary.getCreatedAt() != null ? 
-                        vocabulary.getCreatedAt().format(DATE_FORMATTER) : null)
-                .build();
-    }
-
-    /**
-     * Lấy các từ vựng cần ôn tập (nextReviewAt <= now).
-     */
-    public List<VocabularyReviewResponse> getVocabulariesForReview() {
-        LocalDateTime now = LocalDateTime.now();
-        List<UserVocabularyProgress> dueForReview = userVocabProgressRepository.findAllDueForReview(now);
-        
-        return dueForReview.stream()
-                .map(this::toReviewResponse)
-                .collect(Collectors.toList());
-    }
-
-    /**
-     * Lấy các từ vựng cần ôn tập cho người dùng cụ thể.
-     */
-    public List<VocabularyReviewResponse> getVocabulariesForReviewByUserId(Long userId) {
-        LocalDateTime now = LocalDateTime.now();
+        // Truy vấn repository cho các bản ghi đến hạn ôn tập
         List<UserVocabularyProgress> dueForReview = userVocabProgressRepository.findDueForReview(userId, now);
-        
+
         return dueForReview.stream()
-                .map(this::toReviewResponse)
+                .map(progress -> toResponse(progress.getVocabulary()))
                 .collect(Collectors.toList());
     }
 
     /**
-     * Convert UserVocabularyProgress sang ReviewResponse DTO.
+     * Phương thức bổ trợ chuyển đổi Entity sang Response DTO rút gọn.
+     *
      */
-    private VocabularyReviewResponse toReviewResponse(UserVocabularyProgress progress) {
-        return VocabularyReviewResponse.builder()
-                .vocabularyId(progress.getVocabulary().getId())
-                .word(progress.getVocabulary().getWord())
-                .phonetic(progress.getVocabulary().getPhonetic())
-                .audioUrl(progress.getVocabulary().getAudioUrl())
-                .status(progress.getStatus().toString())
-                .easinessFactor(progress.getEasinessFactor())
-                .intervalDays(progress.getIntervalDays())
-                .nextReviewAt(progress.getNextReviewAt() != null ? 
-                        progress.getNextReviewAt().format(DATE_FORMATTER) : null)
-                .createdAt(progress.getId() != null ? 
-                        LocalDateTime.now().format(DATE_FORMATTER) : null)
+    private VocabularyResponse toResponse(Vocabulary v) {
+        return VocabularyResponse.builder()
+                .id(v.getId()) // Sẽ hiển thị là vocabId trong JSON
+                .word(v.getWord())
+                .level(v.getLevel())
+                .userId(v.getUserId())
                 .build();
     }
 }

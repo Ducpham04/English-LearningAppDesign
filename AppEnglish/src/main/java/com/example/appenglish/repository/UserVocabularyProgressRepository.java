@@ -56,3 +56,4 @@ public interface UserVocabularyProgressRepository extends JpaRepository<UserVoca
     @Query("SELECT uvp FROM UserVocabularyProgress uvp WHERE uvp.user.id = :userId AND uvp.status = :status ORDER BY uvp.nextReviewAt ASC")
     List<UserVocabularyProgress> findByUserIdAndStatusOrderByNextReview(@Param("userId") Long userId, @Param("status") LearningStatus status);
 }
+
