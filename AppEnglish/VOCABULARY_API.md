@@ -238,20 +238,24 @@ http://localhost:8080/api/swagger-ui/
 ## 📝 Data Model
 
 ```json
+## 📝 Data Model (Hệ thống học tập)
+
+```json
 {
-  "id": "Long - ID từ vựng",
-  "word": "String - Từ vựng",
-  "phonetic": "String - Phiên âm IPA",
-  "audioUrl": "String - Link phát âm",
+  "vocabId": 101,
+  "word": "persistent",
+  "level": "HARD",
+  "phonetic": "/pəˈsɪs.tənt/",
+  "audioUrl": "[https://api.app/audio/persistent.mp3](https://api.app/audio/persistent.mp3)",
   "meanings": [
     {
-      "pos": "String - Part of speech (noun, verb, adjective...)",
-      "def": "String - Định nghĩa",
-      "ex": "String - Ví dụ"
+      "pos": "adjective",
+      "def": "kiên trì, bền bỉ",
+      "ex": "She is a persistent student."
     }
   ],
-  "tags": ["String - Thẻ phân loại (A1, IELTS, Food...)"],
-  "createdAt": "String - Ngày tạo (yyyy-MM-dd HH:mm:ss)"
+  "tags": ["Tính cách"],
+  "createdAt": "2026-01-29 10:36:00"
 }
 ```
 

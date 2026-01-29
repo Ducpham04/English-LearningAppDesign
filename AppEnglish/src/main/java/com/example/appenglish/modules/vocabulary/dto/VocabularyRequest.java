@@ -21,6 +21,9 @@ public class VocabularyRequest {
     @Schema(description = "Từ vựng", example = "hello", requiredMode = Schema.RequiredMode.REQUIRED)
     private String word;
 
+    @Schema(description = "Cấp độ khó (EASY, MEDIUM, HARD)", example = "MEDIUM")
+private String level;
+
     @Schema(description = "Phiên âm IPA", example = "həˈloʊ")
     private String phonetic;
 

@@ -45,4 +45,7 @@ public class Vocabulary extends BaseEntity {
     @Type(JsonType.class)
     @Column(columnDefinition = "jsonb")
     private List<String> tags;
+
+    @Column(name = "level")
+private String level;
 }

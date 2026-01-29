@@ -19,6 +19,9 @@ public class VocabularyResponse {
     @Schema(description = "ID từ vựng", example = "1")
     private Long id;
 
+@Schema(description = "Cấp độ khó của từ", example = "EASY")
+private String level;
+
     @Schema(description = "Từ vựng", example = "hello")
     private String word;
 
