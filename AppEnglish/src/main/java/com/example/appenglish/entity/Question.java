@@ -21,5 +21,5 @@ public class Question extends BaseEntity {
     private Test test; // Thuộc bài Test nào
 
     @OneToMany(mappedBy = "question", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private List<TestOption> options; // Danh sách các lựa chọn (A, B, C, D)
+private List<TestOption> options;
 }

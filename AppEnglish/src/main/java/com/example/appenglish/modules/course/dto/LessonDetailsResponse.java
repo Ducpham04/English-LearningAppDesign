@@ -6,17 +6,20 @@ import java.util.List;
 
 @Data
 @Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class LessonDetailsResponse {
     private Long id;
     private String title;
     private LessonType type;
-    private String content; // Dùng cho bài học dạng văn bản
     
-    // Thông tin cho Video
+    // Thêm trường này để fix lỗi "undefined"
+    private Long quizId; 
+    
     private String videoUrl;
     private String subtitlesUrl;
+    private String htmlContent;
     
-    // Thông tin cho Quiz
     private List<QuestionResponse> questions;
 
     @Data
@@ -32,6 +35,5 @@ public class LessonDetailsResponse {
     public static class OptionResponse {
         private Long id;
         private String content;
-        // KHÔNG bao gồm trường isCorrect ở đây để ẩn đáp án
     }
 }

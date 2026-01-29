@@ -17,7 +17,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 /**
- * Service xử lý logic cho Vocabulary và Spaced Repetition (SRS).
+ * Service xử lý logic cho Vocabulary - Đã lược bỏ userId.
  */
 @Service
 @RequiredArgsConstructor
@@ -27,38 +27,38 @@ public class VocabularyService {
     private final UserVocabularyProgressRepository userVocabProgressRepository;
 
     /**
-     * Lấy danh sách từ vựng tích hợp Search (word), Filter (level, userId) và Phân trang.
-     *
+     * Lấy danh sách từ vựng tích hợp Search (word), Filter (level) và Phân trang.
+     * Tự động hiển thị ID (vocabId) trong kết quả trả về.
      */
-    public Page<VocabularyResponse> getAll(String word, String level, Long userId, Pageable pageable) {
-        return repository.findWithFilters(word, level, userId, pageable)
-                .map(this::toResponse);
-    }
+    public Page<VocabularyResponse> getAll(String word, String level, Pageable pageable) {
+    // Chỉ nhận 3 tham số
+    return repository.findWithFilters(word, level, pageable)
+            .map(this::toResponse);
+}
 
     /**
-     * Tạo mới từ vựng với các thông tin chính (word, level, userId).
-     *
+     * Tạo mới từ vựng. 
+     * ID được sinh tự động bởi Database (1, 2, 3...)
      */
     @Transactional
     public VocabularyResponse create(VocabularyRequest req) {
         Vocabulary v = Vocabulary.builder()
                 .word(req.getWord())
+                .phonetic(req.getPhonetic())
+                .definition(req.getDefinition())
+                .example(req.getExample())
                 .level(req.getLevel())
-                .userId(req.getUserId())
+                // Tuyệt đối không gọi .userId() ở đây
                 .build();
         
         return toResponse(repository.save(v));
     }
 
     /**
-     * Lấy danh sách từ vựng cần ôn tập dựa trên logic Spaced Repetition (nextReviewAt <= Now).
-     *
+     * Lấy danh sách từ vựng cần ôn tập.
      */
     public List<VocabularyResponse> getReviewList(Long userId) {
-        // Lấy thời điểm hiện tại để so sánh
         LocalDateTime now = LocalDateTime.now(); 
-        
-        // Truy vấn repository cho các bản ghi đến hạn ôn tập
         List<UserVocabularyProgress> dueForReview = userVocabProgressRepository.findDueForReview(userId, now);
 
         return dueForReview.stream()
@@ -67,15 +67,18 @@ public class VocabularyService {
     }
 
     /**
-     * Phương thức bổ trợ chuyển đổi Entity sang Response DTO rút gọn.
-     *
+     * Chuyển đổi Entity sang Response.
+     * ID lấy từ BaseEntity (tự tăng) sẽ được map vào DTO.
      */
     private VocabularyResponse toResponse(Vocabulary v) {
         return VocabularyResponse.builder()
-                .id(v.getId()) // Sẽ hiển thị là vocabId trong JSON
+                .id(v.getId()) // Trả về ID tự tăng (VocabId)
                 .word(v.getWord())
+                .phonetic(v.getPhonetic())
+                .definition(v.getDefinition())
+                .example(v.getExample())
                 .level(v.getLevel())
-                .userId(v.getUserId())
+                // Đã xóa userId ở đây
                 .build();
     }
 }

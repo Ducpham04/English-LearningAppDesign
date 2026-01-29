@@ -2,18 +2,27 @@ package com.example.appenglish.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
-import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "test_attempts")
-@Getter @Setter
+@Getter 
+@Setter 
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class TestAttempt extends BaseEntity {
+
     @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "test_id")
     private Test test;
 
     @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id")
     private User user;
 
-    private Integer totalScore;
-    private LocalDateTime submittedAt;
+    @Column(nullable = false)
+    private Double score; // Điểm số (0.0 - 10.0)
+
+    @Column(name = "correct_answers", nullable = false)
+    private Integer correctAnswers; // Số câu trả lời đúng
 }

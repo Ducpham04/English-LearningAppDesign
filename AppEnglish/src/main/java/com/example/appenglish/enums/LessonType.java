@@ -4,5 +4,6 @@ public enum LessonType {
     VIDEO,
     QUIZ,
     VOCAB,
-    SPEAKING
+    SPEAKING,
+    TEXT
 }

@@ -1,18 +1,21 @@
 package com.example.appenglish.entity;
 
-import jakarta.persistence.Entity;
 import jakarta.persistence.*;
-import lombok.Getter;
-import lombok.Setter;
+import lombok.*;
 
 @Entity
 @Table(name = "test_options")
-@Getter
-@Setter
+@Getter @Setter
+@NoArgsConstructor @AllArgsConstructor
 public class TestOption extends BaseEntity {
-    @ManyToOne(fetch = FetchType.LAZY)
-    private TestQuestion question;
 
-    private String content; // Nội dung đáp án A, B...
-    private Boolean isCorrect; // Đúng/Sai
+    @Column(nullable = false)
+    private String content; // Đảm bảo tên trường là content
+
+    @Column(name = "is_correct")
+    private Boolean isCorrect;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "question_id")
+    private Question question;
 }

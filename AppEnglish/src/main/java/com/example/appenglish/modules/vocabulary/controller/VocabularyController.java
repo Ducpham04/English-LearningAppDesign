@@ -27,15 +27,18 @@ public class VocabularyController {
      * GET: Lấy danh sách từ vựng.
      * Tích hợp: Tìm kiếm theo từ (word), Lọc theo độ khó (level), Lọc theo người dùng (userId) và Phân trang.
      */
-    @GetMapping
-    @Operation()
-    public ResponseEntity<Page<VocabularyResponse>> get(
-            @RequestParam(required = false) String word,
-            @RequestParam(required = false) String level,
-            @RequestParam(required = false) Long userId,
-            @PageableDefault(size = 10, sort = "id", direction = Sort.Direction.ASC) Pageable pageable) {
-        return ResponseEntity.ok(service.getAll(word, level, userId, pageable));
-    }
+ @GetMapping
+public ResponseEntity<Page<VocabularyResponse>> getVocabularies(
+        @RequestParam(required = false) String word,
+        @RequestParam(required = false) String level,
+        // @RequestParam(required = false) Long userId, // Có thể comment hoặc xóa dòng này
+        Pageable pageable) {
+    
+    // SỬA TẠI ĐÂY: Chỉ truyền 3 đối số thay vì 4
+    Page<VocabularyResponse> result = service.getAll(word, level, pageable);
+    
+    return ResponseEntity.ok(result);
+}
 
     /**
      * GET: Lấy danh sách từ vựng cần ôn tập.

@@ -17,7 +17,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/curriculums")
 @RequiredArgsConstructor
-@Tag(name = "Session", description = "Quản lý danh sách chương học trong khóa học")
+@Tag(name = "Session")
 public class SessionController {
 
     private final SessionService sessionService;
@@ -29,9 +29,7 @@ public class SessionController {
      * @return Danh sách các Session thuộc khóa học đó
      */
     @GetMapping("/{curriculumId}/sessions")
-    @Operation(summary = "Lấy danh sách chương học theo khóa học", 
-               description = "Trả về danh sách các chương học được sắp xếp theo thứ tự hiển thị")
-    public ResponseEntity<List<Session>> getSessionList(
+   public ResponseEntity<List<Session>> getSessionList(
             @PathVariable 
             @Parameter(description = "ID của khóa học", example = "1") Long curriculumId) {
         

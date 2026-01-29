@@ -18,6 +18,10 @@ public class TestQuestion extends BaseEntity {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "test_id")
     private Test test;
+    
+    @ManyToOne(fetch = FetchType.LAZY)
+@JoinColumn(name = "question_id")
+private Question question;
 
     @Column(columnDefinition = "TEXT")
     private String content; // Nội dung câu hỏi (HTML/Text)
