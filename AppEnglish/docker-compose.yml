@@ -7,9 +7,9 @@ services:
         ports:
           - "5432:5432"
         environment:
-          POSTGRES_USER: admin
-          POSTGRES_PASSWORD: password123
-          POSTGRES_DB : lms_database
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB : learning_english
         volumes:
           - postgres_data:/var/lib/postgresql/data # nơi lưu trữ dữ liệu vĩnh viễn
         restart: always                             # Tự động khởi động lại nếu bị crash
@@ -21,6 +21,36 @@ services:
       ports:
         - "6379:6379"
       restart: always
+
+    zookeeper:
+      image: confluentinc/cp-zookeeper:7.5.0
+      environment:
+        ZOOKEEPER_CLIENT_PORT: 2181
+        ZOOKEEPER_TICK_TIME: 2000
+      ports:
+        - "2181:2181"
+
+    kafka:
+      image: confluentinc/cp-kafka:7.5.0
+      depends_on:
+        - zookeeper
+      ports:
+        - "9092:9092" # host access
+      environment:
+        KAFKA_BROKER_ID: 1
+        KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+        KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:29092,PLAINTEXT_HOST://0.0.0.0:9092
+        KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+        KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+        KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+        KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+
+    ytdlp:
+      image: alpine:3.20
+      container_name: langmaster-ytdlp
+      command: [ "sh", "-c", "set -e; apk add --no-cache python3 py3-pip py3-virtualenv ffmpeg ca-certificates >/dev/null 2>&1; python3 -m venv /opt/venv; /opt/venv/bin/pip install --no-cache-dir -U pip yt-dlp; /opt/venv/bin/yt-dlp --version; tail -f /dev/null" ]
+      volumes:
+        - ./temp/youtube-audio:/data
 
 volumes:
     postgres_data:
