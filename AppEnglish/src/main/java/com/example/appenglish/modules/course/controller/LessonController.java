@@ -1,6 +1,7 @@
 package com.example.appenglish.modules.course.controller;
 
 import com.example.appenglish.modules.course.dto.LessonDetailsResponse;
+import com.example.appenglish.modules.course.dto.QuizSubmitRequest;
 import com.example.appenglish.modules.course.service.LessonService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -20,7 +21,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/lessons")
 @RequiredArgsConstructor
-@Tag(name = "Lesson", description = "Quản lý nội dung bài học và làm bài Quiz")
+@Tag(name = "Lesson")
 public class LessonController {
 
     private final LessonService lessonService;
@@ -28,7 +29,6 @@ public class LessonController {
     /**
      * Lấy thông tin chi tiết của một bài học (Video, Quiz, Text).
      */
-    @Operation(summary = "Lấy chi tiết bài học", description = "Tự động ẩn đáp án đúng nếu là bài QUIZ để bảo mật.")
     @GetMapping("/{id}")
     public ResponseEntity<LessonDetailsResponse> getLessonDetails(
             @PathVariable 
@@ -44,21 +44,16 @@ public class LessonController {
      * @param userAnswers Map chứa QuestionID và OptionID người dùng chọn
      * @param userDetails Thông tin user lấy từ Token JWT
      */
-    @Operation(summary = "Nộp bài Quiz", description = "Gửi danh sách đáp án đã chọn để tính điểm và lưu lịch sử.")
-    @ApiResponse(responseCode = "200", description = "Trả về số câu đúng và tổng điểm")
-    @PostMapping("/{id}/submit")
-    public ResponseEntity<Map<String, Object>> submitQuiz(
-            @PathVariable Long id,
-            @RequestBody Map<Long, Long> userAnswers,
-            @AuthenticationPrincipal UserDetails userDetails) {
-        
-        // Giả sử email/username là duy nhất, lấy userId từ service dựa trên email
-        // Ở đây chúng ta tạm gọi submitQuiz với logic đã viết trong LessonService
-        // Lưu ý: Cần thêm logic lấy UserId thực tế từ UserDetails nếu cần
-        
-        // Tạm thời truyền Long.valueOf(1) hoặc một ID giả định nếu chưa có logic lấy ID từ UserDetails
-        Map<String, Object> result = lessonService.submitQuiz(id, 1L, userAnswers);
-        
-        return ResponseEntity.ok(result);
-    }
+    @ApiResponse(responseCode = "200")
+@PostMapping("/{id}/submit")
+public ResponseEntity<Map<String, Object>> submitQuiz(
+        @PathVariable Long id,
+        @RequestBody QuizSubmitRequest request, // Dùng DTO mới ở đây
+        @AuthenticationPrincipal UserDetails userDetails) {
+    
+    // Giả sử lấy userId tạm thời là 1, bạn nên lấy từ userDetails thực tế
+    Map<String, Object> result = lessonService.submitQuiz(id, 1L, request.getAnswers());
+    
+    return ResponseEntity.ok(result);
+}
 }

@@ -19,76 +19,89 @@ public class LessonService {
     private final TestAttemptRepository testAttemptRepository;
     private final UserRepository userRepository;
 
-    /**
-     * Teacher/Admin tạo xong, Học sinh gọi hàm này để lấy bài về làm
-     */
-    public LessonDetailsResponse getLessonDetails(Long lessonId) {
-        Lesson lesson = lessonRepository.findById(lessonId)
-                .orElseThrow(() -> new RuntimeException("Bài học không tồn tại"));
+    public LessonDetailsResponse getLessonDetails(Long id) {
+        Lesson lesson = lessonRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy bài học"));
 
+        // Build Response cơ bản
         LessonDetailsResponse response = LessonDetailsResponse.builder()
-                .id(lesson.getId())
+                .lessonId(lesson.getId()) // ID chạy từ 1
                 .title(lesson.getTitle())
                 .type(lesson.getType())
+                .orderIndex(lesson.getOrderIndex())
+                .metadata(lesson.getContentPayload()) // Lấy dữ liệu từ JSONB
                 .build();
 
-        // Nếu là QUIZ, trả về các câu hỏi nhưng GIẤU ĐÁP ÁN ĐÚNG
-        if (lesson.getType() == LessonType.QUIZ && lesson.getTest() != null) {
-            Test test = lesson.getTest();
-            response.setQuizId(test.getId()); // Gắn QuizID liên quan
-
-            List<LessonDetailsResponse.QuestionResponse> questions = test.getQuestions().stream()
-                .map(q -> LessonDetailsResponse.QuestionResponse.builder()
-                    .id(q.getId())
-                    .content(q.getContent())
-                    .options(q.getOptions().stream()
-                        .map(o -> LessonDetailsResponse.OptionResponse.builder()
-                            .id(o.getId())
-                            .content(o.getContent()) // Tuyệt đối không gửi isCorrect về
-                            .build())
-                        .collect(Collectors.toList()))
-                    .build())
-                .collect(Collectors.toList());
-            response.setQuestions(questions);
+        // 1. Nếu là bài học VIDEO
+        if (lesson.getType() == LessonType.VIDEO && lesson.getVideo() != null) {
+            response.setVideoUrl(lesson.getVideo().getVideoUrl());
         }
+
+        // 2. Nếu bài học có gắn QUIZ (Bất kể type là gì, nếu có Test thì vẫn lấy quizId)
+        if (lesson.getTest() != null) {
+            Test test = lesson.getTest();
+            response.setQuizId(test.getId()); // quizID liên quan
+
+            // Nếu đúng type là QUIZ thì mới lấy danh sách câu hỏi
+            if (lesson.getType() == LessonType.QUIZ) {
+                response.setQuestions(test.getQuestions().stream()
+                    .map(q -> LessonDetailsResponse.QuestionResponse.builder()
+                        .id(q.getId())
+                        .content(q.getContent())
+                        .options(q.getOptions().stream()
+                            .map(o -> LessonDetailsResponse.OptionResponse.builder()
+                                .id(o.getId())
+                                .content(o.getContent())
+                                .build())
+                            .collect(Collectors.toList()))
+                        .build())
+                    .collect(Collectors.toList()));
+            }
+        }
+
         return response;
     }
 
     /**
-     * Học sinh nộp bài, hệ thống tự động chấm điểm
+     * Chấm điểm bài Quiz
      */
     @Transactional
     public Map<String, Object> submitQuiz(Long lessonId, Long userId, Map<Long, Long> userAnswers) {
-        Lesson lesson = lessonRepository.findById(lessonId).orElseThrow();
-        Test test = lesson.getTest();
+        Lesson lesson = lessonRepository.findById(lessonId)
+                .orElseThrow(() -> new RuntimeException("Bài học không tồn tại"));
         
-        int correctCount = 0;
+        Test test = lesson.getTest();
+        if (test == null) throw new RuntimeException("Bài học không có Quiz đi kèm");
+
         List<Question> questions = test.getQuestions();
+        int correctCount = 0;
 
         for (Question q : questions) {
-            Long selectedOptionId = userAnswers.get(q.getId());
-            // So khớp với Database
-            boolean correct = q.getOptions().stream()
-                    .anyMatch(o -> o.getId().equals(selectedOptionId) && Boolean.TRUE.equals(o.getIsCorrect()));
-            if (correct) correctCount++;
+            Long selectedId = userAnswers.get(q.getId());
+            boolean isCorrect = q.getOptions().stream()
+                    .anyMatch(o -> o.getId().equals(selectedId) && Boolean.TRUE.equals(o.getIsCorrect()));
+            if (isCorrect) correctCount++;
         }
 
-        double score = (double) correctCount / questions.size() * 10;
+        double score = questions.isEmpty() ? 0 : (double) correctCount / questions.size() * 10;
 
-        // Lưu lịch sử làm bài cho học sinh
-        User student = userRepository.findById(userId).orElseThrow();
+        // Lưu lịch sử (ID của TestAttempt cũng tự tăng từ 1)
+        User user = userRepository.findById(userId).orElseThrow();
         TestAttempt attempt = TestAttempt.builder()
                 .test(test)
-                .user(student)
+                .user(user)
                 .score(score)
                 .correctAnswers(correctCount)
                 .build();
         testAttemptRepository.save(attempt);
 
         Map<String, Object> result = new HashMap<>();
-        result.put("score", score);
+        result.put("lessonId", lessonId);
+        result.put("quizId", test.getId());
+        result.put("score", Math.round(score * 100.0) / 100.0);
         result.put("correctCount", correctCount);
         result.put("passed", score >= 5.0);
+
         return result;
     }
 }
