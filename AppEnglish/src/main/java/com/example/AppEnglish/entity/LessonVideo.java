@@ -2,35 +2,23 @@ package com.example.appenglish.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
-import org.hibernate.annotations.JdbcTypeCode;
-import org.hibernate.type.SqlTypes;
 
-import java.util.List;
-import java.util.Map;
-
-/**
- * Chi tiết Video bài học.
- * TỐI ƯU: Lưu transcript vào JSONB thay vì bảng riêng để query nhanh.
- */
 @Entity
 @Table(name = "lesson_videos")
 @Getter @Setter
-public class LessonVideo {
-
-    @Id
-    private Long lessonId; // PK = FK (1-1 với Lesson)
+@NoArgsConstructor @AllArgsConstructor
+@Builder
+public class LessonVideo extends BaseEntity {
 
     @OneToOne
-    @MapsId
     @JoinColumn(name = "lesson_id")
     private Lesson lesson;
 
-    @Column(name = "video_url")
-    private String videoUrl; // Link M3U8/MP4 (MinIO/S3)
+    @Column(name = "video_url", nullable = false)
+    private String videoUrl;
 
-    // --- JSONB TRANSCRIPT ---
-    // Cấu trúc: [{"start": 0, "end": 2, "text": "Hello"}, ...]
-    @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "transcript_json", columnDefinition = "jsonb")
-    private List<Map<String, Object>> transcriptJson;
+    @Column(name = "subtitles_url") // Đảm bảo trường này tồn tại
+    private String subtitlesUrl;
+
+    private Integer duration; // Thời lượng video (giây)
 }
