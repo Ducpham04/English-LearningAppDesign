@@ -1,7 +1,18 @@
 package com.example.appenglish.modules.userDetail.dto;
 
-public class UserProfileResponse {
-    private String fullName ;
-    private String email ;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class UserProfileResponse {
+    private String id;
+    private String name;
+    private String email;
+    private String avatar;
+    private SettingsDto settings;
 }

@@ -29,7 +29,8 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         // Auth
                         .requestMatchers("/v1/auth/**",
-                                    "/v1/auth/register/**").permitAll()
+                                    "/v1/auth/register/**",
+                                "/v1/users/**").permitAll()
 
                         // Swagger
                         .requestMatchers(

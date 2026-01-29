@@ -23,6 +23,9 @@ public class JwtUtils {
     @Value("${app.jwt.expiration}")
     private long jwtExpirationMs;
 
+    @Value("${app.jwt.refresh.expiration:604800000}")
+    private long refreshTokenExpirationMs; // 7 days default
+
     private SecretKey signingKey() {
         return Keys.hmacShaKeyFor(jwtSecret.getBytes());
     }
@@ -41,6 +44,19 @@ public class JwtUtils {
                 .issuedAt(now)
                 .expiration(expiry)
                 .claims(Map.of("authorities", authorities))
+                .signWith(signingKey())
+                .compact();
+    }
+
+    public String generateRefreshToken(String email) {
+        Date now = new Date();
+        Date expiry = new Date(now.getTime() + refreshTokenExpirationMs);
+
+        return Jwts.builder()
+                .subject(email)
+                .issuedAt(now)
+                .expiration(expiry)
+                .claim("type", "refresh")
                 .signWith(signingKey())
                 .compact();
     }
