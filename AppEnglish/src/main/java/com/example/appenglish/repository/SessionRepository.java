@@ -50,4 +50,6 @@ public interface SessionRepository extends JpaRepository<Session, Long> {
      * Kiểm tra chương có tồn tại trong khóa học.
      */
     boolean existsByIdAndCourseId(Long id, Long courseId);
+
+    
 }
