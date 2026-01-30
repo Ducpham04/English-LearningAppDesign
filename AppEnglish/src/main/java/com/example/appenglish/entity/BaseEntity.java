@@ -31,4 +31,6 @@ public abstract class BaseEntity implements Serializable {
     @LastModifiedDate
     @Column(name = "updated_at")
     private LocalDateTime updatedAt; // Thời điểm cập nhật cuối cùng
+
+
 }

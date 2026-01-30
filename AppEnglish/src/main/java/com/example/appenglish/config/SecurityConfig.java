@@ -29,10 +29,8 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         // Auth
                         .requestMatchers("/v1/auth/**",
-                                    "/v1/auth/register/**").permitAll()
-                        .requestMatchers("/api/auth/**").permitAll()
-                        .requestMatchers("/upload/**").permitAll()
-                        .requestMatchers("/youtube/**").permitAll()
+                                    "/v1/auth/register/**",
+                                "/v1/users/**").permitAll()
 
                         // Swagger
                         .requestMatchers(
@@ -49,14 +47,8 @@ public class SecurityConfig {
         return http.build();
     }
 
-    @Bean
-    public AuthenticationManager authenticationManager(AuthenticationConfiguration cfg) throws Exception {
-        return cfg.getAuthenticationManager();
-    }
 
-    @Bean
-    public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder();
-    }
+
+
 }
 
