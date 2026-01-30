@@ -1,0 +1,28 @@
+package com.example.appenglish.modules.auth.controller;
+
+import com.example.appenglish.entity.User;
+import com.example.appenglish.service.BadgeService;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.Map;
+
+@RestController
+@RequestMapping("/api/badge")
+public class BadgeController {
+    @Autowired
+    private BadgeService badgeService;
+
+    @PostMapping("/check/{userId}")
+    public ResponseEntity<String> checkBadge(
+            @PathVariable Long userId,
+            @RequestParam String criteria,
+            @RequestBody Map<String, Object> userData
+    ) {
+        User user = new User();
+        user.setId(userId); // Tạo user giả (thực tế sẽ lấy từ database)
+        badgeService.checkAndGrantBadge(user, criteria, userData);
+        return ResponseEntity.ok("Badge checked and granted if conditions met!");
+    }
+}

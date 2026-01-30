@@ -14,22 +14,16 @@ import java.util.Map;
 @Setter
 public class UserBadge {
     @EmbeddedId
-    private UserBadgeId id;
+    private UserBadgeId id;// Khóa chính tổng hợp
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @MapsId("userId")
+    @MapsId("userId")// Map với trường userId của UserBadgeId
     private User user;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @MapsId("badgeId")
+    @MapsId("badgeId") // Map với trường badgeId của UserBadgeId
     private Badge badge;
 
-    private LocalDateTime earnedAt;
+    private LocalDateTime earnedAt;// Thời gian nhận badge
 }
 
-@Embeddable
-@Getter @Setter @EqualsAndHashCode
-class UserBadgeId implements Serializable {
-    private Long userId;
-    private Long badgeId;
-}
