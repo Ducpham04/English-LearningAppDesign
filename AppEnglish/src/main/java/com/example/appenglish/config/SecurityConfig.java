@@ -35,9 +35,18 @@ public class SecurityConfig {
         http
                 // 1. Tắt CSRF vì chúng ta dùng Token (Stateless), không dùng Cookie/Session
                 .csrf(csrf -> csrf.disable())
+<<<<<<< HEAD
                 
                 // 2. Cấu hình CORS để các ứng dụng khác (React, Vue, Mobile) gọi được API
                 .cors(Customizer.withDefaults()) 
+=======
+                .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .authorizeHttpRequests(auth -> auth
+                        // Auth
+                        .requestMatchers("/v1/auth/**",
+                                    "/v1/auth/register/**",
+                                "/v1/users/**").permitAll()
+>>>>>>> origin/develop
 
                 // 3. Cấu hình Stateless (Không lưu trạng thái người dùng trên server)
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
@@ -65,6 +74,7 @@ public class SecurityConfig {
         return http.build();
     }
 
+<<<<<<< HEAD
     // Cấu hình CORS: Cho phép Frontend truy cập vào API từ các Domain khác nhau
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
@@ -88,3 +98,10 @@ public class SecurityConfig {
         return new BCryptPasswordEncoder();
     }
 }
+=======
+
+
+
+}
+
+>>>>>>> origin/develop

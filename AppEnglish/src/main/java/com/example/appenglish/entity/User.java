@@ -47,9 +47,16 @@ public class User extends BaseEntity {
     @Column(nullable = false)
     private AuthProvider provider; // LOCAL, GOOGLE, FACEBOOK
 
+    public enum AuthProvider { LOCAL, GOOGLE, FACEBOOK }
     @Column(name = "provider_id")
     private String providerId; // ID trả về từ Google/FB
 
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt; // Cờ đánh dấu đã xóa (Soft Delete)
+<<<<<<< HEAD:AppEnglish/src/main/java/com/example/AppEnglish/entity/User.java
 }
+=======
+}
+
+
+>>>>>>> origin/develop:AppEnglish/src/main/java/com/example/appenglish/entity/User.java

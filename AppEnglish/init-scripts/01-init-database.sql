@@ -12,6 +12,12 @@ ALTER DATABASE english_learning CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci
 -- GRANT ALL PRIVILEGES ON english_learning.* TO 'appuser'@'%';
 -- FLUSH PRIVILEGES;
 
+-- Insert roles (required for registration)
+INSERT INTO role (name, created_at) VALUES
+('ROLE_USER', NOW()),
+('ROLE_ADMIN', NOW()),
+('ROLE_TEACHER', NOW());
+
 -- Sample data for testing (optional - can be removed in production)
 INSERT INTO users (email, password_hash, full_name, status, created_at) VALUES
 ('admin@example.com', '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'System Admin', 'ACTIVE', NOW()),

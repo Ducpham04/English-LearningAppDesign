@@ -17,6 +17,14 @@ public abstract class BaseEntity {
     @CreationTimestamp
     private LocalDateTime createdAt;
 
+<<<<<<< HEAD:AppEnglish/src/main/java/com/example/AppEnglish/entity/BaseEntity.java
     @UpdateTimestamp
     private LocalDateTime updatedAt;
+=======
+    @LastModifiedDate
+    @Column(name = "updated_at")
+    private LocalDateTime updatedAt; // Thời điểm cập nhật cuối cùng
+
+
+>>>>>>> origin/develop:AppEnglish/src/main/java/com/example/appenglish/entity/BaseEntity.java
 }

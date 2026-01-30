@@ -6,6 +6,8 @@ import lombok.*;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -53,7 +55,13 @@ public class Lesson extends BaseEntity {
     @OneToOne(mappedBy = "lesson", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private LessonVideo video;
 
+<<<<<<< HEAD:AppEnglish/src/main/java/com/example/AppEnglish/entity/Lesson.java
     // Kết nối với bài kiểm tra nếu type là QUIZ
     @OneToOne(mappedBy = "lesson", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private Test test;
+=======
+    @OneToMany(mappedBy = "lesson", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderBy("orderIndex ASC")
+    private List<LessonVocabulary> lessonVocabularies = new ArrayList<>();
+>>>>>>> origin/develop:AppEnglish/src/main/java/com/example/appenglish/entity/Lesson.java
 }
