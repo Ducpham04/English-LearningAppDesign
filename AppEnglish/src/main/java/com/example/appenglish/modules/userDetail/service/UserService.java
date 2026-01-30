@@ -5,6 +5,7 @@ import com.example.appenglish.modules.auth.service.UserConverterService;
 import com.example.appenglish.modules.userDetail.dto.UserDataDto;
 import com.example.appenglish.modules.userDetail.dto.UserProfileRequest;
 import com.example.appenglish.modules.userDetail.dto.UserProfileResponse;
+import com.example.appenglish.modules.userDetail.dto.UserXpDto;
 import com.example.appenglish.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -12,6 +13,9 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -69,5 +73,12 @@ public class UserService {
                 .avatar(user.getAvatarUrl())
                 .settings(request.getSettings())
                 .build();
+    }
+
+    public List<UserXpDto> getTopUsersByXpInLastWeek() {
+        List<Object[]> results = userRepository.findTopUsersByXpInLastWeek();
+        return results.stream().map(result -> new UserXpDto(
+                (Long) result[0], (String) result[1], (Integer) result[2]
+        )).collect(Collectors.toList());
     }
 }
