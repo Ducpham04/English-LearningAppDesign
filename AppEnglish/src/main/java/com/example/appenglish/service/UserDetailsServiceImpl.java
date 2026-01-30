@@ -50,22 +50,33 @@ public class UserDetailsServiceImpl implements UserDetailsService {
     }
 
     // Sửa kiểu trả về từ void -> boolean
+    @Transactional
     public boolean register(RegisterRequest req) {
-        // 1. Nếu trùng email -> Trả về false luôn (Không ném lỗi)
+
         if (userRepository.existsByEmail(req.getEmail())) {
             return false;
         }
-        Role role = new Role() ;
-        if(req.getRole().equals("STUDENT")) {
-            role = roleRepository.findByName("USER") ;
 
+        if (req.getRole() == null) {
+            return false;
+        }
 
-        }else if(req.getRole().equals("TEACHER")) {
-            role = roleRepository.findByName("TEACHER") ;
+        // 1. Map role name
+        String roleName;
+        if ("STUDENT".equalsIgnoreCase(req.getRole())) {
+            roleName = "STUDENT";
+        } else if ("TEACHER".equalsIgnoreCase(req.getRole())) {
+            roleName = "TEACHER";
+        } else {
+            return false;
+        }
 
-            }
-
-        // 2. Logic lưu user như cũ
+        // 2. LẤY ROLE TỪ DB (KHÔNG new)
+        Role role = roleRepository.findByName(roleName)
+                .orElseThrow(() ->
+                        new RuntimeException("Role not found in DB: " + roleName)
+                );
+        // 3. Tạo user
         User newUser = new User();
         newUser.setEmail(req.getEmail());
         newUser.setFullName(req.getFullName());
@@ -74,10 +85,9 @@ public class UserDetailsServiceImpl implements UserDetailsService {
         newUser.setProvider(User.AuthProvider.LOCAL);
 
         userRepository.save(newUser);
-
-        // 3. Trả về true báo thành công
         return true;
     }
+
 
     public List<User> getUsers() {
         return userRepository.findAll();
