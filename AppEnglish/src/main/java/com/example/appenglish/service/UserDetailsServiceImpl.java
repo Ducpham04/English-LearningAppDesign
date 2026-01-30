@@ -1,14 +1,10 @@
 package com.example.appenglish.service;
 
 
-import com.example.appenglish.entity.Role;
-import com.example.appenglish.entity.User;
+import com.example.appenglish.entity.*;
 import com.example.appenglish.modules.auth.dto.RegisterRequest;
-import com.example.appenglish.repository.RoleRepository;
-import com.example.appenglish.repository.UserRepository;
+import com.example.appenglish.repository.*;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Lazy;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
@@ -28,6 +24,10 @@ public class UserDetailsServiceImpl implements UserDetailsService {
     private final UserRepository userRepository;
     private final PasswordEncoder  passwordEncoder;
     private final RoleRepository roleRepository;
+    private final UserProfileRepository userProfileRepository;
+    private final XpRepository xpRepository;
+    private final FaceIdRepository faceIdRepository;
+
     @Override
     @Transactional(readOnly = true)
     public UserDetails loadUserByUsername(String email) throws UsernameNotFoundException {
@@ -85,6 +85,30 @@ public class UserDetailsServiceImpl implements UserDetailsService {
         newUser.setProvider(User.AuthProvider.LOCAL);
 
         userRepository.save(newUser);
+
+        UserProfile profile = new UserProfile();
+        profile.setUser(newUser);
+
+        // Set level with default value if not provided
+        String levelSelection = req.getLevelSelection();
+        if (levelSelection == null || levelSelection.trim().isEmpty()) {
+            levelSelection = "Beginner"; // Default level
+        }
+        profile.setLevel(UserProfile.Level.valueOf(levelSelection));
+        profile.setLearningGoal(req.getLearningGoal());
+        profile.setCurrentStreak(0);
+        userProfileRepository.save(profile);
+
+        XPLog xpLog = new XPLog();
+        xpLog.setUser(newUser);
+
+        xpRepository.save(xpLog);
+
+        FaceVerificationLog faceVerificationLog = new FaceVerificationLog();
+        faceVerificationLog.setUser(newUser);
+
+        faceIdRepository .save(faceVerificationLog);
+
         return true;
     }
 

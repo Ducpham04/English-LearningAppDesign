@@ -35,6 +35,11 @@ public class UserProfile extends BaseEntity {
     @Column(name ="level")
     private Level  level;
 
+    @Column(name = "current_streak", columnDefinition = "integer default 0")
+    private Integer currentStreak = 0;
+
+    @Column(name = "last_activity_date")
+    private LocalDate lastActivityDate;
     public enum Level {Beginner,Elementary, Intermediate, Upper_Intermediate , Advanced ,Proficient}
 
 }

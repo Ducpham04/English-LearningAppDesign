@@ -20,4 +20,7 @@ public class RegisterRequest {
 
     @NotBlank (message = "Vai trò không được để trống")
     private String  role ;
+
+    private String learningGoal ;
+    private String levelSelection ;
 }

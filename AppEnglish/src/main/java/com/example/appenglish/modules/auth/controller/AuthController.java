@@ -3,14 +3,12 @@ package com.example.appenglish.modules.auth.controller;
 import com.example.appenglish.common.dto.BaseResponse;
 import com.example.appenglish.modules.auth.dto.*;
 import com.example.appenglish.modules.auth.service.AuthService;
-import com.example.appenglish.security.JwtUtils;
 import com.example.appenglish.service.UserDetailsServiceImpl;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
@@ -23,8 +21,6 @@ import java.util.List;
 public class AuthController {
 
     private final AuthService authService;
-    private final AuthenticationManager authenticationManager;
-    private final JwtUtils jwtUtils;
     private final UserDetailsServiceImpl userDetailsServiceImpl;
 
     // ========================= LOGIN =========================
@@ -143,7 +139,7 @@ public class AuthController {
 
     // ========================= REGISTER =========================
     @PostMapping("/register/local")
-    public ResponseEntity<BaseResponse<String>> registerLocal(
+    public ResponseEntity<BaseResponse<RegisterResponse>> registerLocal(
             @Valid @RequestBody RegisterRequest req,
             HttpServletRequest httpReq) {
 
@@ -160,14 +156,35 @@ public class AuthController {
                     );
         }
 
-        return ResponseEntity.status(HttpStatus.CREATED)
-                .body(
-                        BaseResponse.ok(
-                                null,
-                                "Đăng ký thành công",
-                                httpReq.getRequestURI()
-                        )
-                );
+        // After successful registration, authenticate the new user to generate tokens and user data
+        try {
+            // Reuse authService.login to authenticate and produce LoginResponse
+            LoginResponse loginData = authService.login(req.getEmail(), req.getPassword());
+
+            RegisterResponse resp = RegisterResponse.builder()
+                    .user(loginData.getUser())
+                    .token(loginData.getToken())
+                    .refreshToken(loginData.getRefreshToken())
+                    .build();
+
+            return ResponseEntity.status(HttpStatus.CREATED)
+                    .body(
+                            BaseResponse.ok(
+                                    resp,
+                                    "Registration successful",
+                                    httpReq.getRequestURI()
+                            )
+                    );
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(
+                            BaseResponse.error(
+                                    "Registration succeeded but failed to generate token",
+                                    "TOKEN_GENERATION_FAILED",
+                                    httpReq.getRequestURI()
+                            )
+                    );
+        }
     }
 
     // ========================= GET ALL USERS =========================
