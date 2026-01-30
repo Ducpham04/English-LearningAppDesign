@@ -5,6 +5,7 @@ import com.example.appenglish.entity.Role;
 import com.example.appenglish.entity.User;
 import com.example.appenglish.modules.auth.dto.RegisterRequest;
 import com.example.appenglish.repository.RoleRepository;
+import com.example.appenglish.repository.UserProfileRepository;
 import com.example.appenglish.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -28,6 +29,7 @@ public class UserDetailsServiceImpl implements UserDetailsService {
     private final UserRepository userRepository;
     private final PasswordEncoder  passwordEncoder;
     private final RoleRepository roleRepository;
+    private final UserProfileRepository userProfileRepository;
     @Override
     @Transactional(readOnly = true)
     public UserDetails loadUserByUsername(String email) throws UsernameNotFoundException {
@@ -85,6 +87,8 @@ public class UserDetailsServiceImpl implements UserDetailsService {
         newUser.setProvider(User.AuthProvider.LOCAL);
 
         userRepository.save(newUser);
+
+
         return true;
     }
 
