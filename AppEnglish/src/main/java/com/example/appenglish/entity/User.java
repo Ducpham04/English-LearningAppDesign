@@ -46,6 +46,7 @@ public class User extends BaseEntity {
     private AuthProvider provider; // LOCAL, GOOGLE, FACEBOOK
 
     public enum AuthProvider { LOCAL, GOOGLE, FACEBOOK }
+
     @Column(name = "provider_id")
     private String providerId; // ID trả về từ Google/FB
 
