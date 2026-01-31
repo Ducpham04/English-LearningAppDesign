@@ -12,6 +12,6 @@ import java.util.Optional;
 public interface LessonVideoRepository extends JpaRepository<LessonVideo, Long> {
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @Query("select lv from LessonVideo lv where lv.lessonId = :lessonId")
+    @Query("select lv from LessonVideo lv where lv.lesson.id = :lessonId")
     Optional<LessonVideo> findByLessonIdForUpdate(@Param("lessonId") Long lessonId);
 }

@@ -1,9 +1,6 @@
 package com.example.appenglish.entity;
 
-<<<<<<< HEAD:AppEnglish/src/main/java/com/example/AppEnglish/entity/AiMessage.java
 import com.example.appenglish.enums.SenderRole;
-=======
->>>>>>> origin/develop:AppEnglish/src/main/java/com/example/appenglish/entity/AIMessage.java
 import io.hypersistence.utils.hibernate.type.json.JsonType;
 import jakarta.persistence.*;
 import lombok.*;
@@ -22,6 +19,9 @@ import java.util.Map;
         @Index(name = "idx_ai_msg_user", columnList = "user_id")
 })
 @Getter @Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
 public class AIMessage extends BaseEntity {
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -41,11 +41,4 @@ public class AIMessage extends BaseEntity {
     @Type(JsonType.class)
     @Column(columnDefinition = "jsonb")
     private Map<String, Object> metadata; // { "tokens": 150, "model": "gpt-4" }
-<<<<<<< HEAD:AppEnglish/src/main/java/com/example/AppEnglish/entity/AiMessage.java
 }
-=======
-}
-
-enum SenderRole { USER, AI }
-
->>>>>>> origin/develop:AppEnglish/src/main/java/com/example/appenglish/entity/AIMessage.java

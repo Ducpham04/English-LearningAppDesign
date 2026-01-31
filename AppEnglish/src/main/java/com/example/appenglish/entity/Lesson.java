@@ -55,13 +55,13 @@ public class Lesson extends BaseEntity {
     @OneToOne(mappedBy = "lesson", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private LessonVideo video;
 
-<<<<<<< HEAD:AppEnglish/src/main/java/com/example/AppEnglish/entity/Lesson.java
     // Kết nối với bài kiểm tra nếu type là QUIZ
     @OneToOne(mappedBy = "lesson", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private Test test;
-=======
+
+    // Kết nối với danh sách từ vựng nếu type là VOCAB
     @OneToMany(mappedBy = "lesson", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("orderIndex ASC")
+    @Builder.Default
     private List<LessonVocabulary> lessonVocabularies = new ArrayList<>();
->>>>>>> origin/develop:AppEnglish/src/main/java/com/example/appenglish/entity/Lesson.java
 }

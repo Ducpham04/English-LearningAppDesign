@@ -55,6 +55,7 @@ public class LessonVideoTranscriptPersistenceService {
 
         lessonVideo.setVideoUrl(s3Uri);
 
+        // Convert DTO List to Map List for JSONB storage
         List<Map<String, Object>> transcriptJson = new ArrayList<>(sentences != null ? sentences.size() : 0);
         if (sentences != null) {
             for (TranscriptSentence s : sentences) {
@@ -67,7 +68,6 @@ public class LessonVideoTranscriptPersistenceService {
         }
 
         lessonVideo.setTranscriptJson(transcriptJson);
-
         log.info("Saved transcript: lessonId={}, sentences={}", lessonId, transcriptJson.size());
     }
 
@@ -75,6 +75,7 @@ public class LessonVideoTranscriptPersistenceService {
     public void markFailed(Long lessonId, String youtubeUrl, String s3Uri, String reason) {
         LessonVideo lessonVideo = getOrCreateLessonVideoLocked(lessonId);
 
+        // Nếu đã có transcript rồi thì không đánh dấu failed nữa
         if (lessonVideo.getTranscriptJson() != null && !lessonVideo.getTranscriptJson().isEmpty()) {
             log.info("Skip markFailed: transcript already exists for lessonId={}", lessonId);
             return;
@@ -87,29 +88,30 @@ public class LessonVideoTranscriptPersistenceService {
     }
 
     private LessonVideo getOrCreateLessonVideoLocked(Long lessonId) {
+        // 1. Kiểm tra Lesson tồn tại
         Lesson lesson = lessonRepository.findById(lessonId)
                 .orElseThrow(() -> new ApiException("Lesson not found", "LESSON_NOT_FOUND"));
 
-        // 1) Fast path: lock existing row
+        // 2. Fast path: Thử lấy và khóa record hiện có
         var existing = lessonVideoRepository.findByLessonIdForUpdate(lessonId);
         if (existing.isPresent()) {
             return existing.get();
         }
 
-        // 2) Create path: insert without holding a detached instance around, then lock
-        // NOTE: saveAndFlush + later re-select can lead to stale/detached merge issues under retries.
+        // 3. Create path: Tạo mới nếu chưa có
         try {
             LessonVideo lv = new LessonVideo();
             lv.setLesson(lesson);
-            // @MapsId will copy lesson.id into lessonId when persisted
-            lessonVideoRepository.save(lv);
-            lessonVideoRepository.flush();
+            // Default empty json to avoid null pointers if needed, or leave null
+            lv.setVideoUrl(""); 
+            
+            lessonVideoRepository.saveAndFlush(lv);
         } catch (DataIntegrityViolationException e) {
-            // Another concurrent transaction inserted it first
+            // Đã có transaction khác tạo rồi
             log.info("LessonVideo already created concurrently for lessonId={}, will re-lock", lessonId);
         }
 
-        // Always re-read with the pessimistic lock as the single source of truth
+        // 4. Luôn đọc lại với khóa Pessimistic để đảm bảo nhất quán
         return lessonVideoRepository.findByLessonIdForUpdate(lessonId)
                 .orElseThrow(() -> new ApiException("Failed to create lesson video", "LESSON_VIDEO_CREATE_FAILED"));
     }

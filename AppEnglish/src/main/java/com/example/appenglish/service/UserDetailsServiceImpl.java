@@ -1,14 +1,12 @@
 package com.example.appenglish.service;
 
-
 import com.example.appenglish.entity.Role;
 import com.example.appenglish.entity.User;
+import com.example.appenglish.enums.AuthProvider;
 import com.example.appenglish.modules.auth.dto.RegisterRequest;
 import com.example.appenglish.repository.RoleRepository;
 import com.example.appenglish.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Lazy;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
@@ -26,8 +24,9 @@ import java.util.Set;
 public class UserDetailsServiceImpl implements UserDetailsService {
 
     private final UserRepository userRepository;
-    private final PasswordEncoder  passwordEncoder;
+    private final PasswordEncoder passwordEncoder;
     private final RoleRepository roleRepository;
+
     @Override
     @Transactional(readOnly = true)
     public UserDetails loadUserByUsername(String email) throws UsernameNotFoundException {
@@ -35,11 +34,17 @@ public class UserDetailsServiceImpl implements UserDetailsService {
                 .orElseThrow(() -> new UsernameNotFoundException("User not found: " + email));
 
         Set<SimpleGrantedAuthority> authorities = new HashSet<>();
+        
+        // Thêm Role vào Authority
         if (user.getRole() != null && user.getRole().getName() != null) {
             authorities.add(new SimpleGrantedAuthority("ROLE_" + user.getRole().getName()));
         }
+        
+        // Thêm Permissions vào Authority (Nếu Role có Permissions)
         if (user.getRole() != null && user.getRole().getPermissions() != null) {
-            user.getRole().getPermissions().forEach(p -> authorities.add(new SimpleGrantedAuthority(p.getCode())));
+            user.getRole().getPermissions().forEach(p -> 
+                authorities.add(new SimpleGrantedAuthority(p.getCode()))
+            );
         }
 
         return org.springframework.security.core.userdetails.User
@@ -49,10 +54,8 @@ public class UserDetailsServiceImpl implements UserDetailsService {
                 .build();
     }
 
-    // Sửa kiểu trả về từ void -> boolean
     @Transactional
     public boolean register(RegisterRequest req) {
-
         if (userRepository.existsByEmail(req.getEmail())) {
             return false;
         }
@@ -68,31 +71,28 @@ public class UserDetailsServiceImpl implements UserDetailsService {
         } else if ("TEACHER".equalsIgnoreCase(req.getRole())) {
             roleName = "TEACHER";
         } else {
-            return false;
+            return false; // Role không hợp lệ
         }
 
-        // 2. LẤY ROLE TỪ DB (KHÔNG new)
+        // 2. Lấy Role từ DB
         Role role = roleRepository.findByName(roleName)
-                .orElseThrow(() ->
-                        new RuntimeException("Role not found in DB: " + roleName)
-                );
+                .orElseThrow(() -> new RuntimeException("Role not found in DB: " + roleName));
+
         // 3. Tạo user
         User newUser = new User();
         newUser.setEmail(req.getEmail());
         newUser.setFullName(req.getFullName());
         newUser.setPasswordHash(passwordEncoder.encode(req.getPassword()));
         newUser.setRole(role);
-        newUser.setProvider(User.AuthProvider.LOCAL);
+        
+        // SỬA TẠI ĐÂY: Dùng AuthProvider.LOCAL thay vì User.AuthProvider.LOCAL
+        newUser.setProvider(AuthProvider.LOCAL);
 
         userRepository.save(newUser);
         return true;
     }
 
-
     public List<User> getUsers() {
         return userRepository.findAll();
     }
-
-
 }
-

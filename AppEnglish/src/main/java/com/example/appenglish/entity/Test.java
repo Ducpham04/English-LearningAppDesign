@@ -2,6 +2,7 @@ package com.example.appenglish.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+import java.util.List;
 
 @Entity
 @Table(name = "tests", indexes = {
@@ -9,6 +10,8 @@ import lombok.*;
         @Index(name = "idx_test_lesson", columnList = "lesson_id")
 })
 @Getter @Setter
+@NoArgsConstructor @AllArgsConstructor
+@Builder
 public class Test extends BaseEntity {
     private String title;
     private Integer duration; // Phút (null = không giới hạn)
@@ -26,4 +29,8 @@ public class Test extends BaseEntity {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "lesson_id")
     private Lesson lesson;
+
+    // SỬA: Thêm quan hệ này để Service có thể lấy danh sách câu hỏi
+    @OneToMany(mappedBy = "test", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    private List<Question> questions;
 }

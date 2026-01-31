@@ -1,56 +1,63 @@
 version: '3.8'
+
 services:
-  # --- Dịch vụ 1 : Database (PostgreSQL) ---
-    db:
-        image: postgres:16-alpine
-        container_name : lms_postgres
-        ports:
-          - "5433:5432"
-        environment:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB : learning_english
-        volumes:
-          - postgres_data:/var/lib/postgresql/data # nơi lưu trữ dữ liệu vĩnh viễn
-        restart: always                             # Tự động khởi động lại nếu bị crash
-        # --- Dịch vụ 2 : Cache (Redis ---)
+  # --- Database (PostgreSQL) ---
+  db:
+    image: postgres:16-alpine
+    container_name: lms_postgres
+    ports:
+      - "5433:5432" # Map port 5433 trên máy host vào 5432 của container
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: learning_english
+    volumes:
+      - postgres_data:/var/lib/postgresql/data # Lưu trữ dữ liệu vĩnh viễn
+    restart: always
 
-    redis:
-      image: redis:7-alpine
-      container_name: lms_redis
-      ports:
-        - "6379:6379"
-      restart: always
+  # --- Cache (Redis) ---
+  redis:
+    image: redis:7-alpine
+    container_name: lms_redis
+    ports:
+      - "6379:6379" # Port mặc định cho Redis
+    restart: always
 
-    zookeeper:
-      image: confluentinc/cp-zookeeper:7.5.0
-      environment:
-        ZOOKEEPER_CLIENT_PORT: 2181
-        ZOOKEEPER_TICK_TIME: 2000
-      ports:
-        - "2181:2181"
+  # --- Message Broker (Kafka & Zookeeper) ---
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    container_name: lms_zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
 
-    kafka:
-      image: confluentinc/cp-kafka:7.5.0
-      depends_on:
-        - zookeeper
-      ports:
-        - "9092:9092" # host access
-      environment:
-        KAFKA_BROKER_ID: 1
-        KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-        KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:29092,PLAINTEXT_HOST://0.0.0.0:9092
-        KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
-        KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
-        KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
-        KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: lms_kafka
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092" # Port để ứng dụng Spring Boot bên ngoài kết nối vào
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      # PLAINTEXT cho nội bộ docker, PLAINTEXT_HOST cho ứng dụng chạy từ localhost
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:29092,PLAINTEXT_HOST://0.0.0.0:9092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
 
-    ytdlp:
-      image: alpine:3.20
-      container_name: langmaster-ytdlp
-      command: [ "sh", "-c", "set -e; apk add --no-cache python3 py3-pip py3-virtualenv ffmpeg ca-certificates >/dev/null 2>&1; python3 -m venv /opt/venv; /opt/venv/bin/pip install --no-cache-dir -U pip yt-dlp; /opt/venv/bin/yt-dlp --version; tail -f /dev/null" ]
-      volumes:
-        - ./temp/youtube-audio:/data
+  # --- Media Downloader (yt-dlp) ---
+  ytdlp:
+    image: alpine:3.20
+    container_name: langmaster-ytdlp
+    # Cài đặt yt-dlp và các phụ thuộc cần thiết để xử lý âm thanh/video
+    command: [ "sh", "-c", "set -e; apk add --no-cache python3 py3-pip py3-virtualenv ffmpeg ca-certificates >/dev/null 2>&1; python3 -m venv /opt/venv; /opt/venv/bin/pip install --no-cache-dir -U pip yt-dlp; /opt/venv/bin/yt-dlp --version; tail -f /dev/null" ]
+    volumes:
+      - ./temp/youtube-audio:/data # Đồng bộ dữ liệu tải về với thư mục tạm của app
 
 volumes:
-    postgres_data:
+  postgres_data: # Khai báo volume cho PostgreSQL

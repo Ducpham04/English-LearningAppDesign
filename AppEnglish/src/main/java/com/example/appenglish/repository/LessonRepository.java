@@ -1,7 +1,6 @@
 package com.example.appenglish.repository;
 
 import com.example.appenglish.entity.Lesson;
-<<<<<<< HEAD
 import com.example.appenglish.enums.LessonType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -71,10 +70,3 @@ public interface LessonRepository extends JpaRepository<Lesson, Long> {
     @Query("SELECT l FROM Lesson l WHERE l.session.id = :sessionId AND l.orderIndex = :orderIndex")
     Optional<Lesson> findBySessionIdAndOrderIndex(@Param("sessionId") Long sessionId, @Param("orderIndex") Integer orderIndex);
 }
-=======
-import org.springframework.data.jpa.repository.JpaRepository;
-
-public interface LessonRepository extends JpaRepository<Lesson, Long> {
-}
-
->>>>>>> origin/develop

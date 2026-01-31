@@ -23,8 +23,8 @@ import java.util.Arrays;
 import java.util.List;
 
 @Configuration
-@EnableWebSecurity // Kích hoạt tính năng bảo mật web
-@EnableMethodSecurity // Cho phép dùng @PreAuthorize ở Controller
+@EnableWebSecurity
+@EnableMethodSecurity
 @RequiredArgsConstructor
 public class SecurityConfig {
 
@@ -33,30 +33,21 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-                // 1. Tắt CSRF vì chúng ta dùng Token (Stateless), không dùng Cookie/Session
+                // 1. Tắt CSRF vì dùng Token (Stateless)
                 .csrf(csrf -> csrf.disable())
-<<<<<<< HEAD
-                
-                // 2. Cấu hình CORS để các ứng dụng khác (React, Vue, Mobile) gọi được API
-                .cors(Customizer.withDefaults()) 
-=======
-                .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .authorizeHttpRequests(auth -> auth
-                        // Auth
-                        .requestMatchers("/v1/auth/**",
-                                    "/v1/auth/register/**",
-                                "/v1/users/**").permitAll()
->>>>>>> origin/develop
 
-                // 3. Cấu hình Stateless (Không lưu trạng thái người dùng trên server)
+                // 2. Cấu hình CORS
+                .cors(Customizer.withDefaults())
+
+                // 3. Cấu hình Stateless (Không lưu session)
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                
-                // 4. Phân quyền đường dẫn
+
+                // 4. Phân quyền đường dẫn (Hợp nhất từ cả 2 nhánh)
                 .authorizeHttpRequests(auth -> auth
-                        // Cho phép truy cập công khai các API Auth (Login, Register)
-                        .requestMatchers("/api/auth/**").permitAll()
+                        // Các API Auth công khai (bao gồm cả chuẩn /api/auth và /v1/auth để tránh lỗi 403)
+                        .requestMatchers("/api/auth/**", "/v1/auth/**", "/v1/users/**").permitAll()
                         
-                        // Cho phép truy cập Swagger để xem tài liệu API
+                        // Swagger UI
                         .requestMatchers(
                                 "/v3/api-docs/**",
                                 "/swagger-ui/**",
@@ -64,25 +55,24 @@ public class SecurityConfig {
                                 "/webjars/**"
                         ).permitAll()
 
-                        // Các API còn lại bắt buộc phải có Token hợp lệ
+                        // Các API còn lại phải xác thực
                         .anyRequest().authenticated()
                 );
 
-        // 5. Thêm Filter kiểm tra JWT trước khi đến bước xác thực User mặc định
+        // 5. Thêm Filter JWT
         http.addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
-        
+
         return http.build();
     }
 
-<<<<<<< HEAD
-    // Cấu hình CORS: Cho phép Frontend truy cập vào API từ các Domain khác nhau
+    // Cấu hình CORS: Cho phép Frontend truy cập
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(List.of("*")); // Trong thực tế nên thay "*" bằng domain của Frontend
+        configuration.setAllowedOrigins(List.of("*")); // Lưu ý: Nên đổi "*" thành domain cụ thể khi deploy production
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type", "Cache-Control"));
-        
+
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
         return source;
@@ -98,10 +88,3 @@ public class SecurityConfig {
         return new BCryptPasswordEncoder();
     }
 }
-=======
-
-
-
-}
-
->>>>>>> origin/develop

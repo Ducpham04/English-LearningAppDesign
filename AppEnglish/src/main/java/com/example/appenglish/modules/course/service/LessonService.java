@@ -42,20 +42,23 @@ public class LessonService {
             Test test = lesson.getTest();
             response.setQuizId(test.getId()); // quizID liên quan
 
-            // Nếu đúng type là QUIZ thì mới lấy danh sách câu hỏi
+            // Nếu đúng type là QUIZ thì mới lấy danh sách câu hỏi chi tiết
             if (lesson.getType() == LessonType.QUIZ) {
-                response.setQuestions(test.getQuestions().stream()
-                    .map(q -> LessonDetailsResponse.QuestionResponse.builder()
-                        .id(q.getId())
-                        .content(q.getContent())
-                        .options(q.getOptions().stream()
-                            .map(o -> LessonDetailsResponse.OptionResponse.builder()
-                                .id(o.getId())
-                                .content(o.getContent())
-                                .build())
-                            .collect(Collectors.toList()))
-                        .build())
-                    .collect(Collectors.toList()));
+                // Lưu ý: Cần đảm bảo Test entity có list questions và Question entity có list options
+                if (test.getQuestions() != null) {
+                    response.setQuestions(test.getQuestions().stream()
+                            .map(q -> LessonDetailsResponse.QuestionResponse.builder()
+                                    .id(q.getId())
+                                    .content(q.getContent())
+                                    .options(q.getOptions() != null ? q.getOptions().stream()
+                                            .map(o -> LessonDetailsResponse.OptionResponse.builder()
+                                                    .id(o.getId())
+                                                    .content(o.getContent())
+                                                    .build())
+                                            .collect(Collectors.toList()) : new ArrayList<>())
+                                    .build())
+                            .collect(Collectors.toList()));
+                }
             }
         }
 
@@ -74,19 +77,25 @@ public class LessonService {
         if (test == null) throw new RuntimeException("Bài học không có Quiz đi kèm");
 
         List<Question> questions = test.getQuestions();
+        if (questions == null) questions = new ArrayList<>();
+        
         int correctCount = 0;
 
         for (Question q : questions) {
             Long selectedId = userAnswers.get(q.getId());
-            boolean isCorrect = q.getOptions().stream()
-                    .anyMatch(o -> o.getId().equals(selectedId) && Boolean.TRUE.equals(o.getIsCorrect()));
-            if (isCorrect) correctCount++;
+            // Kiểm tra null safe cho options
+            if (q.getOptions() != null) {
+                boolean isCorrect = q.getOptions().stream()
+                        .anyMatch(o -> o.getId().equals(selectedId) && Boolean.TRUE.equals(o.getIsCorrect()));
+                if (isCorrect) correctCount++;
+            }
         }
 
         double score = questions.isEmpty() ? 0 : (double) correctCount / questions.size() * 10;
 
         // Lưu lịch sử (ID của TestAttempt cũng tự tăng từ 1)
-        User user = userRepository.findById(userId).orElseThrow();
+        User user = userRepository.findById(userId).orElseThrow(() -> new RuntimeException("User not found"));
+        
         TestAttempt attempt = TestAttempt.builder()
                 .test(test)
                 .user(user)
@@ -100,7 +109,7 @@ public class LessonService {
         result.put("quizId", test.getId());
         result.put("score", Math.round(score * 100.0) / 100.0);
         result.put("correctCount", correctCount);
-        result.put("passed", score >= 5.0);
+        result.put("passed", score >= 5.0); // Ví dụ điểm sàn là 5
 
         return result;
     }
