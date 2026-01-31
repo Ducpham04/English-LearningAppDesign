@@ -1,9 +1,12 @@
 package com.example.appenglish.modules.vocabulary.service;
 
+import com.example.appenglish.entity.Lesson;
+import com.example.appenglish.entity.LessonVocabulary;
 import com.example.appenglish.entity.UserVocabularyProgress;
 import com.example.appenglish.entity.Vocabulary;
 import com.example.appenglish.modules.vocabulary.dto.VocabularyRequest;
 import com.example.appenglish.modules.vocabulary.dto.VocabularyResponse;
+import com.example.appenglish.repository.LessonRepository;
 import com.example.appenglish.repository.UserVocabularyProgressRepository;
 import com.example.appenglish.repository.VocabularyRepository;
 import lombok.RequiredArgsConstructor;
@@ -17,7 +20,8 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 /**
- * Service xử lý logic cho Vocabulary - Đã lược bỏ userId.
+ * Service xử lý logic cho Vocabulary.
+ * Hỗ trợ Teacher tạo từ vựng và gắn vào Lesson để Student ôn tập.
  */
 @Service
 @RequiredArgsConstructor
@@ -25,40 +29,58 @@ public class VocabularyService {
 
     private final VocabularyRepository repository;
     private final UserVocabularyProgressRepository userVocabProgressRepository;
+    private final LessonRepository lessonRepository;
 
     /**
      * Lấy danh sách từ vựng tích hợp Search (word), Filter (level) và Phân trang.
-     * Tự động hiển thị ID (vocabId) trong kết quả trả về.
      */
     public Page<VocabularyResponse> getAll(String word, String level, Pageable pageable) {
-    // Chỉ nhận 3 tham số
-    return repository.findWithFilters(word, level, pageable)
-            .map(this::toResponse);
-}
+        return repository.findWithFilters(word, level, pageable)
+                .map(this::toResponse);
+    }
 
     /**
-     * Tạo mới từ vựng. 
-     * ID được sinh tự động bởi Database (1, 2, 3...)
+     * Tạo mới từ vựng và tự động liên kết với Bài học (Lesson).
+     * Khi Teacher post từ vựng kèm lessonId, từ này sẽ xuất hiện trong luồng học của Student.
      */
     @Transactional
     public VocabularyResponse create(VocabularyRequest req) {
+        // 1. Tạo và lưu Entity Vocabulary
         Vocabulary v = Vocabulary.builder()
                 .word(req.getWord())
                 .phonetic(req.getPhonetic())
                 .definition(req.getDefinition())
                 .example(req.getExample())
                 .level(req.getLevel())
-                // Tuyệt đối không gọi .userId() ở đây
                 .build();
         
-        return toResponse(repository.save(v));
+        Vocabulary savedVocab = repository.save(v);
+
+        // 2. Logic kết nối: Nếu có lessonId, tạo bản ghi trong bảng liên kết LessonVocabulary
+        if (req.getLessonId() != null) {
+            Lesson lesson = lessonRepository.findById(req.getLessonId())
+                    .orElseThrow(() -> new RuntimeException("Không tìm thấy bài học với ID: " + req.getLessonId()));
+            
+            // Khởi tạo mối quan hệ Lesson - Vocabulary
+            LessonVocabulary link = new LessonVocabulary();
+            link.setLesson(lesson);
+            link.setVocabulary(savedVocab);
+            
+            // Lưu liên kết (Đảm bảo thực thể Lesson có Cascade hoặc lưu qua Repository liên kết nếu có)
+            lesson.getLessonVocabularies().add(link);
+            lessonRepository.save(lesson);
+        }
+        
+        return toResponse(savedVocab);
     }
 
     /**
-     * Lấy danh sách từ vựng cần ôn tập.
+     * Lấy danh sách từ vựng cần ôn tập dựa trên thuật toán Spaced Repetition (Lặp lại ngắt quãng).
+     * Student sẽ học những từ mà Teacher đã gán vào tiến trình của họ.
      */
     public List<VocabularyResponse> getReviewList(Long userId) {
         LocalDateTime now = LocalDateTime.now(); 
+        // Tìm các từ vựng đến hạn ôn tập của User cụ thể
         List<UserVocabularyProgress> dueForReview = userVocabProgressRepository.findDueForReview(userId, now);
 
         return dueForReview.stream()
@@ -67,18 +89,16 @@ public class VocabularyService {
     }
 
     /**
-     * Chuyển đổi Entity sang Response.
-     * ID lấy từ BaseEntity (tự tăng) sẽ được map vào DTO.
+     * Chuyển đổi Entity sang Response DTO.
      */
     private VocabularyResponse toResponse(Vocabulary v) {
         return VocabularyResponse.builder()
-                .id(v.getId()) // Trả về ID tự tăng (VocabId)
+                .id(v.getId()) 
                 .word(v.getWord())
                 .phonetic(v.getPhonetic())
                 .definition(v.getDefinition())
                 .example(v.getExample())
                 .level(v.getLevel())
-                // Đã xóa userId ở đây
                 .build();
     }
 }
