@@ -32,6 +32,12 @@ public class SecurityConfig {
                                     "/v1/auth/register/**",
                                 "/v1/users/**").permitAll()
 
+                        // Badge Check API public
+                        .requestMatchers("/api/badge/check/**").permitAll()
+
+                        // Badge Notification
+                        .requestMatchers("/api/notification/**").permitAll()
+
                         // Swagger
                         .requestMatchers(
                                 "/v3/api-docs/**",

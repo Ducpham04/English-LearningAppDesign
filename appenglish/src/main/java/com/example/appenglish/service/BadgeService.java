@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.Map;
+import java.util.Optional;
 
 @Service
 public class BadgeService {
@@ -30,7 +31,10 @@ public class BadgeService {
      */
     public void checkAndGrantBadge(User user, String criteria, Map<String, Object> userData) {
         // Tìm badge dựa trên điều kiện
-        Badge badge = badgeRepository.findByCriteria(criteria);
+        Optional<Badge> badgeOptional = badgeRepository.findByCriteria(criteria);
+        Badge badge = badgeOptional.orElseThrow(() ->
+                new IllegalArgumentException("Badge not found for criteria: " + criteria)
+        );
 
         if (badge == null) {
             throw new RuntimeException("Badge not found!");
@@ -76,13 +80,33 @@ public class BadgeService {
      * @return true nếu đạt điều kiện, false nếu không.
      */
     private boolean checkCondition(Map<String, Object> condition, Map<String, Object> userData) {
-        // Ví dụ: Kiểm tra streak của user
-        if (condition.containsKey("streak")) {
-            int requiredStreak = (int) condition.get("streak");
-            int userStreak = (int) userData.getOrDefault("streak", 0);
-            return userStreak >= requiredStreak;
+        // Xử lý trường hợp tiêu chí hoặc dữ liệu user bị null
+        if (condition == null || userData == null) {
+            System.out.println("Condition or userData is null!");
+            return false; // Điều kiện không đạt nếu null
         }
 
-        return false; // Mặc định không đạt nếu không triển khai điều kiện.
+        // Kiểm tra nội dung "streak"
+        if (condition.containsKey("streak")) {
+            Object streakCondition = condition.get("streak");
+            Object userStreakData = userData.get("streak");
+
+            // Xử lý nếu dữ liệu streak bị null
+            if (streakCondition == null || userStreakData == null) {
+                System.out.println("Condition streak or user streak is missing!");
+                return false;
+            }
+
+            try {
+                int requiredStreak = (int) streakCondition; // Cast an toàn
+                int userStreak = (int) userStreakData; // Cast an toàn
+                return userStreak >= requiredStreak;
+            } catch (ClassCastException e) {
+                System.out.println("Failed to cast streak data: " + e.getMessage());
+                return false;
+            }
+        }
+
+        return false; // Điều kiện không đạt mặc định.
     }
 }

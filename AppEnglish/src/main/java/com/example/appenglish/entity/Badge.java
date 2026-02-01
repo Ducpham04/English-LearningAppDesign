@@ -12,11 +12,14 @@ import java.util.Map;
 @Table(name = "badges")
 @Getter @Setter
 public class Badge extends BaseEntity {
-    private String name;
-    private String iconUrl;
+    private String name;// Tên huy hiệu
+    private String iconUrl;// URL của icon huy hiệu
+
+    // Thêm trường criteria để ánh xạ phương thức trong repository
+    private String criteria; // Tiêu chí phân loại huy hiệu (VD: "STREAK_7_DAYS")
 
     // JSONB: Điều kiện nhận huy hiệu { "streak": 7 }
     @Type(JsonType.class)
     @Column(columnDefinition = "jsonb")
-    private Map<String, Object> conditionRule;
+    private Map<String, Object> conditionRule;// Rule điều kiện nhận badge
 }
