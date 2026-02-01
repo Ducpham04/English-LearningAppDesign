@@ -1,12 +1,9 @@
 package com.example.appenglish.modules.vocabulary.service;
 
-import com.example.appenglish.entity.Lesson;
-import com.example.appenglish.entity.LessonVocabulary;
 import com.example.appenglish.entity.UserVocabularyProgress;
 import com.example.appenglish.entity.Vocabulary;
 import com.example.appenglish.modules.vocabulary.dto.VocabularyRequest;
 import com.example.appenglish.modules.vocabulary.dto.VocabularyResponse;
-import com.example.appenglish.repository.LessonRepository;
 import com.example.appenglish.repository.UserVocabularyProgressRepository;
 import com.example.appenglish.repository.VocabularyRepository;
 import lombok.RequiredArgsConstructor;
@@ -21,7 +18,7 @@ import java.util.stream.Collectors;
 
 /**
  * Service xử lý logic cho Vocabulary.
- * Hỗ trợ Teacher tạo từ vựng và gắn vào Lesson để Student ôn tập.
+ * Đã loại bỏ lessonId để tập trung vào quản lý kho từ vựng chung.
  */
 @Service
 @RequiredArgsConstructor
@@ -29,10 +26,9 @@ public class VocabularyService {
 
     private final VocabularyRepository repository;
     private final UserVocabularyProgressRepository userVocabProgressRepository;
-    private final LessonRepository lessonRepository;
 
     /**
-     * Lấy danh sách từ vựng tích hợp Search (word), Filter (level) và Phân trang.
+     * Lấy danh sách từ vựng tích hợp Search, Filter và Phân trang.
      */
     public Page<VocabularyResponse> getAll(String word, String level, Pageable pageable) {
         return repository.findWithFilters(word, level, pageable)
@@ -40,12 +36,11 @@ public class VocabularyService {
     }
 
     /**
-     * Tạo mới từ vựng và tự động liên kết với Bài học (Lesson).
-     * Khi Teacher post từ vựng kèm lessonId, từ này sẽ xuất hiện trong luồng học của Student.
+     * Tạo mới từ vựng vào kho chung.
+     * Đã lược bỏ toàn bộ logic liên kết với Lesson để tránh lỗi 500 khi test.
      */
     @Transactional
     public VocabularyResponse create(VocabularyRequest req) {
-        // 1. Tạo và lưu Entity Vocabulary
         Vocabulary v = Vocabulary.builder()
                 .word(req.getWord())
                 .phonetic(req.getPhonetic())
@@ -55,32 +50,15 @@ public class VocabularyService {
                 .build();
         
         Vocabulary savedVocab = repository.save(v);
-
-        // 2. Logic kết nối: Nếu có lessonId, tạo bản ghi trong bảng liên kết LessonVocabulary
-        if (req.getLessonId() != null) {
-            Lesson lesson = lessonRepository.findById(req.getLessonId())
-                    .orElseThrow(() -> new RuntimeException("Không tìm thấy bài học với ID: " + req.getLessonId()));
-            
-            // Khởi tạo mối quan hệ Lesson - Vocabulary
-            LessonVocabulary link = new LessonVocabulary();
-            link.setLesson(lesson);
-            link.setVocabulary(savedVocab);
-            
-            // Lưu liên kết (Đảm bảo thực thể Lesson có Cascade hoặc lưu qua Repository liên kết nếu có)
-            lesson.getLessonVocabularies().add(link);
-            lessonRepository.save(lesson);
-        }
         
         return toResponse(savedVocab);
     }
 
     /**
-     * Lấy danh sách từ vựng cần ôn tập dựa trên thuật toán Spaced Repetition (Lặp lại ngắt quãng).
-     * Student sẽ học những từ mà Teacher đã gán vào tiến trình của họ.
+     * Thuật toán Spaced Repetition (Giữ lại cho Student ôn tập sau này).
      */
     public List<VocabularyResponse> getReviewList(Long userId) {
         LocalDateTime now = LocalDateTime.now(); 
-        // Tìm các từ vựng đến hạn ôn tập của User cụ thể
         List<UserVocabularyProgress> dueForReview = userVocabProgressRepository.findDueForReview(userId, now);
 
         return dueForReview.stream()
@@ -88,9 +66,6 @@ public class VocabularyService {
                 .collect(Collectors.toList());
     }
 
-    /**
-     * Chuyển đổi Entity sang Response DTO.
-     */
     private VocabularyResponse toResponse(Vocabulary v) {
         return VocabularyResponse.builder()
                 .id(v.getId()) 

@@ -46,7 +46,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         // Các API Auth công khai (bao gồm cả chuẩn /api/auth và /v1/auth để tránh lỗi 403)
                         .requestMatchers("/api/auth/**", "/v1/auth/**", "/v1/users/**").permitAll()
-                        
+
                         // Swagger UI
                         .requestMatchers(
                                 "/v3/api-docs/**",
@@ -54,7 +54,8 @@ public class SecurityConfig {
                                 "/swagger-ui.html",
                                 "/webjars/**"
                         ).permitAll()
-
+                        .requestMatchers("/api/vocabularies/**").permitAll() 
+    .requestMatchers("/v3/api-docs/**", "/swagger-ui/**").permitAll()
                         // Các API còn lại phải xác thực
                         .anyRequest().authenticated()
                 );

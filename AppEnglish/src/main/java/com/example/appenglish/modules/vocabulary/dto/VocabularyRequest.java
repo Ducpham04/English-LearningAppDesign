@@ -11,18 +11,16 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class VocabularyRequest {
-    
-    @NotBlank(message = "Từ vựng không được để trống")
+    @NotBlank(message = "Word is required")
     private String word;
 
     private String phonetic;
 
-    @NotBlank(message = "Giải nghĩa không được để trống")
+    @NotBlank(message = "Definition is required")
     private String definition;
 
     private String example;
 
     private String level;
-
-    private Long lessonId;
+    // Đã xóa lessonId ở đây
 }
