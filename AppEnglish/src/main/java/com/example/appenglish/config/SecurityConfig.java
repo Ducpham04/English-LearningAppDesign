@@ -54,8 +54,6 @@ public class SecurityConfig {
                                 "/swagger-ui.html",
                                 "/webjars/**"
                         ).permitAll()
-                        .requestMatchers("/api/vocabularies/**").permitAll() 
-    .requestMatchers("/v3/api-docs/**", "/swagger-ui/**").permitAll()
                         // Các API còn lại phải xác thực
                         .anyRequest().authenticated()
                 );
