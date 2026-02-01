@@ -5,37 +5,33 @@ import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDateTime;
 
-/**
- * TRÁI TIM CỦA HỆ THỐNG SRS.
- * Lưu tiến độ học của 1 User với 1 Từ vựng.
- * Áp dụng thuật toán SuperMemo-2 (SM-2).
- */
 @Entity
 @Table(name = "user_vocabulary_progress")
-@Getter @Setter
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class UserVocabularyProgress {
 
     @EmbeddedId
-    private UserVocabId id; // Composite Key (User + Vocab)
+    private UserVocabId id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @MapsId("userId")
+    @MapsId("userId") // Khớp với biến trong UserVocabId
+    @JoinColumn(name = "user_id")
     private User user;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @MapsId("vocabId")
+    @MapsId("vocabularyId") // Khớp với biến trong UserVocabId
+    @JoinColumn(name = "vocabulary_id")
     private Vocabulary vocabulary;
 
     @Enumerated(EnumType.STRING)
-    private LearningStatus status; // NEW, LEARNING, MASTERED
+    private LearningStatus status;
 
-    // --- THUẬT TOÁN SM-2 ---
-    @Column(name = "easiness_factor")
-    private Double easinessFactor = 2.5; // Độ khó của từ (càng cao càng dễ)
+    @Builder.Default
+    private Integer reviewCount = 0;
 
-    @Column(name = "interval_days")
-    private Integer intervalDays = 0; // Số ngày chờ đến lần ôn tiếp
-
-    @Column(name = "next_review_at")
-    private LocalDateTime nextReviewAt; // Ngày giờ chính xác phải ôn tập
+    private LocalDateTime lastReviewedAt;
+    private LocalDateTime nextReviewAt;
 }

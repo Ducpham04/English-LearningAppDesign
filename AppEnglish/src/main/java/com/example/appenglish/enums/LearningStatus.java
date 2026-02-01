@@ -9,5 +9,7 @@ package com.example.appenglish.enums;
 public enum LearningStatus {
     NEW,
     LEARNING,
+    STARTED,
+    COMPLETED,
     MASTERED
 }

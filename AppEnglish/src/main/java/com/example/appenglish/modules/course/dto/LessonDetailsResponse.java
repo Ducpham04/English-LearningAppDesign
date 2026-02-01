@@ -3,6 +3,8 @@ package com.example.appenglish.modules.course.dto;
 import com.example.appenglish.enums.LessonType;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.*;
+
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 
@@ -10,64 +12,104 @@ import java.util.Map;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Schema(description = "Thông tin chi tiết bài học và các nội dung liên quan (Quiz/Video)")
 public class LessonDetailsResponse {
 
-    @Schema(description = "ID của bài học (tự tăng từ 1)", example = "1")
+    @Schema(example = "1")
     private Long lessonId;
 
-    @Schema(description = "Tiêu đề bài học", example = "Present Simple Tense")
-    private String title;
+    @Schema(example = "1")
+    private Long sessionId;
 
-    @Schema(description = "Loại bài học", example = "QUIZ")
-    private LessonType type;
-
-    @Schema(description = "Thứ tự bài học trong chương", example = "1")
-    private Integer orderIndex;
-    
-    // --- QUIZ INFO ---
-    
-    @Schema(description = "ID của bài Quiz đi kèm bài học này", example = "101")
+    @Schema(example = "101", description = "ID của bài tập đi kèm (nếu có)")
     private Long quizId;
 
-    @Schema(description = "Danh sách câu hỏi (chỉ có dữ liệu nếu type là QUIZ)")
+    @Schema(example = "Greetings & Introductions")
+    private String title;
+
+    @Schema(example = "video")
+    private LessonType type;
+
+    @Schema(example = "Learn basic greetings and how to introduce yourself")
+    private String description;
+
+    @Schema(example = "5", description = "Thời lượng ước tính (phút)")
+    private Integer duration;
+
+    @Schema(example = "completed")
+    private String status;
+
+    @Schema(example = "1")
+    private Integer order;
+
+    @Schema(example = "https://cdn.english-ai.com/videos/lesson1.mp4")
+    private String videoUrl;
+    
+    // --- Phần dành cho Video Lesson ---
+    private List<SubtitleResponse> subtitles;
+    
+    @Schema(example = "[\"hello\", \"my\", \"name\", \"is\"]")
+    private List<String> targetWords;
+
+    // --- Phần dành cho Quiz Lesson (Đáp án đúng đã bị ẩn) ---
+    @Schema(description = "Danh sách câu hỏi bài tập")
     private List<QuestionResponse> questions;
 
-    // --- PHẦN NỘI DUNG LINH HOẠT ---
+    // --- Phần tiến độ người dùng ---
+    @Schema(example = "70", description = "Điểm tối thiểu để hoàn thành")
+    private Integer minScore;
 
-    @Schema(
-        description = "Dữ liệu cấu hình linh hoạt (Metadata)",
-        example = "{ \"duration\": \"15m\", \"difficulty\": \"Easy\", \"vocab_count\": 12 }"
-    )
-    private Map<String, Object> metadata; 
+    @Schema(example = "85.5", description = "Điểm số cao nhất của người dùng")
+    private Double userScore;
 
-    @Schema(description = "Đường dẫn Video (chỉ có nếu type là VIDEO)", example = "https://youtube.com/watch?v=abc")
-    private String videoUrl;
+    private LocalDateTime completedAt;
+    
+    private Map<String, Object> metadata;
 
-    // --- INNER DTOs ---
+    // --- Inner Classes dành cho Subtitles ---
 
     @Data
     @Builder
-    @Schema(description = "Thông tin câu hỏi")
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class SubtitleResponse {
+        private String id;
+        private String text;
+        private Double startTime;
+        private Double endTime;
+        private List<WordDetail> words;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class WordDetail {
+        private String text;
+        private Double startTime;
+        private Double endTime;
+        private String pronunciation;
+        private String meaning;
+    }
+
+    // --- Inner Classes dành cho Quiz (Bảo mật cao) ---
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
     public static class QuestionResponse {
-        @Schema(description = "ID câu hỏi (tự tăng)", example = "1")
         private Long id;
-
-        @Schema(description = "Nội dung câu hỏi", example = "What is the capital of France?")
         private String content;
-
-        @Schema(description = "Danh sách các lựa chọn trả lời")
         private List<OptionResponse> options;
     }
 
     @Data
     @Builder
-    @Schema(description = "Thông tin lựa chọn trả lời")
+    @NoArgsConstructor
+    @AllArgsConstructor
     public static class OptionResponse {
-        @Schema(description = "ID lựa chọn (tự tăng)", example = "1")
         private Long id;
-
-        @Schema(description = "Nội dung lựa chọn", example = "Paris")
+        @Schema(example = "Hello")
         private String content;
     }
 }

@@ -8,9 +8,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-/**
- * Controller cho Classroom API.
- */
 @RestController
 @RequestMapping("/api/classrooms")
 @RequiredArgsConstructor
@@ -19,21 +16,22 @@ public class ClassroomController {
 
     private final ClassroomService classroomService;
 
-    /**
-     * Lấy chi tiết lớp học với tính toán % tiến độ.
-     */
     @GetMapping("/{id}")
-    @Operation()
+    @Operation(summary = "Get class details and overall completion progress")
     public ResponseEntity<ClassroomResponse> getClassDetails(@PathVariable Long id) {
-        ClassroomResponse response = classroomService.getClassDetails(id);
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(classroomService.getClassDetails(id));
     }
 
-    /**
-     * Cập nhật trạng thái hoàn thành cho học viên trong lớp.
-     */
+    @GetMapping("/{id}/progress")
+    @Operation(summary = "Get specific learning progress for a student in a class")
+    public ResponseEntity<Double> getLearningProgress(
+            @PathVariable Long id,
+            @RequestParam Long userId) {
+        return ResponseEntity.ok(classroomService.calculateLearningProgress(userId, id));
+    }
+
     @PutMapping("/{classId}/students/{studentId}/complete")
-    @Operation()
+    @Operation(summary = "Update student completion status for the entire class")
     public ResponseEntity<Void> updateStudentCompletion(
             @PathVariable Long classId,
             @PathVariable Long studentId,

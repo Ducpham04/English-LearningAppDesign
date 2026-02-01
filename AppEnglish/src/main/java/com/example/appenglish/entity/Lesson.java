@@ -7,26 +7,30 @@ import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 /**
  * Bài học (Micro-learning).
- * ĐIỂM ĐẶC BIỆT: Trường contentPayload (JSONB).
- * Lưu cấu hình linh hoạt cho từng loại bài học.
  */
 @Entity
 @Table(name = "lessons", indexes = {
     @Index(name = "idx_lesson_type", columnList = "type"),
     @Index(name = "idx_lesson_session", columnList = "session_id")
 })
-@Getter @Setter
-@NoArgsConstructor @AllArgsConstructor
+@Getter 
+@Setter
+@NoArgsConstructor 
+@AllArgsConstructor
 @Builder
 public class Lesson extends BaseEntity {
 
     @Column(nullable = false)
     private String title;
+
+    @Column(columnDefinition = "TEXT")
+    private String description; // Fix lỗi undefined getDescription()
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "course_id")
@@ -37,31 +41,40 @@ public class Lesson extends BaseEntity {
     private LessonType type; // VIDEO, QUIZ, VOCAB, SPEAKING
 
     @Column(name = "order_index")
-    private Integer orderIndex; // Thứ tự bài học trong Session
+    private Integer orderIndex;
 
-    // --- JSONB CONFIG ---
-    // Lưu các metadata nhỏ như duration, vocab_count, v.v.
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "content_payload", columnDefinition = "jsonb")
-    private Map<String, Object> contentPayload;
-    
+    @Builder.Default // Bắt buộc phải có để Builder không làm null trường này
+    private Map<String, Object> contentPayload = new HashMap<>(); 
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "session_id")
     private Session session;
 
     // --- RELATIONS ---
 
-    // Kết nối với video nếu type là VIDEO
     @OneToOne(mappedBy = "lesson", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private LessonVideo video;
 
-    // Kết nối với bài kiểm tra nếu type là QUIZ
     @OneToOne(mappedBy = "lesson", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private Test test;
 
-    // Kết nối với danh sách từ vựng nếu type là VOCAB
     @OneToMany(mappedBy = "lesson", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("orderIndex ASC")
-    @Builder.Default
+    @Builder.Default // Bắt buộc phải có để tránh NullPointerException khi dùng Builder
     private List<LessonVocabulary> lessonVocabularies = new ArrayList<>();
+
+    /**
+     * Helper method để lấy duration từ JSON payload an toàn.
+     */
+    public Integer getDurationFromPayload() {
+        if (contentPayload != null) {
+            Object duration = contentPayload.get("duration");
+            if (duration instanceof Number) {
+                return ((Number) duration).intValue();
+            }
+        }
+        return 0;
+    }
 }

@@ -54,7 +54,7 @@ public class SecurityConfig {
                                 "/swagger-ui.html",
                                 "/webjars/**"
                         ).permitAll()
-                        // Các API còn lại phải xác thực
+                        // Các API còn lại phải xác 
                         .anyRequest().authenticated()
                 );
 

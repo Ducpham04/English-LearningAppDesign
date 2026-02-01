@@ -6,19 +6,24 @@ import java.util.List;
 
 @Entity
 @Table(name = "sessions")
-@Getter @Setter
+@Getter @Setter 
+@NoArgsConstructor @AllArgsConstructor 
+@Builder
 public class Session extends BaseEntity {
-
     private String title;
+    
+    @Column(columnDefinition = "TEXT")
+    private String description; // THÊM DÒNG NÀY
+
+    private String thumbnail;   // THÊM DÒNG NÀY
 
     @Column(name = "order_index")
-    private Integer orderIndex; // Thứ tự chương (Chương 1, Chương 2)
+    private Integer orderIndex;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "course_id")
     private Curriculum course;
 
-    // Một chương có nhiều bài học
-    @OneToMany(mappedBy = "session", cascade = CascadeType.ALL)
+    @OneToMany(mappedBy = "session")
     private List<Lesson> lessons;
 }

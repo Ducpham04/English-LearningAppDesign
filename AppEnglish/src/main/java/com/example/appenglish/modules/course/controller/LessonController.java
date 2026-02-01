@@ -1,59 +1,87 @@
 package com.example.appenglish.modules.course.controller;
 
+import com.example.appenglish.modules.course.dto.LessonCompleteRequest;
+import com.example.appenglish.modules.course.dto.LessonCompleteResponse;
 import com.example.appenglish.modules.course.dto.LessonDetailsResponse;
-import com.example.appenglish.modules.course.dto.QuizSubmitRequest;
 import com.example.appenglish.modules.course.service.LessonService;
 import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import lombok.RequiredArgsConstructor;
+import lombok.*;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.Map;
-
-/**
- * Controller xử lý các yêu cầu liên quan đến Lesson (Bài học).
- */
 @RestController
 @RequestMapping("/api/lessons")
 @RequiredArgsConstructor
-@Tag(name = "Lesson")
+@Tag(name = "Lesson", description = "Quản lý nội dung bài học và tiến độ hoàn thành")
 public class LessonController {
 
-    private final LessonService lessonService;
+    private final LessonService service;
 
     /**
-     * Lấy thông tin chi tiết của một bài học (Video, Quiz, Text).
+     * Wrapper cho API 5.3 (Chi tiết bài học)
      */
-    @GetMapping("/{id}")
-    public ResponseEntity<LessonDetailsResponse> getLessonDetails(
-            @PathVariable 
-            @Parameter(description = "ID của bài học", example = "1") Long id) {
-        
-        return ResponseEntity.ok(lessonService.getLessonDetails(id));
+    @Data @Builder @NoArgsConstructor @AllArgsConstructor
+    @Schema(name = "LessonDataResponse", description = "Phản hồi chi tiết bài học")
+    public static class LessonDataResponse {
+        private boolean success;
+        private LessonDetailsResponse data;
     }
 
     /**
-     * POST /api/lessons/{id}/submit
-     * Nộp kết quả bài Quiz.
-     * @param id ID của bài học chứa bài test
-     * @param userAnswers Map chứa QuestionID và OptionID người dùng chọn
-     * @param userDetails Thông tin user lấy từ Token JWT
+     * Wrapper cho API 5.5 (Hoàn thành bài học & Gửi bài Quiz)
      */
-    @ApiResponse(responseCode = "200")
-@PostMapping("/{id}/submit")
-public ResponseEntity<Map<String, Object>> submitQuiz(
-        @PathVariable Long id,
-        @RequestBody QuizSubmitRequest request, // Dùng DTO mới ở đây
-        @AuthenticationPrincipal UserDetails userDetails) {
-    
-    // Giả sử lấy userId tạm thời là 1, bạn nên lấy từ userDetails thực tế
-    Map<String, Object> result = lessonService.submitQuiz(id, 1L, request.getAnswers());
-    
-    return ResponseEntity.ok(result);
-}
+    @Data @Builder @NoArgsConstructor @AllArgsConstructor
+    @Schema(name = "LessonCompleteDataResponse", description = "Phản hồi sau khi hoàn thành bài học")
+    public static class LessonCompleteDataResponse {
+        private boolean success;
+        private LessonCompleteResponse data;
+        private String message;
+    }
+
+    @GetMapping("/{lessonId}")
+    @Operation(
+        summary = "5.3 Get Lesson Details",
+        description = "Lấy toàn bộ nội dung chi tiết của một bài học bao gồm Video URL, Phụ đề chi tiết, Từ vựng mục tiêu và điểm số hiện tại của người dùng.",
+        responses = {
+            @ApiResponse(responseCode = "200", description = "Thành công", 
+                         content = @Content(schema = @Schema(implementation = LessonDataResponse.class))),
+            @ApiResponse(responseCode = "404", description = "Không tìm thấy bài học")
+        }
+    )
+    public ResponseEntity<LessonDataResponse> getLesson(@PathVariable Long lessonId) {
+        var data = service.getLessonDetails(lessonId);
+        return ResponseEntity.ok(LessonDataResponse.builder()
+                .success(true)
+                .data(data)
+                .build());
+    }
+
+    @PostMapping("/{lessonId}/complete")
+    @Operation(
+        summary = "5.5 Complete Lesson & Submit Quiz",
+        description = "Gửi yêu cầu hoàn thành bài học. Nếu bài học có Quiz (answers không rỗng), hệ thống sẽ tự động chấm điểm, lưu lịch sử, cộng XP và trả về thông tin bài học tiếp theo.",
+        responses = {
+            @ApiResponse(responseCode = "200", description = "Hoàn thành bài học thành công", 
+                         content = @Content(schema = @Schema(implementation = LessonCompleteDataResponse.class)))
+        }
+    )
+    public ResponseEntity<LessonCompleteDataResponse> completeLesson(
+            @PathVariable Long lessonId,
+            @RequestBody LessonCompleteRequest request) {
+        
+        // Mock userId = 1L (Sẽ thay thế bằng SecurityContextHolder sau khi có Security)
+        Long userId = 1L; 
+        
+        var result = service.completeLesson(lessonId, userId, request);
+        
+        return ResponseEntity.ok(LessonCompleteDataResponse.builder()
+                .success(true)
+                .data(result)
+                .message("Lesson completed! +" + result.getXpEarned() + " XP")
+                .build());
+    }
 }

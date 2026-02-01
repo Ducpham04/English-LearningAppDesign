@@ -5,51 +5,34 @@ import com.example.appenglish.entity.ClassStudent;
 import com.example.appenglish.modules.classroom.dto.ClassroomResponse;
 import com.example.appenglish.repository.ClassroomRepository;
 import com.example.appenglish.repository.ClassStudentRepository;
+import com.example.appenglish.repository.LessonRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.format.DateTimeFormatter;
 import java.util.Optional;
 
-/**
- * Service cho Classroom.
- */
 @Service
 @RequiredArgsConstructor
 public class ClassroomService {
 
     private final ClassroomRepository classroomRepository;
     private final ClassStudentRepository classStudentRepository;
+    private final LessonRepository lessonRepository;
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
-    /**
-     * Lấy chi tiết lớp học với tính toán % tiến độ.
-     * 
-     * Công thức tính tiến độ:
-     * - Đếm số học viên hoàn thành khóa học
-     * - Chia cho tổng số học viên trong lớp
-     * - Nhân 100 để được phần trăm
-     */
     public ClassroomResponse getClassDetails(Long classId) {
-        Optional<Classroom> classroom = classroomRepository.findById(classId);
-        
-        if (classroom.isEmpty()) {
-            throw new RuntimeException("Classroom not found with id: " + classId);
-        }
+        Classroom cls = classroomRepository.findById(classId)
+                .orElseThrow(() -> new RuntimeException("Classroom not found with id: " + classId));
 
-        Classroom cls = classroom.get();
-        
-        // Đếm tổng số học viên trong lớp
         int totalStudents = (int) classStudentRepository.countByClassroomId(classId);
-        
-        // Đếm số học viên hoàn thành (status = 'COMPLETED')
         int completedStudents = (int) classStudentRepository.countByClassroomIdAndStatus(classId, "COMPLETED");
-        
-        // Tính % tiến độ
+
         double progressPercentage = 0.0;
         if (totalStudents > 0) {
             progressPercentage = (double) completedStudents / totalStudents * 100;
-            progressPercentage = Math.round(progressPercentage * 10.0) / 10.0; // Làm tròn 1 chữ số thập phân
+            progressPercentage = Math.round(progressPercentage * 10.0) / 10.0;
         }
 
         return ClassroomResponse.builder()
@@ -63,24 +46,26 @@ public class ClassroomService {
                 .totalStudents(totalStudents)
                 .completedStudents(completedStudents)
                 .progressPercentage(progressPercentage)
-                .createdAt(cls.getCreatedAt() != null ? 
-                        cls.getCreatedAt().format(DATE_FORMATTER) : null)
+                .createdAt(cls.getCreatedAt() != null ? cls.getCreatedAt().format(DATE_FORMATTER) : null)
                 .build();
     }
 
-    /**
-     * Cập nhật trạng thái hoàn thành cho học viên.
-     */
+    public double calculateLearningProgress(Long userId, Long classroomId) {
+        long totalLessons = lessonRepository.countByClassroomId(classroomId);
+        if (totalLessons == 0) return 0.0;
+
+        long completedLessons = lessonRepository.countCompletedByUserIdAndClassroomId(userId, classroomId);
+
+        double progress = (double) completedLessons / totalLessons * 100;
+        return Math.round(progress * 100.0) / 100.0;
+    }
+
+    @Transactional
     public void updateStudentCompletion(Long classId, Long studentId, boolean completed) {
-        // Tìm ClassStudent record
-        Optional<ClassStudent> classStudent = classStudentRepository.findByClassroomIdAndUserId(classId, studentId);
-        
-        if (classStudent.isPresent()) {
-            ClassStudent cs = classStudent.get();
-            cs.setStatus(completed ? "COMPLETED" : "ACTIVE");
-            classStudentRepository.save(cs);
-        } else {
-            throw new RuntimeException("Student not found in this classroom");
-        }
+        ClassStudent cs = classStudentRepository.findByClassroomIdAndUserId(classId, studentId)
+                .orElseThrow(() -> new RuntimeException("Student not found in this classroom"));
+
+        cs.setStatus(completed ? "COMPLETED" : "ACTIVE");
+        classStudentRepository.save(cs);
     }
 }
