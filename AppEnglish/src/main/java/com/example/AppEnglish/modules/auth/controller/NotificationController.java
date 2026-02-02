@@ -11,7 +11,7 @@ import java.util.List;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/api/notification")
+@RequestMapping("/notification")
 public class NotificationController {
     @Autowired
     private NotificationService notificationService;
