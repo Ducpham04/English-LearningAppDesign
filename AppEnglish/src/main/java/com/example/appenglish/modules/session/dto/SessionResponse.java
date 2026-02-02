@@ -25,7 +25,6 @@ public class SessionResponse {
     private Integer vocabularyCount;
     private UserProgressData userProgress;
 
-    // QUAN TRỌNG: Phải là public static class
     @Data
     @Builder
     @NoArgsConstructor

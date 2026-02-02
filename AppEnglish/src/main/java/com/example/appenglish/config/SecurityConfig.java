@@ -33,42 +33,29 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-                // 1. Tắt CSRF vì dùng Token (Stateless)
                 .csrf(csrf -> csrf.disable())
-
-                // 2. Cấu hình CORS
                 .cors(Customizer.withDefaults())
-
-                // 3. Cấu hình Stateless (Không lưu session)
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-
-                // 4. Phân quyền đường dẫn (Hợp nhất từ cả 2 nhánh)
                 .authorizeHttpRequests(auth -> auth
-                        // Các API Auth công khai (bao gồm cả chuẩn /api/auth và /v1/auth để tránh lỗi 403)
-                        .requestMatchers("/api/auth/**", "/v1/auth/**", "/v1/users/**").permitAll()
-
-                        // Swagger UI
+                        .requestMatchers("/auth/**").permitAll()
                         .requestMatchers(
                                 "/v3/api-docs/**",
                                 "/swagger-ui/**",
                                 "/swagger-ui.html",
                                 "/webjars/**"
                         ).permitAll()
-                        // Các API còn lại phải xác 
                         .anyRequest().authenticated()
                 );
 
-        // 5. Thêm Filter JWT
         http.addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }
 
-    // Cấu hình CORS: Cho phép Frontend truy cập
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(List.of("*")); // Lưu ý: Nên đổi "*" thành domain cụ thể khi deploy production
+        configuration.setAllowedOrigins(List.of("*"));
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type", "Cache-Control"));
 

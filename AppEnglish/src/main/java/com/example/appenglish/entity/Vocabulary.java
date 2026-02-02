@@ -9,11 +9,13 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Kho từ vựng Global.
- * Kết hợp giữa các trường cơ bản (Word, Level) và mở rộng (Tags, Relations).
+ * Thực thể Từ vựng (Vocabulary)
+ * Đã loại bỏ liên kết trực tiếp tới Lesson để đơn giản hóa cấu trúc.
  */
 @Entity
-@Table(name = "vocabularies")
+@Table(name = "vocabularies", indexes = {
+    @Index(name = "idx_vocab_word", columnList = "word")
+})
 @Getter @Setter
 @Builder
 @NoArgsConstructor
@@ -28,22 +30,18 @@ public class Vocabulary extends BaseEntity {
     @Column(columnDefinition = "TEXT")
     private String definition;
 
-    // --- GIỮ LẠI TỪ HEAD (Để tương thích với VocabularyService cũ) ---
-    
     @Column(columnDefinition = "TEXT")
     private String example;
 
-    private String level; // VD: A1, B1, C2
+    @Column(length = 20)
+    private String level; // Ví dụ: A1, B2, IELTS, Oxford_3000
 
-    // --- THÊM TỪ NHÁNH DEVELOP (Tính năng mới) ---
-
-    // Cấu trúc: ["IELTS", "Food", "Topic_Travel"]
+    /**
+     * Tags mở rộng sử dụng kiểu dữ liệu JSONB của PostgreSQL.
+     * Cho phép lưu trữ linh hoạt các nhãn như: ["Food", "Travel", "IELTS_Speaking"]
+     */
     @Type(JsonType.class)
     @Column(columnDefinition = "jsonb")
-    private List<String> tags;
-
-    // Liên kết với bài học (Lesson)
-    @OneToMany(mappedBy = "vocabulary", fetch = FetchType.LAZY)
     @Builder.Default
-    private List<LessonVocabulary> lessonVocabularies = new ArrayList<>();
+    private List<String> tags = new ArrayList<>();
 }

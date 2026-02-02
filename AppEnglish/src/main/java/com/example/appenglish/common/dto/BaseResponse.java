@@ -21,6 +21,10 @@ public class BaseResponse<T> {
     private Instant timestamp;
     private String path;
 
+    public static <T> BaseResponse<T> ok(T data, String path) {
+        return ok(data, "Success", path);
+    }
+
     public static <T> BaseResponse<T> ok(T data, String message, String path) {
         return BaseResponse.<T>builder()
                 .success(true)

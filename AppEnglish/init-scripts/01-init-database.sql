@@ -26,9 +26,9 @@ INSERT INTO users (email, password_hash, full_name, status, created_at) VALUES
 
 -- Insert user roles
 INSERT INTO user_roles (user_id, role_name) VALUES
-(1, 'ADMIN'),
-(2, 'TEACHER'),
-(3, 'STUDENT');
+(1, 'ROLE_ADMIN'),
+(2, 'ROLE_TEACHER'),
+(3, 'ROLE_USER');
 
 -- Sample topics
 INSERT INTO topics (name, description, difficulty_level, order_index, estimated_duration_minutes, created_at) VALUES

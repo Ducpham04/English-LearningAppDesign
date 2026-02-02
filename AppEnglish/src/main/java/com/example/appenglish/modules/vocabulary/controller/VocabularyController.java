@@ -1,101 +1,80 @@
 package com.example.appenglish.modules.vocabulary.controller;
 
-import com.example.appenglish.entity.User;
+import com.example.appenglish.common.dto.BaseResponse;
+import com.example.appenglish.common.utils.SecurityUtils;
 import com.example.appenglish.modules.vocabulary.dto.VocabularyRequest;
 import com.example.appenglish.modules.vocabulary.dto.VocabularyResponse;
 import com.example.appenglish.modules.vocabulary.service.VocabularyService;
-import com.example.appenglish.repository.UserRepository;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
-import lombok.*;
+import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/api/vocabulary")
+@RequestMapping("/vocabulary")
 @RequiredArgsConstructor
-@Tag(name = "Vocabulary", description = "Quản lý kho từ vựng và tiến trình học tập")
+@Tag(name = "Vocabulary")
 public class VocabularyController {
 
     private final VocabularyService service;
-    private final UserRepository userRepository;
-
-    /**
-     * Wrapper cho format 7.1 (Get All)
-     */
-    @Data @Builder @NoArgsConstructor @AllArgsConstructor
-    public static class VocabularyDataResponse {
-        private boolean success;
-        private VocabularyResponse.VocabularyListWrapper data;
-    }
-
-    /**
-     * Wrapper cho format 7.2 (Review List)
-     */
-    @Data @Builder @NoArgsConstructor @AllArgsConstructor
-    public static class VocabularyReviewListResponse {
-        private boolean success;
-        private VocabularyResponse.VocabularyReviewWrapper data;
-    }
-
-    /**
-     * Helper: Lấy User ID từ Authentication (Email trong Token)
-     */
-    private Long getCurrentUserId(Authentication authentication) {
-        if (authentication == null) return null;
-        String email = authentication.getName();
-        return userRepository.findByEmail(email)
-                .map(User::getId)
-                .orElseThrow(() -> new RuntimeException("User not found for email: " + email));
-    }
 
     @GetMapping
-    @Operation(summary = "7.1 Get All Vocabularies", description = "Lấy danh sách từ vựng kèm thống kê cá nhân (nếu đã đăng nhập)")
-    public ResponseEntity<VocabularyDataResponse> getVocabularies(
-            Authentication authentication,
+    @Operation(summary = "Get all vocabularies")
+    public ResponseEntity<BaseResponse<VocabularyResponse.VocabularyListWrapper>> getVocabularies(
             @RequestParam(required = false) Long sessionId,
             @RequestParam(required = false) Boolean learned,
             @RequestParam(required = false) String search,
             @RequestParam(defaultValue = "1") int page,
-            @RequestParam(defaultValue = "50") int limit) {
+            @RequestParam(defaultValue = "50") int limit,
+            HttpServletRequest request) {
 
-        // Lấy ID động, nếu chưa login thì trả về null (Service cần xử lý userId null)
-        Long userId = (authentication != null) ? getCurrentUserId(authentication) : null;
+        Long userId = null;
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth != null && auth.isAuthenticated() && !"anonymousUser".equals(auth.getPrincipal().toString())) {
+            userId = SecurityUtils.getCurrentUserId();
+        }
         
         var data = service.getAllCustomFormat(sessionId, learned, search, PageRequest.of(page - 1, limit), userId);
 
-        return ResponseEntity.ok(VocabularyDataResponse.builder()
-                .success(true)
-                .data(data)
-                .build());
+        return ResponseEntity.ok(
+            BaseResponse.ok(data, "Fetch vocabularies successfully", request.getRequestURI())
+        );
     }
 
     @GetMapping("/review")
-    @Operation(summary = "7.2 Get Review List", description = "Lấy danh sách các từ cần ôn tập của người dùng hiện tại")
-    public ResponseEntity<VocabularyReviewListResponse> getReviewList(
-            Authentication authentication,
-            @RequestParam(defaultValue = "20") int limit) {
+    @Operation(summary = "Get vocabulary review list")
+    public ResponseEntity<BaseResponse<VocabularyResponse.VocabularyReviewWrapper>> getReviewList(
+            @RequestParam(defaultValue = "20") int limit,
+            HttpServletRequest request) {
         
-        Long userId = getCurrentUserId(authentication);
+        Long userId = SecurityUtils.getCurrentUserId();
         var reviewData = service.getReviewList(userId);
         
-        if (reviewData.getWords().size() > limit) {
+        if (reviewData.getWords() != null && reviewData.getWords().size() > limit) {
             reviewData.setWords(reviewData.getWords().subList(0, limit));
         }
         
-        return ResponseEntity.ok(VocabularyReviewListResponse.builder()
-                .success(true)
-                .data(reviewData)
-                .build());
+        return ResponseEntity.ok(
+            BaseResponse.ok(reviewData, "Fetch review list successfully", request.getRequestURI())
+        );
     }
 
     @PostMapping
-    @Operation(summary = "7.3 Create Vocabulary", description = "Yêu cầu đăng nhập để tạo từ vựng mới")
-    public ResponseEntity<VocabularyResponse> post(
-            @Valid @RequestBody VocabularyRequest req) {
-        return ResponseEntity.ok(service.create(req));
+    @Operation(summary = "Create new vocabulary")
+    public ResponseEntity<BaseResponse<VocabularyResponse>> create(
+            @Valid @RequestBody VocabularyRequest req,
+            HttpServletRequest request) {
+        
+        var data = service.create(req);
+        
+        return ResponseEntity.ok(
+            BaseResponse.ok(data, "Vocabulary created successfully", request.getRequestURI())
+        );
     }
 }
