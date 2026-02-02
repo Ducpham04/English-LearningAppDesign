@@ -31,6 +31,9 @@ public class SecurityConfig {
                         .requestMatchers("/v1/auth/**",
                                     "/v1/auth/register/**",
                                 "/v1/users/**").permitAll()
+                        .requestMatchers("/youtube/**").permitAll()
+                        .requestMatchers("/upload/transcribe/**").permitAll()
+//                        .requestMatchers("/pronunciation/**").permitAll()
 
                         // Swagger
                         .requestMatchers(
