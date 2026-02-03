@@ -1,12 +1,13 @@
 package com.example.appenglish.modules.auth.controller;
 
+import com.example.appenglish.modules.userDetail.dto.XPRequest;
 import com.example.appenglish.service.XPService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/api/xp")
+@RequestMapping("/xp")
 public class XPController {
 
     private final XPService xpService;
@@ -15,7 +16,6 @@ public class XPController {
     public XPController(XPService xpService) {
         this.xpService = xpService;
     }
-
     /**
      * API cộng XP cho user
      *
@@ -25,13 +25,17 @@ public class XPController {
      * @return HTTP response với trạng thái thành công
      */
 
-    @PostMapping("/add/{userId}")
+    /**
+     * API cộng XP cho user
+     *
+     * @param xpRequest DTO chứa thông tin cần cộng XP
+     * @return HTTP response với trạng thái thành công
+     */
+    @PostMapping("/add")
     public ResponseEntity<String> addXp(
-            @PathVariable Long userId,
-            @RequestParam Integer amount,
-            @RequestParam String actionType
+            @RequestBody XPRequest xpRequest
     ) {
-        xpService.addXp(userId, amount, actionType); // Gọi service để cộng XP
+        xpService.addXp(xpRequest.getUserId(), xpRequest.getAmount(), xpRequest.getActionType()); // Gọi service để cộng XP
         return ResponseEntity.ok("XP added successfully!"); // Trả về kết quả thành công
     }
 
@@ -41,10 +45,9 @@ public class XPController {
      * @param userId ID của user (truyền trong URL)
      * @return Tổng XP hiện tại của user
      */
-
     @GetMapping("/total/{userId}")
     public ResponseEntity<Integer> getTotalXp(@PathVariable Long userId) {
-        Integer totalXp = xpService.getTotalXp(userId);// Gọi service tính tổng XP
+        Integer totalXp = xpService.getTotalXp(userId); // Gọi service tính tổng XP
         return ResponseEntity.ok(totalXp); // Trả về tổng XP
     }
 }

@@ -32,6 +32,9 @@ public class SecurityConfig {
                                     "/v1/auth/register/**",
                                 "/v1/users/**").permitAll()
 
+                        // XP APIs - thêm vào cấu hình
+                        .requestMatchers("/api/xp/**").permitAll()
+
                         // Swagger
                         .requestMatchers(
                                 "/v3/api-docs/**",
