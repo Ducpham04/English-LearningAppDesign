@@ -19,3 +19,20 @@ function sendMessage(messageContent) {
 
 // Example: Gửi tin nhắn từ client
 // sendMessage("Hello Server!");
+
+
+//Xử lý chỉnh sửa nội dung tin nhắn trước khi gửi (trường hợp gửi metadata hoặc cấu trúc phức tạp)
+function sendMessage(messageContent) {
+    const payload = JSON.stringify({
+        content: messageContent,
+        timestamp: new Date().toISOString()
+    });
+    stompClient.send('/app/send-message', {}, payload); // Gửi định dạng JSON
+}
+
+//Lưu danh sách tin nhắn hoặc xử lý phản hồi server:
+stompClient.subscribe('/topic/messages', (message) => {
+    const parsedMessage = JSON.parse(message.body);
+    console.log('Message content: ', parsedMessage.content);
+    console.log('Timestamp: ', parsedMessage.timestamp);
+});

@@ -31,6 +31,8 @@ public class SecurityConfig {
                         .requestMatchers("/v1/auth/**",
                                     "/v1/auth/register/**",
                                 "/v1/users/**").permitAll()
+                        //web socket test
+                        .requestMatchers("/app/send-message").permitAll()
 
                         // Swagger
                         .requestMatchers(
