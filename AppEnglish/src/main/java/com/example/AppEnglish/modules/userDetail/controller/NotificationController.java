@@ -1,6 +1,7 @@
 package com.example.appenglish.modules.userDetail.controller;
 
 import com.example.appenglish.entity.User;
+import com.example.appenglish.modules.userDetail.dto.NotificationDto;
 import com.example.appenglish.service.NotificationService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -9,7 +10,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/api/notifications")
+@RequestMapping("/notifications")
 public class NotificationController {
 
     private final NotificationService notificationService;
@@ -19,17 +20,14 @@ public class NotificationController {
         this.notificationService = notificationService;
     }
 
-    @PostMapping("/send/{userId}")
-    public ResponseEntity<String> sendNotification(
-            @PathVariable Long userId,
-            @RequestParam String message,
-            @RequestBody Map<String, Object> metadata
-    ) {
-        // Tạo user tạm thời chỉ để demo, thực tế sẽ lấy từ DB
+    @PostMapping("/send")
+    public ResponseEntity<String> sendNotification(@RequestBody NotificationDto notificationDTO) {
+        // Tạo user từ userId trong DTO
         User user = new User();
-        user.setId(userId);
+        user.setId(notificationDTO.getUserId());
 
-        notificationService.sendToUser(user, message, metadata);
-        return ResponseEntity.ok("Notification sent!");
+        // Gọi service để gửi thông báo
+        notificationService.sendToUser(user, notificationDTO.getMessage(), notificationDTO.getMetadata());
+        return ResponseEntity.ok("Notification sent successfully!");
     }
 }

@@ -32,6 +32,9 @@ public class SecurityConfig {
                                     "/v1/auth/register/**",
                                 "/v1/users/**").permitAll()
 
+                        // Notifications API
+                        .requestMatchers("/notifications/**").permitAll()
+
                         // Swagger
                         .requestMatchers(
                                 "/v3/api-docs/**",

@@ -7,6 +7,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
 import java.util.Map;
 
 @Service
@@ -22,6 +23,11 @@ public class NotificationService {
     }
 
     public void sendToUser(User user, String message, Map<String, Object> metadata) {
+        // Nếu metadata không chứa timestamp, tự thêm giá trị now()
+        if (!metadata.containsKey("timestamp")) {
+            metadata.put("timestamp", LocalDateTime.now().toString());
+        }
+
         // Tạo và lưu thông báo
         Notification notification = new Notification();
         notification.setUser(user);
