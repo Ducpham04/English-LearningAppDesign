@@ -15,8 +15,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
-
+import java.util.concurrent.atomic.AtomicInteger;
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -75,10 +76,56 @@ public class UserService {
                 .build();
     }
 
+
+
     public List<UserXpDto> getTopUsersByXpInLastWeek() {
         List<Object[]> results = userRepository.findTopUsersByXpInLastWeek();
+
+        if (results.isEmpty()) {
+            log.warn("No users found for leaderboard in the last week.");
+            return List.of(); // Trả về danh sách rỗng nếu không có kết quả
+        }
+
+        AtomicInteger rankCounter = new AtomicInteger(1); // Tính thứ hạng
         return results.stream().map(result -> new UserXpDto(
-                (Long) result[0], (String) result[1], (Integer) result[2]
+                rankCounter.getAndIncrement(), // Thứ tự xếp hạng
+                (Long) result[0],              // userId
+                (String) result[1],            // displayName
+                (Integer) result[2]            // totalXp
+        )).collect(Collectors.toList());
+    }
+
+    public List<UserXpDto> getTopUsersByXpToday() {
+        List<Object[]> results = userRepository.findTopUsersByXpToday();
+
+        if (results.isEmpty()) {
+            log.warn("No users found for leaderboard today.");
+            return List.of();
+        }
+
+        AtomicInteger rankCounter = new AtomicInteger(1);
+        return results.stream().map(result -> new UserXpDto(
+                rankCounter.getAndIncrement(),
+                (Long) result[0],
+                (String) result[1],
+                (Integer) result[2]
+        )).collect(Collectors.toList());
+    }
+
+    public List<UserXpDto> getTopUsersByXpThisMonth() {
+        List<Object[]> results = userRepository.findTopUsersByXpThisMonth();
+
+        if (results.isEmpty()) {
+            log.warn("No users found for leaderboard this month.");
+            return List.of();
+        }
+
+        AtomicInteger rankCounter = new AtomicInteger(1);
+        return results.stream().map(result -> new UserXpDto(
+                rankCounter.getAndIncrement(),
+                (Long) result[0],
+                (String) result[1],
+                (Integer) result[2]
         )).collect(Collectors.toList());
     }
 }

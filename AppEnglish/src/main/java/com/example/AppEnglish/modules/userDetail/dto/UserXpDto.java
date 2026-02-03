@@ -8,6 +8,7 @@ import lombok.Setter;
 @Setter
 @AllArgsConstructor
 public class UserXpDto {
+    private Integer rank; // Thứ tự xếp hạng
     private Long userId;
     private String displayName;
     private Integer totalXp;

@@ -19,5 +19,23 @@ public interface UserRepository extends JpaRepository<User, Long> {
             "ORDER BY total_xp DESC " +
             "LIMIT 10", nativeQuery = true)
     List<Object[]> findTopUsersByXpInLastWeek();
+
+    @Query(value = "SELECT u.user_id, u.display_name, SUM(ds.xp_points) AS total_xp " +
+            "FROM USERS u " +
+            "JOIN DAILY_SESSIONS ds ON u.user_id = ds.user_id " +
+            "WHERE ds.session_date = CURDATE() " + // Lấy dữ liệu ngày hôm nay
+            "GROUP BY u.user_id, u.display_name " +
+            "ORDER BY total_xp DESC " +
+            "LIMIT 10", nativeQuery = true)
+    List<Object[]> findTopUsersByXpToday();
+
+    @Query(value = "SELECT u.user_id, u.display_name, SUM(ds.xp_points) AS total_xp " +
+            "FROM USERS u " +
+            "JOIN DAILY_SESSIONS ds ON u.user_id = ds.user_id " +
+            "WHERE MONTH(ds.session_date) = MONTH(CURDATE()) " + // Lấy dữ liệu trong tháng hiện tại
+            "GROUP BY u.user_id, u.display_name " +
+            "ORDER BY total_xp DESC " +
+            "LIMIT 10", nativeQuery = true)
+    List<Object[]> findTopUsersByXpThisMonth();
 }
 
