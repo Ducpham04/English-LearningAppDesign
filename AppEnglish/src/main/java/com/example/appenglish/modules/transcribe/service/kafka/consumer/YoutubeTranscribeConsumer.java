@@ -6,6 +6,8 @@ import com.example.appenglish.modules.transcribe.service.s3.StorageService;
 import com.example.appenglish.modules.transcribe.service.transcript.AwsTranscribeTranscriptParser;
 import com.example.appenglish.modules.transcribe.service.transcript.LessonVideoTranscriptPersistenceService;
 import com.example.appenglish.modules.transcribe.service.transcript.TranscriptionService;
+import com.example.appenglish.modules.transcribe.service.transcript.EspeakIpaService;
+import com.example.appenglish.modules.transcribe.service.translate.AwsTranslateService;
 import com.example.appenglish.modules.transcribe.service.youtube.YoutubeDownloaderService;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
@@ -29,6 +31,8 @@ public class YoutubeTranscribeConsumer {
     TranscriptionService transcriptionService;
     AwsTranscribeTranscriptParser transcriptParser;
     LessonVideoTranscriptPersistenceService persistenceService;
+    AwsTranslateService awsTranslateService;
+    EspeakIpaService espeakIpaService;
 
     @KafkaListener(
             topics = "${spring.kafka.topics.youtube-transcribe}",
@@ -53,6 +57,36 @@ public class YoutubeTranscribeConsumer {
 
             String transcriptJson = transcriptionService.fetchTranscript(jobName);
             List<TranscriptSentence> sentences = transcriptParser.parseSentences(transcriptJson);
+
+            log.info("Starting translation for YouTube lessonId={} from en to vi. Sentences count: {}", event.getLessonId(), sentences.size());
+            int successCount = 0;
+            for (TranscriptSentence s : sentences) {
+                try {
+                    String translated = awsTranslateService.translateToVietnamese(s.getText(), "en");
+                    s.setViText(translated);
+                    if (translated != null && !translated.isBlank()) {
+                        successCount++;
+                    }
+                } catch (Exception ex) {
+                    log.warn("Translate failed for lessonId={} text={} error={}", event.getLessonId(), s.getText(), ex.getMessage());
+                }
+            }
+            log.info("Translation completed for YouTube lessonId={}. Success: {}/{}", event.getLessonId(), successCount, sentences.size());
+
+            log.info("Starting IPA generation for YouTube lessonId={}. Sentences count: {}", event.getLessonId(), sentences.size());
+            int ipaSuccess = 0;
+            for (TranscriptSentence s : sentences) {
+                try {
+                    String ipa = espeakIpaService.toIpa(s.getText());
+                    s.setIpa(ipa);
+                    if (ipa != null && !ipa.isBlank()) {
+                        ipaSuccess++;
+                    }
+                } catch (Exception ex) {
+                    log.warn("IPA generation failed for lessonId={} text={} error={}", event.getLessonId(), s.getText(), ex.getMessage());
+                }
+            }
+            log.info("IPA generation completed for YouTube lessonId={}. Success: {}/{}", event.getLessonId(), ipaSuccess, sentences.size());
 
             persistenceService.saveTranscriptForLessonVideo(event.getLessonId(), event.getYoutubeUrl(), s3Uri, sentences, transcriptJson);
 

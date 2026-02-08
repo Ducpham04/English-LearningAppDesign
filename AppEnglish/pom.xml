@@ -156,6 +156,11 @@
 		</dependency>
 		<dependency>
 			<groupId>software.amazon.awssdk</groupId>
+			<artifactId>translate</artifactId>
+			<version>${aws.sdk.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>software.amazon.awssdk</groupId>
 			<artifactId>aws-xml-protocol</artifactId>
 			<version>${aws.sdk.version}</version>
 		</dependency>

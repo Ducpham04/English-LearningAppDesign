@@ -11,5 +11,8 @@ public class TranscriptSentence {
     private String text;
     private Integer startMs;
     private Integer endMs;
+    private String viText;
+    private Integer sentenceIndex;
+    private String ipa;
 }
 

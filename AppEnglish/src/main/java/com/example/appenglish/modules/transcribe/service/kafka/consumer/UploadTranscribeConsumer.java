@@ -6,6 +6,8 @@ import com.example.appenglish.modules.transcribe.service.s3.StorageService;
 import com.example.appenglish.modules.transcribe.service.transcript.AwsTranscribeTranscriptParser;
 import com.example.appenglish.modules.transcribe.service.transcript.LessonVideoTranscriptPersistenceService;
 import com.example.appenglish.modules.transcribe.service.transcript.TranscriptionService;
+import com.example.appenglish.modules.transcribe.service.transcript.EspeakIpaService;
+import com.example.appenglish.modules.transcribe.service.translate.AwsTranslateService;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
@@ -26,6 +28,8 @@ public class UploadTranscribeConsumer {
     AwsTranscribeTranscriptParser transcriptParser;
     LessonVideoTranscriptPersistenceService persistenceService;
     StorageService storageService;
+    AwsTranslateService awsTranslateService;
+    EspeakIpaService espeakIpaService;
 
     @KafkaListener(
             topics = "${spring.kafka.topics.upload-transcribe}",
@@ -49,6 +53,41 @@ public class UploadTranscribeConsumer {
 
             String transcriptJson = transcriptionService.fetchTranscript(jobName);
             List<TranscriptSentence> sentences = transcriptParser.parseSentences(transcriptJson);
+
+            String sourceLang = "en";
+            if (languageCode != null) {
+                sourceLang = languageCode.contains("-") ? languageCode.substring(0, languageCode.indexOf('-')) : languageCode;
+            }
+            log.info("Starting translation for lessonId={} from {} to vi. Sentences count: {}", lessonId, sourceLang, sentences.size());
+
+            int successCount = 0;
+            for (TranscriptSentence s : sentences) {
+                try {
+                    String translated = awsTranslateService.translateToVietnamese(s.getText(), sourceLang);
+                    s.setViText(translated);
+                    if (translated != null && !translated.isBlank()) {
+                        successCount++;
+                    }
+                } catch (Exception ex) {
+                    log.warn("Translate failed for lessonId={} text={} error={}", lessonId, s.getText(), ex.getMessage());
+                }
+            }
+            log.info("Translation completed for lessonId={}. Success: {}/{}", lessonId, successCount, sentences.size());
+
+            log.info("Starting IPA generation for lessonId={}. Sentences count: {}", lessonId, sentences.size());
+            int ipaSuccess = 0;
+            for (TranscriptSentence s : sentences) {
+                try {
+                    String ipa = espeakIpaService.toIpa(s.getText());
+                    s.setIpa(ipa);
+                    if (ipa != null && !ipa.isBlank()) {
+                        ipaSuccess++;
+                    }
+                } catch (Exception ex) {
+                    log.warn("IPA generation failed for lessonId={} text={} error={}", lessonId, s.getText(), ex.getMessage());
+                }
+            }
+            log.info("IPA generation completed for lessonId={}. Success: {}/{}", lessonId, ipaSuccess, sentences.size());
 
             persistenceService.saveTranscriptForLessonVideo(lessonId, s3Uri, s3Uri, sentences, transcriptJson);
 

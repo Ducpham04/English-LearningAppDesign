@@ -10,6 +10,7 @@ import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.transcribe.TranscribeClient;
+import software.amazon.awssdk.services.translate.TranslateClient;
 
 @Configuration
 @FieldDefaults(level = AccessLevel.PRIVATE)
@@ -37,6 +38,15 @@ public class AwsConfig {
     public TranscribeClient transcribeClient() {
         AwsBasicCredentials credentials = AwsBasicCredentials.create(accessKey, secretKey);
         return TranscribeClient.builder()
+                .region(Region.of(region))
+                .credentialsProvider(StaticCredentialsProvider.create(credentials))
+                .build();
+    }
+
+    @Bean
+    public TranslateClient translateClient() {
+        AwsBasicCredentials credentials = AwsBasicCredentials.create(accessKey, secretKey);
+        return TranslateClient.builder()
                 .region(Region.of(region))
                 .credentialsProvider(StaticCredentialsProvider.create(credentials))
                 .build();
