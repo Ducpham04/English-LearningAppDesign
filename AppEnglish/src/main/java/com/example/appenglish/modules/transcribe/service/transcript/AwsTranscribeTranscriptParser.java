@@ -44,6 +44,7 @@ public class AwsTranscribeTranscriptParser {
             Double sentenceStart = null;
             Double lastEnd = null;
             Double lastPronunciationEnd = null;
+            int sentenceIndex = 0;
 
             for (JsonNode item : items) {
                 String type = item.path("type").asText("");
@@ -65,7 +66,7 @@ public class AwsTranscribeTranscriptParser {
                             && start >= 0
                             && (start - lastPronunciationEnd) * 1000.0 >= opt.getSplitOnSilenceGapMs()
                             && currentText.length() > 0) {
-                        flushSentence(sentences, currentText, sentenceStart, lastEnd);
+                        flushSentence(sentences, currentText, sentenceStart, lastEnd, sentenceIndex++);
                         sentenceStart = null;
                         lastEnd = null;
                     }
@@ -82,7 +83,7 @@ public class AwsTranscribeTranscriptParser {
                     currentText.append(content);
 
                     if (opt.getMaxChars() != null && currentText.length() >= opt.getMaxChars()) {
-                        flushSentence(sentences, currentText, sentenceStart, lastEnd);
+                        flushSentence(sentences, currentText, sentenceStart, lastEnd, sentenceIndex++);
                         sentenceStart = null;
                         lastEnd = null;
                     }
@@ -90,18 +91,18 @@ public class AwsTranscribeTranscriptParser {
                     currentText.append(content);
 
                     if (shouldFlushOnPunctuation(content, opt)) {
-                        flushSentence(sentences, currentText, sentenceStart, lastEnd);
+                        flushSentence(sentences, currentText, sentenceStart, lastEnd, sentenceIndex++);
                         sentenceStart = null;
                         lastEnd = null;
                     } else if (opt.getMaxChars() != null && currentText.length() >= opt.getMaxChars()) {
-                        flushSentence(sentences, currentText, sentenceStart, lastEnd);
+                        flushSentence(sentences, currentText, sentenceStart, lastEnd, sentenceIndex++);
                         sentenceStart = null;
                         lastEnd = null;
                     }
                 }
             }
 
-            flushSentence(sentences, currentText, sentenceStart, lastEnd);
+            flushSentence(sentences, currentText, sentenceStart, lastEnd, sentenceIndex++);
             return sentences;
         } catch (Exception e) {
             throw new RuntimeException("Failed to parse AWS Transcribe transcript JSON", e);
@@ -125,12 +126,21 @@ public class AwsTranscribeTranscriptParser {
                 || "…".equals(punctuation) || "...".equals(punctuation);
     }
 
-    private static void flushSentence(List<TranscriptSentence> out, StringBuilder text, Double start, Double end) {
+    private static void flushSentence(List<TranscriptSentence> out,
+                                      StringBuilder text,
+                                      Double start,
+                                      Double end,
+                                      int sentenceIndex) {
         String s = text.toString().trim();
         if (!s.isBlank()) {
             Integer startMs = start != null ? (int) Math.round(start * 1000) : null;
             Integer endMs = end != null ? (int) Math.round(end * 1000) : null;
-            out.add(new TranscriptSentence(s, startMs, endMs));
+            TranscriptSentence ts = new TranscriptSentence();
+            ts.setText(s);
+            ts.setStartMs(startMs);
+            ts.setEndMs(endMs);
+            ts.setSentenceIndex(sentenceIndex);
+            out.add(ts);
         }
         text.setLength(0);
     }
