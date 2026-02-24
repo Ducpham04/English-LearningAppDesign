@@ -33,6 +33,7 @@ public class SecurityConfig {
                                 "/v1/users/**").permitAll()
                         .requestMatchers("/youtube/**").permitAll()
                         .requestMatchers("/upload/transcribe/**").permitAll()
+                        .requestMatchers("/v1/speaking/realtime").permitAll()
 //                        .requestMatchers("/pronunciation/**").permitAll()
 
                         // Swagger
