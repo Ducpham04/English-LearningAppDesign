@@ -1,9 +1,8 @@
 package com.example.appenglish.modules.auth.controller;
 
 import com.example.appenglish.common.dto.BaseResponse;
-import com.example.appenglish.modules.auth.dto.LoginRequest;
-import com.example.appenglish.modules.auth.dto.LoginResponse;
-import com.example.appenglish.modules.auth.dto.RegisterRequest;
+import com.example.appenglish.modules.auth.dto.*;
+import com.example.appenglish.modules.auth.service.AuthService;
 import com.example.appenglish.security.JwtUtils;
 import com.example.appenglish.service.UserDetailsServiceImpl;
 import jakarta.servlet.http.HttpServletRequest;
@@ -12,22 +11,18 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.Set;
-import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/v1/auth")
 @RequiredArgsConstructor
 public class AuthController {
 
+    private final AuthService authService;
     private final AuthenticationManager authenticationManager;
     private final JwtUtils jwtUtils;
     private final UserDetailsServiceImpl userDetailsServiceImpl;
@@ -38,38 +33,112 @@ public class AuthController {
             @Valid @RequestBody LoginRequest req,
             HttpServletRequest httpReq) {
 
-        Authentication authentication = authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(
-                        req.getEmail(),
-                        req.getPassword()
-                )
-        );
+        try {
+            LoginResponse data = authService.login(req.getEmail(), req.getPassword());
 
-        SecurityContextHolder.getContext().setAuthentication(authentication);
+            return ResponseEntity.ok(
+                    BaseResponse.ok(
+                            data,
+                            "Login successful",
+                            httpReq.getRequestURI()
+                    )
+            );
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(
+                            BaseResponse.error(
+                                    "Invalid email or password",
+                                    "INVALID_CREDENTIALS",
+                                    httpReq.getRequestURI()
+                            )
+                    );
+        }
+    }
 
-        String token = jwtUtils.generateToken(authentication);
+    // ========================= REFRESH TOKEN =========================
+    @PostMapping("/refresh")
+    public ResponseEntity<BaseResponse<TokenResponseDto>> refreshToken(
+            @Valid @RequestBody RefreshTokenRequest req,
+            HttpServletRequest httpReq) {
 
-        UserDetails userDetails = (UserDetails) authentication.getPrincipal();
+        try {
+            TokenResponseDto data = authService.refreshToken(req.getRefreshToken());
 
-        Set<String> authorities = authentication.getAuthorities()
-                .stream()
-                .map(GrantedAuthority::getAuthority)
-                .collect(Collectors.toSet());
+            return ResponseEntity.ok(
+                    BaseResponse.ok(
+                            data,
+                            "Token refreshed successfully",
+                            httpReq.getRequestURI()
+                    )
+            );
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(
+                            BaseResponse.error(
+                                    "Invalid refresh token",
+                                    "INVALID_REFRESH_TOKEN",
+                                    httpReq.getRequestURI()
+                            )
+                    );
+        }
+    }
 
-        LoginResponse data = new LoginResponse(
-                "Bearer",
-                token,
-                userDetails.getUsername(),
-                authorities
-        );
+    // ========================= LOGOUT =========================
+    @PostMapping("/logout")
+    public ResponseEntity<BaseResponse<?>> logout(
+            HttpServletRequest httpReq) {
 
-        return ResponseEntity.ok(
-                BaseResponse.ok(
-                        data,
-                        "Login successful",
-                        httpReq.getRequestURI()
-                )
-        );
+        try {
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            if (authentication != null) {
+                authService.logout(authentication.getName());
+            }
+
+            return ResponseEntity.ok(
+                    BaseResponse.ok(
+                            null,
+                            "Logout successful",
+                            httpReq.getRequestURI()
+                    )
+            );
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(
+                            BaseResponse.error(
+                                    "Logout failed",
+                                    "LOGOUT_FAILED",
+                                    httpReq.getRequestURI()
+                            )
+                    );
+        }
+    }
+
+    // ========================= RESET PASSWORD =========================
+    @PostMapping("/reset-password")
+    public ResponseEntity<BaseResponse<?>> resetPassword(
+            @Valid @RequestBody ResetPasswordRequest req,
+            HttpServletRequest httpReq) {
+
+        try {
+            authService.resetPassword(req.getEmail());
+
+            return ResponseEntity.ok(
+                    BaseResponse.ok(
+                            null,
+                            "Password reset email sent",
+                            httpReq.getRequestURI()
+                    )
+            );
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(
+                            BaseResponse.error(
+                                    "User not found",
+                                    "USER_NOT_FOUND",
+                                    httpReq.getRequestURI()
+                            )
+                    );
+        }
     }
 
     // ========================= REGISTER =========================

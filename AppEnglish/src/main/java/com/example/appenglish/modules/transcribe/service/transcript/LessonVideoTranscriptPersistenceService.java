@@ -48,27 +48,35 @@ public class LessonVideoTranscriptPersistenceService {
                                              String rawTranscriptJson) {
         LessonVideo lessonVideo = getOrCreateLessonVideoLocked(lessonId);
 
-        if (lessonVideo.getTranscriptJson() != null && !lessonVideo.getTranscriptJson().isEmpty()) {
-            log.info("Skip saveTranscript: transcript already exists for lessonId={}", lessonId);
-            return;
-        }
-
+        boolean hasExisting = lessonVideo.getTranscriptJson() != null && !lessonVideo.getTranscriptJson().isEmpty();
+        
         lessonVideo.setVideoUrl(s3Uri);
 
         List<Map<String, Object>> transcriptJson = new ArrayList<>(sentences != null ? sentences.size() : 0);
         if (sentences != null) {
             for (TranscriptSentence s : sentences) {
                 Map<String, Object> item = new HashMap<>();
+                item.put("sentenceIndex", s.getSentenceIndex());
                 item.put("start", s.getStartMs());
                 item.put("end", s.getEndMs());
                 item.put("text", s.getText());
+                if (s.getViText() != null && !s.getViText().isBlank()) {
+                    item.put("viText", s.getViText());
+                }
+                item.put("ipa", s.getIpa());
                 transcriptJson.add(item);
             }
         }
 
+        if (hasExisting) {
+            // Option A: If already exists, only update if new version has more translations or different content
+            log.info("Transcript already exists for lessonId={}, updating with potentially new translations", lessonId);
+        }
+
         lessonVideo.setTranscriptJson(transcriptJson);
 
-        log.info("Saved transcript: lessonId={}, sentences={}", lessonId, transcriptJson.size());
+        long translatedCount = transcriptJson.stream().filter(m -> m.get("viText") != null).count();
+        log.info("Saved transcript: lessonId={}, sentences={}, translated={}", lessonId, transcriptJson.size(), translatedCount);
     }
 
     @Transactional

@@ -1,0 +1,18 @@
+package com.example.appenglish.modules.pronunciation.dto.event;
+
+import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.NoArgsConstructor;
+import lombok.Value;
+
+@Value
+@Builder
+@NoArgsConstructor(force = true, access = AccessLevel.PRIVATE)
+@AllArgsConstructor
+public class PronunciationAudioUploadEvent {
+    Long attemptId;
+    String stagingKey;
+    String contentType;
+}
+

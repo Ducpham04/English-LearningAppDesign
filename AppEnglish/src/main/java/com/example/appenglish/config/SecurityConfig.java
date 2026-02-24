@@ -29,10 +29,11 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         // Auth
                         .requestMatchers("/v1/auth/**",
-                                    "/v1/auth/register/**").permitAll()
-                        .requestMatchers("/api/auth/**").permitAll()
-                        .requestMatchers("/upload/**").permitAll()
+                                    "/v1/auth/register/**",
+                                "/v1/users/**").permitAll()
                         .requestMatchers("/youtube/**").permitAll()
+                        .requestMatchers("/upload/transcribe/**").permitAll()
+//                        .requestMatchers("/pronunciation/**").permitAll()
 
                         // Swagger
                         .requestMatchers(
@@ -48,6 +49,8 @@ public class SecurityConfig {
         http.addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
         return http.build();
     }
+
+
 
 
 }
