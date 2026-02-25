@@ -32,7 +32,9 @@ public class JwtUtils {
 
     public String generateToken(Authentication authentication) {
         String subject = authentication.getName(); // email
-        List<String> authorities = authentication.getAuthorities().stream()
+        List<String> authorities = authentication.getAuthorities() == null
+                ? List.of()
+                : authentication.getAuthorities().stream()
                 .map(GrantedAuthority::getAuthority)
                 .toList();
 
@@ -79,6 +81,22 @@ public class JwtUtils {
             return true;
         } catch (Exception e) {
             log.debug("JWT invalid: {}", e.getMessage());
+            return false;
+        }
+    }
+
+    public boolean isRefreshToken(String token) {
+        try {
+            var claims = Jwts.parser()
+                    .verifyWith(signingKey())
+                    .build()
+                    .parseSignedClaims(token)
+                    .getPayload();
+
+            Object type = claims.get("type");
+            return "refresh".equals(type);
+        } catch (Exception e) {
+            log.debug("JWT type check failed: {}", e.getMessage());
             return false;
         }
     }

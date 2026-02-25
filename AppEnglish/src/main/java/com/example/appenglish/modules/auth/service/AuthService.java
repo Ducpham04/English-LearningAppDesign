@@ -1,7 +1,6 @@
 package com.example.appenglish.modules.auth.service;
 
 import com.example.appenglish.entity.User;
-import com.example.appenglish.modules.auth.dto.LoginRequest;
 import com.example.appenglish.modules.auth.dto.LoginResponse;
 import com.example.appenglish.modules.auth.dto.TokenResponseDto;
 import com.example.appenglish.modules.userDetail.dto.UserDataDto;
@@ -11,6 +10,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -26,6 +27,7 @@ public class AuthService {
     private final JwtUtils jwtUtils;
     private final UserRepository userRepository;
     private final UserConverterService userConverterService;
+    private final UserDetailsService userDetailsService;
 
     public LoginResponse login(String email, String password) {
         // Authenticate user
@@ -54,26 +56,28 @@ public class AuthService {
     }
 
     public TokenResponseDto refreshToken(String refreshToken) {
-        // Validate refresh token
-        if (!jwtUtils.validate(refreshToken)) {
+        // Validate refresh token and ensure it's actually a refresh token
+        if (!jwtUtils.validate(refreshToken) || !jwtUtils.isRefreshToken(refreshToken)) {
             throw new RuntimeException("Invalid refresh token");
         }
 
         // Get email from token
         String email = jwtUtils.getSubject(refreshToken);
 
-        // Find user
-        User user = userRepository.findByEmail(email)
+        // Ensure user exists
+        userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
-        // Generate new tokens
-        String newAccessToken = jwtUtils.generateToken(
-                new UsernamePasswordAuthenticationToken(
-                        user.getEmail(),
-                        null,
-                        null
-                )
+        // Load full user details (with authorities) for new access token
+        UserDetails userDetails = userDetailsService.loadUserByUsername(email);
+        Authentication authentication = new UsernamePasswordAuthenticationToken(
+                userDetails,
+                null,
+                userDetails.getAuthorities()
         );
+
+        // Generate new tokens
+        String newAccessToken = jwtUtils.generateToken(authentication);
         String newRefreshToken = jwtUtils.generateRefreshToken(email);
 
         return TokenResponseDto.builder()
@@ -90,7 +94,7 @@ public class AuthService {
     }
 
     public void resetPassword(String email) {
-        User user = userRepository.findByEmail(email)
+        userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
         // TODO: Send password reset email

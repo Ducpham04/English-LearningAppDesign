@@ -41,42 +41,57 @@ export function Register() {
   ];
 
   const validateForm = () => {
+    console.log('--- Register.tsx: validateForm start ---', { name, email, password, confirmPassword });
     if (!name.trim()) {
       setError('Please enter your name');
+      console.log('--- Register.tsx: Name validation failed ---');
       return false;
     }
     if (!email.trim() || !email.includes('@')) {
       setError('Please enter a valid email');
+      console.log('--- Register.tsx: Email validation failed ---');
       return false;
     }
     if (password.length < 6) {
       setError('Password must be at least 6 characters');
+      console.log('--- Register.tsx: Password validation failed ---');
       return false;
     }
     if (password !== confirmPassword) {
       setError('Passwords do not match');
+      console.log('--- Register.tsx: Passwords do not match ---');
       return false;
     }
+    console.log('--- Register.tsx: validateForm passed ---');
     return true;
   };
 
+  useEffect(() => {
+    // Nếu đã đăng nhập thì tự động chuyển hướng về trang phù hợp
+    if (isAuthenticated) {
+      console.log('--- Register.tsx: User already authenticated, redirecting ---', user?.role);
+      const target = user?.role === 'teacher' ? '/teacher' : user?.role === 'admin' ? '/admin' : '/';
+      navigate(target, { replace: true });
+    }
+  }, [isAuthenticated, user, navigate]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    console.log('--- Register.tsx: handleSubmit triggered ---');
     setError('');
 
-    if (!validateForm()) return;
+    if (!validateForm()) {
+      console.log('--- Register.tsx: Validation failed ---', { name, email, password, confirmPassword });
+      return;
+    }
 
     try {
+      console.log('--- Register.tsx: Calling authStore.register ---', { name, email, selectedRole });
       await register(name, email, password, selectedRole);
-      // Navigate based on role
-      if (selectedRole === 'teacher') {
-        navigate('/teacher');
-      } else if (selectedRole === 'admin') {
-        navigate('/admin');
-      } else {
-        navigate('/');
-      }
+      console.log('--- Register.tsx: Registration success ---');
+      // Điều hướng sẽ được xử lý bởi useEffect khi isAuthenticated thay đổi
     } catch (err: any) {
+      console.error('--- Register.tsx: Registration error ---', err);
       setError(err.message || 'Registration failed. Please try again.');
     }
   };
@@ -250,6 +265,7 @@ export function Register() {
                   size="lg"
                   disabled={isLoading}
                   className="w-full bg-green-500 hover:bg-green-600 text-white rounded-xl py-6 text-lg shadow-lg hover:shadow-xl transition-all"
+                  onClick={() => console.log('--- Button: onClick triggered ---')}
                 >
                   {isLoading ? (
                     <>

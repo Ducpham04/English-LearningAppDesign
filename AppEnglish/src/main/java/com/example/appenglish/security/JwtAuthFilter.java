@@ -31,6 +31,15 @@ public class JwtAuthFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request,
                                     HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
+        // Swagger/OpenAPI endpoints should never be blocked by JWT filter.
+        // If this filter writes 401/403 for missing/invalid tokens, Swagger UI
+        // will show "Failed to load API definition".
+        String path = request.getServletPath();
+        if (isSwaggerPath(path)) {
+            filterChain.doFilter(request, response);
+            return;
+        }
+
         String token = resolveToken(request);
         if (token != null && jwtUtils.validate(token)) {
             String email = jwtUtils.getSubject(token);
@@ -42,7 +51,17 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
             SecurityContextHolder.getContext().setAuthentication(authentication);
         }
+
         filterChain.doFilter(request, response);
+    }
+
+    private boolean isSwaggerPath(String path) {
+        if (path == null) return false;
+        return path.startsWith("/v3/api-docs")
+                || path.startsWith("/swagger-ui")
+                || path.equals("/swagger-ui.html")
+                || path.startsWith("/swagger-resources")
+                || path.startsWith("/webjars");
     }
 
     private String resolveToken(HttpServletRequest request) {

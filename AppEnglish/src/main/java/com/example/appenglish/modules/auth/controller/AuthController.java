@@ -8,6 +8,8 @@ import com.example.appenglish.service.UserDetailsServiceImpl;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -21,6 +23,8 @@ import java.util.List;
 @RequestMapping("/v1/auth")
 @RequiredArgsConstructor
 public class AuthController {
+
+    private static final Logger log = LoggerFactory.getLogger(AuthController.class);
 
     private final AuthService authService;
     private final AuthenticationManager authenticationManager;
@@ -147,9 +151,12 @@ public class AuthController {
             @Valid @RequestBody RegisterRequest req,
             HttpServletRequest httpReq) {
 
+        log.info("Register request received: email={}, role={}", req.getEmail(), req.getRole());
+
         boolean isSuccess = userDetailsServiceImpl.register(req);
 
         if (!isSuccess) {
+            log.warn("Register failed for email={}, role={}", req.getEmail(), req.getRole());
             return ResponseEntity.status(HttpStatus.CONFLICT)
                     .body(
                             BaseResponse.error(
@@ -160,6 +167,7 @@ public class AuthController {
                     );
         }
 
+        log.info("Register success for email={}, role={}", req.getEmail(), req.getRole());
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(
                         BaseResponse.ok(

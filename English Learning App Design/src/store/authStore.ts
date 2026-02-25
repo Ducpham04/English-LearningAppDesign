@@ -2,12 +2,19 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { AuthUser, UserRole, LoginCredentials } from '@/types/auth';
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api';
+
+interface AuthTokens {
+  accessToken: string;
+  refreshToken: string;
+}
+
 interface AuthState {
   user: AuthUser | null;
+  tokens: AuthTokens | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  
-  // Actions
+
   login: (credentials: LoginCredentials) => Promise<void>;
   logout: () => void;
   register: (name: string, email: string, password: string, role: UserRole) => Promise<void>;
@@ -15,94 +22,125 @@ interface AuthState {
   checkPermission: (permission: string) => boolean;
 }
 
-// Mock login function - Replace with real API call
-const mockLogin = async (email: string, password: string): Promise<AuthUser> => {
-  // Simulate API delay
-  await new Promise(resolve => setTimeout(resolve, 500));
-  
-  // Mock users for different roles
-  if (email.includes('student')) {
-    return {
-      id: 'student-1',
-      name: 'John Student',
-      email: email,
-      avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=John',
-      role: 'student',
-      permissions: ['view:lessons', 'submit:homework'],
-      level: 3,
-      xp: 750,
-      streak: 5,
-      totalLessonsCompleted: 15,
-      faceIdEnrolled: false,
-      enrolledClasses: ['class-1', 'class-2'], // Student is enrolled in 2 classes
-    };
-  } else if (email.includes('teacher')) {
-    return {
-      id: 'teacher-1',
-      name: 'Jane Teacher',
-      email: email,
-      avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Jane',
-      role: 'teacher',
-      permissions: ['view:lessons', 'create:lessons', 'manage:classes', 'view:analytics'],
-      teachingSubjects: ['English', 'Pronunciation'],
-    };
-  } else if (email.includes('admin')) {
-    return {
-      id: 'admin-1',
-      name: 'Admin User',
-      email: email,
-      avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Admin',
-      role: 'admin',
-      permissions: ['*'], // All permissions
-      isSuperAdmin: true,
-    };
-  }
-  
-  throw new Error('Invalid credentials');
-};
-
 export const useAuthStore = create<AuthState>()(
   persist(
     (set, get) => ({
       user: null,
+      tokens: null,
       isAuthenticated: false,
       isLoading: false,
 
+      // LOGIN: gọi BE /v1/auth/login, nhận LoginResponse (user + token + refreshToken)
       login: async (credentials) => {
         set({ isLoading: true });
         try {
-          const user = await mockLogin(credentials.email, credentials.password);
-          set({ user, isAuthenticated: true, isLoading: false });
+          const res = await fetch(`${API_BASE_URL}/v1/auth/login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              email: credentials.email,
+              password: credentials.password,
+            }),
+          });
+
+          if (!res.ok) {
+            const body = await res.json().catch(() => null);
+            const message = body?.message || 'Đăng nhập thất bại';
+            throw new Error(message);
+          }
+
+          const body = await res.json();
+          const data = body.data as {
+            user: any;
+            token: string;
+            refreshToken: string;
+          };
+
+          const backendRole = (data.user.role ?? '').toString().toLowerCase();
+          const normalizedRole = (['student', 'teacher', 'admin'].includes(backendRole)
+            ? backendRole
+            : 'student') as UserRole;
+
+          const mappedUser: AuthUser = {
+            id: data.user.id?.toString() ?? '',
+            name: data.user.fullName ?? data.user.name ?? data.user.email,
+            email: data.user.email,
+            avatar: data.user.avatarUrl ?? undefined,
+            role: normalizedRole,
+            permissions: Array.isArray(data.user.permissions) && data.user.permissions.length > 0
+              ? data.user.permissions
+              : ['view:lessons'],
+          };
+
+          set({
+            user: mappedUser,
+            tokens: {
+              accessToken: data.token,
+              refreshToken: data.refreshToken,
+            },
+            isAuthenticated: true,
+            isLoading: false,
+          });
         } catch (error) {
           set({ isLoading: false });
           throw error;
         }
       },
 
+      // LOGOUT: gọi BE (nếu có token) rồi xoá user + token trên FE
       logout: () => {
-        set({ user: null, isAuthenticated: false });
+        const { tokens } = get();
+
+        if (tokens?.accessToken) {
+          // Fire-and-forget, không chặn UI
+          fetch(`${API_BASE_URL}/v1/auth/logout`, {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${tokens.accessToken}`,
+            },
+          }).catch(() => {
+            // Bỏ qua lỗi logout phía BE, FE vẫn xoá state
+          });
+        }
+
+        set({ user: null, tokens: null, isAuthenticated: false });
       },
 
+      // REGISTER: gọi /v1/auth/register/local, sau đó tự động login lại bằng email/password
       register: async (name, email, password, role) => {
+        console.log('--- AuthStore: register start ---', { name, email, role });
         set({ isLoading: true });
         try {
-          // Simulate registration
-          await new Promise(resolve => setTimeout(resolve, 500));
-          
-          const user: AuthUser = {
-            id: `${role}-${Date.now()}`,
-            name,
+          const payload = {
+            fullName: name,
             email,
-            role,
-            permissions: role === 'student' 
-              ? ['view:lessons', 'submit:homework']
-              : role === 'teacher'
-              ? ['view:lessons', 'create:lessons', 'manage:classes']
-              : ['*'],
+            password,
+            role: role.toUpperCase(), // STUDENT / TEACHER
           };
-          
-          set({ user, isAuthenticated: true, isLoading: false });
+          console.log('--- AuthStore: Sending request to:', `${API_BASE_URL}/v1/auth/register/local`);
+          console.log('--- AuthStore: Payload:', payload);
+
+          const res = await fetch(`${API_BASE_URL}/v1/auth/register/local`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          });
+
+          console.log('--- AuthStore: Response status:', res.status);
+
+          if (!res.ok) {
+            const body = await res.json().catch(() => null);
+            console.error('--- AuthStore: Register error body:', body);
+            const message = body?.message || 'Đăng ký thất bại';
+            throw new Error(message);
+          }
+
+          console.log('--- AuthStore: Register success, now logging in...');
+          // Đăng ký xong → tự động login để UX mượt hơn
+          await get().login({ email, password });
+          set({ isLoading: false });
         } catch (error) {
+          console.error('--- AuthStore: Register exception:', error);
           set({ isLoading: false });
           throw error;
         }
@@ -124,9 +162,10 @@ export const useAuthStore = create<AuthState>()(
     }),
     {
       name: 'auth-storage',
-      partialize: (state) => ({ 
-        user: state.user, 
-        isAuthenticated: state.isAuthenticated 
+      partialize: (state) => ({
+        user: state.user,
+        tokens: state.tokens,
+        isAuthenticated: state.isAuthenticated,
       }),
     }
   )

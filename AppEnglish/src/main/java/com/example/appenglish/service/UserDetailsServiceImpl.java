@@ -7,8 +7,8 @@ import com.example.appenglish.modules.auth.dto.RegisterRequest;
 import com.example.appenglish.repository.RoleRepository;
 import com.example.appenglish.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Lazy;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
@@ -24,6 +24,8 @@ import java.util.Set;
 @Service
 @RequiredArgsConstructor
 public class UserDetailsServiceImpl implements UserDetailsService {
+
+    private static final Logger log = LoggerFactory.getLogger(UserDetailsServiceImpl.class);
 
     private final UserRepository userRepository;
     private final PasswordEncoder  passwordEncoder;
@@ -53,11 +55,15 @@ public class UserDetailsServiceImpl implements UserDetailsService {
     @Transactional
     public boolean register(RegisterRequest req) {
 
+        log.info("Start register user: email={}, role={}", req.getEmail(), req.getRole());
+
         if (userRepository.existsByEmail(req.getEmail())) {
+            log.warn("Register failed: email already exists {}", req.getEmail());
             return false;
         }
 
         if (req.getRole() == null) {
+            log.warn("Register failed: role is null for email={}", req.getEmail());
             return false;
         }
 
@@ -68,14 +74,16 @@ public class UserDetailsServiceImpl implements UserDetailsService {
         } else if ("TEACHER".equalsIgnoreCase(req.getRole())) {
             roleName = "TEACHER";
         } else {
+            log.warn("Register failed: unsupported role {} for email={}", req.getRole(), req.getEmail());
             return false;
         }
 
         // 2. LẤY ROLE TỪ DB (KHÔNG new)
         Role role = roleRepository.findByName(roleName)
-                .orElseThrow(() ->
-                        new RuntimeException("Role not found in DB: " + roleName)
-                );
+                .orElseThrow(() -> {
+                    log.error("Register failed: Role not found in DB: {}", roleName);
+                    return new RuntimeException("Role not found in DB: " + roleName);
+                });
         // 3. Tạo user
         User newUser = new User();
         newUser.setEmail(req.getEmail());
@@ -85,6 +93,7 @@ public class UserDetailsServiceImpl implements UserDetailsService {
         newUser.setProvider(User.AuthProvider.LOCAL);
 
         userRepository.save(newUser);
+        log.info("Register success: new user id={}, email={}", newUser.getId(), newUser.getEmail());
         return true;
     }
 

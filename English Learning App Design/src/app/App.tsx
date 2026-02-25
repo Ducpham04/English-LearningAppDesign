@@ -101,11 +101,11 @@ export default function App() {
           {/* Auth Routes */}
           <Route 
             path="/login" 
-            element={isAuthenticated ? <Navigate to={user?.role === 'teacher' ? '/teacher' : user?.role === 'admin' ? '/admin' : '/'} replace /> : <Login />} 
+            element={<Login />} 
           />
           <Route 
             path="/register" 
-            element={isAuthenticated ? <Navigate to={user?.role === 'teacher' ? '/teacher' : user?.role === 'admin' ? '/admin' : '/'} replace /> : <Register />} 
+            element={<Register />} 
           />
 
           {/* Protected Student Routes */}
