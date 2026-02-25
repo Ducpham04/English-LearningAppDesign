@@ -1,108 +1,146 @@
+/**
+ * Authentication Store using Zustand with persistence
+ * Handles user authentication state, tokens, and permissions
+ */
+
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { AuthUser, UserRole, LoginCredentials } from '@/types/auth';
+import axiosInstance from '@/services/axiosConfig';
+
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api';
+
+interface AuthTokens {
+  accessToken: string;
+  refreshToken: string;
+}
 
 interface AuthState {
   user: AuthUser | null;
+  tokens: AuthTokens | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  
+
   // Actions
   login: (credentials: LoginCredentials) => Promise<void>;
   logout: () => void;
   register: (name: string, email: string, password: string, role: UserRole) => Promise<void>;
   updateUser: (updates: Partial<AuthUser>) => void;
+  updateTokens: (tokens: AuthTokens) => void;
   checkPermission: (permission: string) => boolean;
 }
 
-// Mock login function - Replace with real API call
-const mockLogin = async (email: string, password: string): Promise<AuthUser> => {
-  // Simulate API delay
-  await new Promise(resolve => setTimeout(resolve, 500));
-  
-  // Mock users for different roles
-  if (email.includes('student')) {
-    return {
-      id: 'student-1',
-      name: 'John Student',
-      email: email,
-      avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=John',
-      role: 'student',
-      permissions: ['view:lessons', 'submit:homework'],
-      level: 3,
-      xp: 750,
-      streak: 5,
-      totalLessonsCompleted: 15,
-      faceIdEnrolled: false,
-      enrolledClasses: ['class-1', 'class-2'], // Student is enrolled in 2 classes
-    };
-  } else if (email.includes('teacher')) {
-    return {
-      id: 'teacher-1',
-      name: 'Jane Teacher',
-      email: email,
-      avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Jane',
-      role: 'teacher',
-      permissions: ['view:lessons', 'create:lessons', 'manage:classes', 'view:analytics'],
-      teachingSubjects: ['English', 'Pronunciation'],
-    };
-  } else if (email.includes('admin')) {
-    return {
-      id: 'admin-1',
-      name: 'Admin User',
-      email: email,
-      avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Admin',
-      role: 'admin',
-      permissions: ['*'], // All permissions
-      isSuperAdmin: true,
-    };
+// Helper function to normalize role from backend
+const normalizeRole = (backendRole: string): UserRole => {
+  const role = (backendRole ?? '').toString().toLowerCase();
+  if (['student', 'teacher', 'admin'].includes(role)) {
+    return role as UserRole;
   }
-  
-  throw new Error('Invalid credentials');
+  return 'student'; // Default fallback
 };
 
 export const useAuthStore = create<AuthState>()(
   persist(
     (set, get) => ({
       user: null,
+      tokens: null,
       isAuthenticated: false,
       isLoading: false,
 
+      // LOGIN: Call BE /v1/auth/login, receive LoginResponse (user + token + refreshToken)
       login: async (credentials) => {
         set({ isLoading: true });
         try {
-          const user = await mockLogin(credentials.email, credentials.password);
-          set({ user, isAuthenticated: true, isLoading: false });
+          const res = await axiosInstance.post('/v1/auth/login', {
+            email: credentials.email,
+            password: credentials.password,
+          });
+
+          const body = res.data;
+          const data = body.data as {
+            user: any;
+            token: string;
+            refreshToken: string;
+          };
+
+          const backendRole = (data.user.role ?? '').toString().toLowerCase();
+          const normalizedRole = normalizeRole(backendRole);
+
+          const mappedUser: AuthUser = {
+            id: data.user.id?.toString() ?? '',
+            name: data.user.fullName ?? data.user.name ?? data.user.email,
+            email: data.user.email,
+            avatar: data.user.avatarUrl ?? undefined,
+            role: normalizedRole,
+            permissions: Array.isArray(data.user.permissions) && data.user.permissions.length > 0
+              ? data.user.permissions
+              : ['view:lessons'],
+            // Student specific fields
+            level: data.user.level,
+            xp: data.user.xp,
+            streak: data.user.streak,
+            totalLessonsCompleted: data.user.totalLessonsCompleted,
+            faceIdEnrolled: data.user.faceIdEnrolled,
+            enrolledClasses: data.user.enrolledClasses,
+            // Teacher specific fields
+            teachingSubjects: data.user.teachingSubjects,
+            // Admin specific fields
+            isSuperAdmin: data.user.isSuperAdmin,
+          };
+
+          set({
+            user: mappedUser,
+            tokens: {
+              accessToken: data.token,
+              refreshToken: data.refreshToken,
+            },
+            isAuthenticated: true,
+            isLoading: false,
+          });
         } catch (error) {
           set({ isLoading: false });
           throw error;
         }
       },
 
+      // LOGOUT: Call BE (if has token) then clear user + token on FE
       logout: () => {
-        set({ user: null, isAuthenticated: false });
+        const { tokens } = get();
+
+        if (tokens?.accessToken) {
+          // Fire-and-forget, don't block UI
+          axiosInstance
+            .post('/v1/auth/logout')
+            .catch(() => {
+              // Ignore logout errors, FE still clears state
+            });
+        }
+
+        set({ user: null, tokens: null, isAuthenticated: false });
       },
 
+      // REGISTER: Call /v1/auth/register/local, then auto-login
       register: async (name, email, password, role) => {
+        console.log('--- AuthStore: register start ---', { name, email, role });
         set({ isLoading: true });
         try {
-          // Simulate registration
-          await new Promise(resolve => setTimeout(resolve, 500));
-          
-          const user: AuthUser = {
-            id: `${role}-${Date.now()}`,
-            name,
+          const payload = {
+            fullName: name,
             email,
-            role,
-            permissions: role === 'student' 
-              ? ['view:lessons', 'submit:homework']
-              : role === 'teacher'
-              ? ['view:lessons', 'create:lessons', 'manage:classes']
-              : ['*'],
+            password,
+            role: role.toUpperCase(), // STUDENT / TEACHER
           };
-          
-          set({ user, isAuthenticated: true, isLoading: false });
+          console.log('--- AuthStore: Sending request to:', `${API_BASE_URL}/v1/auth/register/local`);
+          console.log('--- AuthStore: Payload:', payload);
+
+          await axiosInstance.post('/v1/auth/register/local', payload);
+
+          console.log('--- AuthStore: Register success, now logging in...');
+          // Auto-login after registration for better UX
+          await get().login({ email, password });
+          set({ isLoading: false });
         } catch (error) {
+          console.error('--- AuthStore: Register exception:', error);
           set({ isLoading: false });
           throw error;
         }
@@ -115,6 +153,10 @@ export const useAuthStore = create<AuthState>()(
         }
       },
 
+      updateTokens: (tokens) => {
+        set({ tokens });
+      },
+
       checkPermission: (permission) => {
         const user = get().user;
         if (!user) return false;
@@ -124,9 +166,10 @@ export const useAuthStore = create<AuthState>()(
     }),
     {
       name: 'auth-storage',
-      partialize: (state) => ({ 
-        user: state.user, 
-        isAuthenticated: state.isAuthenticated 
+      partialize: (state) => ({
+        user: state.user,
+        tokens: state.tokens,
+        isAuthenticated: state.isAuthenticated,
       }),
     }
   )

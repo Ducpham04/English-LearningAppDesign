@@ -34,8 +34,11 @@ export function Login() {
 
     try {
       await login({ email, password });
-      // Navigate based on role
-      const role = selectedRole || (email.includes('teacher') ? 'teacher' : email.includes('admin') ? 'admin' : 'student');
+      
+      // Get the updated state from store
+      const user = useAuthStore.getState().user;
+      const role = user?.role;
+
       if (role === 'teacher') {
         navigate('/teacher');
       } else if (role === 'admin') {

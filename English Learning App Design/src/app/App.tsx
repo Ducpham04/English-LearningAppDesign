@@ -18,6 +18,7 @@ import { FaceEnrollment } from '@/features/onboarding/FaceEnrollment';
 // Auth
 import { Login } from '@/features/auth/Login';
 import { Register } from '@/features/auth/Register';
+import { Profile } from '@/features/auth/Profile';
 
 // Layout
 import { AppLayout } from '@/app/components/layout/AppLayout';
@@ -115,7 +116,7 @@ export default function App() {
               <Route path="/sessions" element={<SessionOverview />} />
               <Route path="/sessions/:sessionId" element={<SessionDetail />} />
               <Route path="/vocabulary" element={<VocabularyScreen />} />
-              <Route path="/profile" element={<ProfileScreen />} />
+              <Route path="/profile" element={<Profile />} />
               <Route path="/settings" element={<StudentSettings />} />
               <Route path="/lessons/video/:lessonId" element={<VideoLesson />} />
               <Route path="/lessons/pronunciation/:lessonId" element={<PronunciationPractice />} />

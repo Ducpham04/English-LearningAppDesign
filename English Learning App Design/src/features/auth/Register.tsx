@@ -68,10 +68,14 @@ export function Register() {
 
     try {
       await register(name, email, password, selectedRole);
-      // Navigate based on role
-      if (selectedRole === 'teacher') {
+      
+      // Get the updated state from store after auto-login
+      const user = useAuthStore.getState().user;
+      const role = user?.role;
+
+      if (role === 'teacher') {
         navigate('/teacher');
-      } else if (selectedRole === 'admin') {
+      } else if (role === 'admin') {
         navigate('/admin');
       } else {
         navigate('/');
