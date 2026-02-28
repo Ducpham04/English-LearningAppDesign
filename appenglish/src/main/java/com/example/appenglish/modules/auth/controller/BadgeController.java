@@ -1,6 +1,7 @@
 package com.example.appenglish.modules.auth.controller;
 
 import com.example.appenglish.entity.User;
+import com.example.appenglish.repository.UserRepository;
 import com.example.appenglish.service.BadgeService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -11,8 +12,12 @@ import java.util.Map;
 @RestController
 @RequestMapping("/badge")
 public class BadgeController {
+
     @Autowired
     private BadgeService badgeService;
+
+    @Autowired
+    private UserRepository userRepository;
 
     @PostMapping("/check/{userId}")
     public ResponseEntity<String> checkBadge(
@@ -20,9 +25,13 @@ public class BadgeController {
             @RequestParam String criteria,
             @RequestBody Map<String, Object> userData
     ) {
-        User user = new User();
-        user.setId(userId); // Tạo user giả (thực tế sẽ lấy từ database)
+        // Lấy user thật từ database
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found with ID: " + userId));
+
+        // Kiểm tra và cấp badge
         badgeService.checkAndGrantBadge(user, criteria, userData);
+
         return ResponseEntity.ok("Badge checked and granted if conditions met!");
     }
 }
