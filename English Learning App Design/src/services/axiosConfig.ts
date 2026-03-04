@@ -5,9 +5,7 @@
 
 import axios, { AxiosError, InternalAxiosRequestConfig, AxiosResponse } from 'axios';
 import { useAuthStore } from '@/store/authStore';
-
-// API Base URL
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api';
+import { API_BASE_URL } from './baseUrl';
 
 // Create axios instance
 export const axiosInstance = axios.create({
@@ -21,6 +19,7 @@ export const axiosInstance = axios.create({
 // Track ongoing refresh requests to prevent multiple simultaneous refreshes
 let isRefreshing = false;
 let refreshSubscribers: ((token: string) => void)[] = [];
+let logoutInitiated = false;
 
 /**
  * Add subscriber to wait for token refresh
@@ -38,22 +37,47 @@ function onTokenRefreshed(token: string) {
 }
 
 /**
+ * Handle logout redirect once to prevent multiple redirects
+ */
+function handleLogoutRedirect() {
+  if (!logoutInitiated && !window.location.pathname.includes('/login')) {
+    logoutInitiated = true;
+    console.warn('[Axios] Initiating logout redirect...');
+    setTimeout(() => {
+      window.location.href = '/login';
+    }, 500);
+  }
+}
+
+/**
  * Request Interceptor
  * Automatically attaches JWT token to all requests
  */
 axiosInstance.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
+    // Log request details
+    console.log(`[Axios Request] ${config.method?.toUpperCase()} ${config.baseURL}${config.url}`, {
+      url: config.url,
+      baseURL: config.baseURL,
+      fullURL: `${config.baseURL}${config.url}`,
+      headers: config.headers,
+    });
+
     // Get auth state from Zustand store
     const state = useAuthStore.getState();
 
     // If we have a token, attach it to Authorization header
     if (state.tokens?.accessToken && config.headers) {
       config.headers.Authorization = `Bearer ${state.tokens.accessToken}`;
+      console.log('[Axios Request] Token attached to request');
+    } else {
+      console.log('[Axios Request] No token available');
     }
 
     return config;
   },
   (error: AxiosError) => {
+    console.error('[Axios Request Error]', error);
     return Promise.reject(error);
   }
 );
@@ -64,13 +88,24 @@ axiosInstance.interceptors.request.use(
  */
 axiosInstance.interceptors.response.use(
   (response: AxiosResponse) => {
+    console.log(`[Axios Response] ${response.status} - ${response.config.method?.toUpperCase()} ${response.config.url}`, {
+      data: response.data,
+    });
     return response;
   },
   async (error: AxiosError) => {
     const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
+    
+    console.error('[Axios Response Error]', {
+      status: error.response?.status,
+      url: error.config?.url,
+      message: error.message,
+      data: (error.response as any)?.data,
+    });
 
     // Handle 401 Unauthorized errors
     if (error.response?.status === 401 && originalRequest && !originalRequest._retry) {
+      console.warn('[Axios 401] Unauthorized error detected');
       // Mark request as retried to prevent infinite loops
       originalRequest._retry = true;
 
@@ -79,8 +114,9 @@ axiosInstance.interceptors.response.use(
 
       // If we don't have a refresh token, logout and redirect to login
       if (!authStore.tokens?.refreshToken) {
+        console.warn('[Axios 401] No refresh token available, logging out...');
         authStore.logout();
-        window.location.href = '/login';
+        handleLogoutRedirect();
         return Promise.reject(error);
       }
 
@@ -101,6 +137,7 @@ axiosInstance.interceptors.response.use(
 
       try {
         // Call refresh token endpoint
+        console.log('[Axios 401] Attempting to refresh token...');
         const response = await axios.post(`${API_BASE_URL}/v1/auth/refresh`, {
           refreshToken: authStore.tokens.refreshToken,
         });
@@ -108,6 +145,8 @@ axiosInstance.interceptors.response.use(
         const data = response.data.data;
         const newAccessToken = data.token;
         const newRefreshToken = data.refreshToken;
+
+        console.log('[Axios 401] Token refreshed successfully');
 
         // Update auth store with new tokens
         authStore.updateTokens({
@@ -126,8 +165,9 @@ axiosInstance.interceptors.response.use(
         return axiosInstance(originalRequest);
       } catch (refreshError) {
         // If refresh fails, logout user
+        console.error('[Axios 401] Token refresh failed, logging out...', refreshError);
         authStore.logout();
-        window.location.href = '/login';
+        handleLogoutRedirect();
         return Promise.reject(refreshError);
       } finally {
         isRefreshing = false;

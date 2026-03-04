@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Card } from '@/app/components/ui/card';
 import { Button } from '@/app/components/ui/button';
 import { Input } from '@/app/components/ui/input';
@@ -33,11 +33,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/app/components/ui/select';
+import apiService from '@/services/apiService';
+
+type ContentType = 'video' | 'pronunciation' | 'conversation' | 'vocabulary';
 
 interface Content {
   id: string;
   title: string;
-  type: 'video' | 'pronunciation' | 'conversation' | 'vocabulary';
+  type: ContentType;
   level: 'beginner' | 'intermediate' | 'advanced';
   author: string;
   createdAt: string;
@@ -51,69 +54,47 @@ export function ContentManagement() {
   const [searchQuery, setSearchQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState<'all' | Content['type']>('all');
   const [statusFilter, setStatusFilter] = useState<'all' | Content['status']>('all');
+  const [contents, setContents] = useState<Content[]>([]);
 
-  const contents: Content[] = [
-    {
-      id: '1',
-      title: 'Everyday Conversations - At Restaurant',
-      type: 'video',
-      level: 'beginner',
-      author: 'Teacher Trần Thị B',
-      createdAt: '2026-01-10',
-      status: 'approved',
-      rating: 4.8,
-      uses: 145,
-      reports: 0,
-    },
-    {
-      id: '2',
-      title: 'Pronunciation Practice - TH Sounds',
-      type: 'pronunciation',
-      level: 'intermediate',
-      author: 'Teacher Nguyễn Văn C',
-      createdAt: '2026-01-12',
-      status: 'approved',
-      rating: 4.9,
-      uses: 267,
-      reports: 0,
-    },
-    {
-      id: '3',
-      title: 'AI Conversation - Job Interview',
-      type: 'conversation',
-      level: 'advanced',
-      author: 'Teacher Lê Thị D',
-      createdAt: '2026-01-14',
-      status: 'pending',
-      rating: 0,
-      uses: 0,
-      reports: 0,
-    },
-    {
-      id: '4',
-      title: 'Business Vocabulary Set 1',
-      type: 'vocabulary',
-      level: 'intermediate',
-      author: 'Teacher Phạm Văn E',
-      createdAt: '2026-01-15',
-      status: 'approved',
-      rating: 4.6,
-      uses: 152,
-      reports: 2,
-    },
-    {
-      id: '5',
-      title: 'Controversial Topic Discussion',
-      type: 'conversation',
-      level: 'advanced',
-      author: 'Teacher Hoàng Thị F',
-      createdAt: '2026-01-16',
-      status: 'rejected',
-      rating: 0,
-      uses: 0,
-      reports: 5,
-    },
-  ];
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const res = await apiService.lesson.getAll();
+        const lessons = res.data.data || [];
+        const mapped: Content[] = lessons.map((l: any) => {
+          let type: ContentType = 'video';
+          switch (l.type) {
+            case 'SPEAKING':
+              type = 'pronunciation';
+              break;
+            case 'VOCAB':
+              type = 'vocabulary';
+              break;
+            case 'QUIZ':
+              type = 'conversation';
+              break;
+          }
+          return {
+            id: String(l.id),
+            title: l.title,
+            type,
+            level: 'beginner',
+            author: l.teacherName || 'Unknown',
+            createdAt: l.createdAt || new Date().toISOString(),
+            status: 'approved',
+            rating: 0,
+            uses: 0,
+            reports: 0,
+          };
+        });
+        setContents(mapped);
+      } catch (e) {
+        setContents([]);
+      }
+    };
+
+    load();
+  }, []);
 
   const filteredContents = contents.filter((content) => {
     const matchesSearch = content.title.toLowerCase().includes(searchQuery.toLowerCase());

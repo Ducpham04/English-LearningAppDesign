@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card } from '@/app/components/ui/card';
 import { Button } from '@/app/components/ui/button';
@@ -26,6 +26,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/app/components/ui/dropdown-menu';
+import apiService from '@/services/apiService';
 
 interface Student {
   id: string;
@@ -34,7 +35,7 @@ interface Student {
   avatar?: string;
   level: number;
   xp: number;
-  class: string;
+  className: string;
   progress: number;
   streak: number;
   accuracy: number;
@@ -47,87 +48,46 @@ export function StudentsManagement() {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedClass, setSelectedClass] = useState<string>('all');
+  const [students, setStudents] = useState<Student[]>([]);
 
-  const students: Student[] = [
-    {
-      id: '1',
-      name: 'Nguyễn Văn A',
-      email: 'nguyenvana@email.com',
-      level: 8,
-      xp: 2450,
-      class: 'Class 10A',
-      progress: 75,
-      streak: 12,
-      accuracy: 87,
-      lastActive: '2026-01-16',
-      status: 'active',
-      trend: 'up',
-    },
-    {
-      id: '2',
-      name: 'Trần Thị B',
-      email: 'tranthib@email.com',
-      level: 6,
-      xp: 1820,
-      class: 'Class 10A',
-      progress: 62,
-      streak: 5,
-      accuracy: 92,
-      lastActive: '2026-01-15',
-      status: 'active',
-      trend: 'up',
-    },
-    {
-      id: '3',
-      name: 'Lê Văn C',
-      email: 'levanc@email.com',
-      level: 4,
-      xp: 980,
-      class: 'Class 10B',
-      progress: 35,
-      streak: 0,
-      accuracy: 68,
-      lastActive: '2026-01-10',
-      status: 'at-risk',
-      trend: 'down',
-    },
-    {
-      id: '4',
-      name: 'Phạm Thị D',
-      email: 'phamthid@email.com',
-      level: 10,
-      xp: 3200,
-      class: 'Class 10A',
-      progress: 88,
-      streak: 25,
-      accuracy: 95,
-      lastActive: '2026-01-16',
-      status: 'active',
-      trend: 'up',
-    },
-    {
-      id: '5',
-      name: 'Hoàng Văn E',
-      email: 'hoangvane@email.com',
-      level: 5,
-      xp: 1450,
-      class: 'Class 10B',
-      progress: 48,
-      streak: 2,
-      accuracy: 75,
-      lastActive: '2026-01-14',
-      status: 'inactive',
-      trend: 'stable',
-    },
-  ];
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const res = await apiService.user.getAllUsers();
+        const data = res.data.data || [];
+        const mapped: Student[] = data
+          .filter((u: any) => (u.role || '').toString().toLowerCase().includes('student') || (u.roleName || '').toString().toLowerCase().includes('student'))
+          .map((u: any) => ({
+            id: u.id,
+            name: u.fullName || u.email,
+            email: u.email,
+            avatar: u.avatarUrl,
+            level: u.level ?? 1,
+            xp: u.xp ?? 0,
+            className: '',
+            progress: 0,
+            streak: u.streak ?? 0,
+            accuracy: 0,
+            lastActive: new Date().toISOString(),
+            status: 'active',
+            trend: 'stable',
+          }));
+        setStudents(mapped);
+      } catch (e) {
+        setStudents([]);
+      }
+    };
 
-  const classes = ['all', 'Class 10A', 'Class 10B', 'Class 11A'];
+    load();
+  }, []);
+
+  const classes = ['all'];
 
   const filteredStudents = students.filter((student) => {
     const matchesSearch =
       student.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       student.email.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesClass = selectedClass === 'all' || student.class === selectedClass;
+    const matchesClass = selectedClass === 'all' || student.className === selectedClass;
     return matchesSearch && matchesClass;
   });
 
@@ -135,9 +95,9 @@ export function StudentsManagement() {
     total: students.length,
     active: students.filter((s) => s.status === 'active').length,
     atRisk: students.filter((s) => s.status === 'at-risk').length,
-    avgProgress: Math.round(
-      students.reduce((sum, s) => sum + s.progress, 0) / students.length
-    ),
+    avgProgress: students.length
+      ? Math.round(students.reduce((sum, s) => sum + s.progress, 0) / students.length)
+      : 0,
   };
 
   const statusColors = {

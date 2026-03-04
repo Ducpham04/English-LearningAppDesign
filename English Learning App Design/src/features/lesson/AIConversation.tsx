@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { useAppStore } from '@/store/appStore';
+import { useCompleteLesson } from '@/hooks/useCompleteLesson';
 import { Card } from '@/app/components/ui/card';
 import { Button } from '@/app/components/ui/button';
 import { Badge } from '@/app/components/ui/badge';
@@ -34,7 +35,8 @@ const aiPrompts = [
 ];
 
 export function AIConversation() {
-  const { selectedLessonId, setCurrentView, completeLesson, addXP } = useAppStore();
+  const { selectedLessonId, setCurrentView } = useAppStore();
+  const { completeAndSave } = useCompleteLesson();
   const lesson = getLessonById(selectedLessonId || '');
   
   const [messages, setMessages] = useState<Message[]>([
@@ -132,10 +134,11 @@ export function AIConversation() {
     }, 1500);
   };
 
-  const handleComplete = () => {
-    completeLesson(selectedLessonId || '', 90);
-    addXP(100);
-    setCurrentView('session-detail');
+  const handleComplete = async () => {
+    const lid = selectedLessonId || '';
+    if (!lid) return;
+    const ok = await completeAndSave(lid, 90);
+    if (ok) setCurrentView('session-detail');
   };
 
   const handlePlayAudio = (messageId: string) => {

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/app/components/ui/button';
 import { Card } from '@/app/components/ui/card';
@@ -7,17 +7,27 @@ import { Label } from '@/app/components/ui/label';
 import { motion } from 'motion/react';
 import { Mail, Lock, User as UserIcon, AlertCircle, Loader2, CheckCircle } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
+import { getErrorMessage, logError } from '@/utils/errorHandler';
 import type { UserRole } from '@/types/auth';
 
 export function Register() {
   const navigate = useNavigate();
-  const { register, isLoading } = useAuthStore();
+  const { register, isLoading, user, isAuthenticated } = useAuthStore();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [selectedRole, setSelectedRole] = useState<UserRole>('student');
   const [error, setError] = useState('');
+
+  // Redirect if already authenticated
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      console.log('[Register] User already authenticated, redirecting to dashboard:', user.role);
+      const dashboardRoute = user.role === 'teacher' ? '/teacher' : user.role === 'admin' ? '/admin' : '/';
+      navigate(dashboardRoute, { replace: true });
+    }
+  }, [isAuthenticated, user, navigate]);
 
   const roles = [
     { 
@@ -81,7 +91,9 @@ export function Register() {
         navigate('/');
       }
     } catch (err: any) {
-      setError(err.message || 'Registration failed. Please try again.');
+      logError('Register', err, { email });
+      const errorMsg = getErrorMessage(err, 'Registration failed. Please try again.');
+      setError(errorMsg);
     }
   };
 

@@ -10,14 +10,16 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/app/components/ui/pop
 import { CalendarIcon, Plus, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
+import apiService from '@/services/apiService';
 
 interface CreateSessionModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess?: () => void;
+  courseId: number;
 }
 
-export function CreateSessionModal({ open, onOpenChange, onSuccess }: CreateSessionModalProps) {
+export function CreateSessionModal({ open, onOpenChange, onSuccess, courseId }: CreateSessionModalProps) {
   const [date, setDate] = useState<Date>();
   const [formData, setFormData] = useState({
     title: '',
@@ -37,7 +39,7 @@ export function CreateSessionModal({ open, onOpenChange, onSuccess }: CreateSess
     { id: '4', title: 'Hotel Booking Conversation', type: 'AI Chat' },
   ];
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!formData.title || !formData.level || !date || selectedLessons.length === 0) {
@@ -45,21 +47,33 @@ export function CreateSessionModal({ open, onOpenChange, onSuccess }: CreateSess
       return;
     }
 
-    toast.success('Session created successfully! 🎉');
-    onOpenChange(false);
-    onSuccess?.();
-    
-    // Reset form
-    setFormData({
-      title: '',
-      description: '',
-      level: '',
-      duration: '60',
-      maxStudents: '20',
-      lessons: [],
-    });
-    setSelectedLessons([]);
-    setDate(undefined);
+    try {
+      // BE SessionRequest: title, orderIndex, courseId
+      await apiService.session.create({
+        title: formData.title,
+        orderIndex: 0,
+        courseId,
+      });
+
+      toast.success('Session created successfully! 🎉');
+      onOpenChange(false);
+      onSuccess?.();
+      
+      // Reset form
+      setFormData({
+        title: '',
+        description: '',
+        level: '',
+        duration: '60',
+        maxStudents: '20',
+        lessons: [],
+      });
+      setSelectedLessons([]);
+      setDate(undefined);
+    } catch (error: any) {
+      console.error('Failed to create session', error);
+      toast.error(error?.message || 'Failed to create session');
+    }
   };
 
   const addLesson = (lessonId: string) => {

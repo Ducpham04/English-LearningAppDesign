@@ -6,6 +6,7 @@ import { Progress } from '@/app/components/ui/progress';
 import { Badge } from '@/app/components/ui/badge';
 import { Mic, Volume2, RotateCcw, CheckCircle2, XCircle, ArrowLeft, ArrowRight, Trophy } from 'lucide-react';
 import { toast } from 'sonner';
+import { useCompleteLesson } from '@/hooks/useCompleteLesson';
 
 interface Word {
   id: number;
@@ -18,6 +19,7 @@ interface Word {
 export function PronunciationLesson() {
   const navigate = useNavigate();
   const { lessonId } = useParams();
+  const { completeAndSave } = useCompleteLesson();
   
   const [currentWordIndex, setCurrentWordIndex] = useState(0);
   const [isRecording, setIsRecording] = useState(false);
@@ -130,11 +132,16 @@ export function PronunciationLesson() {
     }
   };
 
-  const handleComplete = () => {
-    const avgScore = scores.reduce((a, b) => a + b, 0) / scores.length;
-    const xp = Math.floor(avgScore / 2);
-    toast.success(`🎉 Lesson Completed! +${xp} XP`);
-    navigate('/student/learning');
+  const handleComplete = async () => {
+    if (!lessonId) return;
+    const avgScore = scores.length
+      ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length)
+      : 80;
+    const ok = await completeAndSave(lessonId, avgScore);
+    if (ok) {
+      toast.success(`🎉 Lesson Completed!`);
+      navigate('/student/learning');
+    }
   };
 
   const getDifficultyColor = (difficulty: string) => {

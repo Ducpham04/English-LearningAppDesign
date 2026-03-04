@@ -5,26 +5,84 @@ import { SessionCard } from '@/features/session/SessionCard';
 import { FloatingParticles } from '@/shared/ui/FloatingParticles';
 import { AnimatedMascot } from '@/shared/ui/AnimatedMascot';
 import { useAppStore } from '@/store/appStore';
-import { getClassesByStudentId } from '@/services/mockData';
+import { useStudentDashboard } from '@/hooks/useStudentData';
 import { PlayCircle, BookOpen, Award, Sparkles, Zap, Target, Users, Calendar, GraduationCap } from 'lucide-react';
 import { motion } from 'motion/react';
-import { useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 export function Dashboard() {
-  const { user, sessions, userProgress, setCurrentView, setSelectedSession, setSelectedLesson } = useAppStore();
+  const { setCurrentView, setSelectedSession, setSelectedLesson, userProgress, sessions, hydrateFromDashboard } = useAppStore();
   const navigate = useNavigate();
   
+  const { data: dashboardData, loading, error, refetch } = useStudentDashboard();
   const [showMascot, setShowMascot] = useState(true);
-  const currentSession = sessions.find(s => s.id === userProgress.currentSessionId);
-  const inProgressSessions = sessions.filter(s => s.status === 'in-progress');
-  const enrolledClasses = getClassesByStudentId(user.id);
+  const hydratedRef = useRef(false);
+
+  useEffect(() => {
+    if (dashboardData?.user && !hydratedRef.current) {
+      hydratedRef.current = true;
+      hydrateFromDashboard({ user: dashboardData.user });
+    }
+  }, [dashboardData?.user]);
+
+  const user = dashboardData?.user
+    ? {
+        id: dashboardData.user.id,
+        name: dashboardData.user.fullName || 'Người dùng',
+        avatar:
+          dashboardData.user.avatarUrl ||
+          'https://api.dicebear.com/7.x/avataaars/svg?seed=user1',
+        level: dashboardData.user.level || 1,
+        xp: dashboardData.user.xp || 0,
+        streak: dashboardData.user.streak || 0,
+        totalLessonsCompleted: dashboardData.user.totalLessonsCompleted || 0,
+      }
+    : {
+        id: '1',
+        name: 'Người dùng',
+        avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=user1',
+        level: 1,
+        xp: 0,
+        streak: 0,
+        totalLessonsCompleted: 0,
+      };
+
+  const stats = dashboardData?.stats;
+  const enrolledClasses = dashboardData?.enrolledClasses || [];
+  const courses = dashboardData?.courses || [];
+
+  // Các session đang học sẽ được điều khiển bởi dữ liệu thật sau khi có API progress riêng.
+  const currentSession = null;
+  const inProgressSessions: typeof sessions = [];
 
   const getMascotMessage = () => {
     if (user.streak >= 7) return 'Wow! Bạn đã học liên tục 7 ngày! Tuyệt vời! 🔥';
     if (user.totalLessonsCompleted >= 10) return 'Bạn đã hoàn thành nhiều bài học rồi đấy! Tiếp tục phát huy nhé! 💪';
     return 'Chào bạn! Hôm nay chúng ta học gì nào? 😊';
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-500 mx-auto mb-4"></div>
+          <p className="text-gray-500">Đang tải dữ liệu...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-red-500 mb-4">Lỗi: {error}</p>
+          <Button onClick={refetch}>Thử lại</Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="relative min-h-screen">

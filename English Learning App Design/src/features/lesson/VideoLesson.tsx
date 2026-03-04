@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { useAppStore } from '@/store/appStore';
+import { useCompleteLesson } from '@/hooks/useCompleteLesson';
 import { Card } from '@/app/components/ui/card';
 import { Button } from '@/app/components/ui/button';
 import { Badge } from '@/app/components/ui/badge';
@@ -71,7 +72,8 @@ const mockSubtitles: SubtitleSegment[] = [
 ];
 
 export function VideoLesson() {
-  const { selectedLessonId, setCurrentView, completeLesson, addXP } = useAppStore();
+  const { selectedLessonId, setCurrentView, completeLesson } = useAppStore();
+  const { completeAndSave } = useCompleteLesson();
   const lesson = getLessonById(selectedLessonId || '');
   
   const [isPlaying, setIsPlaying] = useState(false);
@@ -121,10 +123,11 @@ export function VideoLesson() {
     setCurrentTime(time);
   };
 
-  const handleComplete = () => {
-    completeLesson(selectedLessonId || '', 95);
-    addXP(50);
-    setCurrentView('session-detail');
+  const handleComplete = async () => {
+    const lid = selectedLessonId || '';
+    if (!lid) return;
+    const ok = await completeAndSave(lid, 95);
+    if (ok) setCurrentView('session-detail');
   };
 
   const progress = (currentTime / duration) * 100;

@@ -1,16 +1,17 @@
 import { Button } from '@/app/components/ui/button';
 import { Card } from '@/app/components/ui/card';
 import { useAppStore } from '@/store/appStore';
-import { mockVocabulary } from '@/services/mockData';
+import { useAllVocabulary, type VocabularyInfo } from '@/hooks/useStudentData';
 import { ArrowLeft, Volume2 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useState } from 'react';
 
 export function VocabularyScreen() {
   const { setCurrentView } = useAppStore();
-  const [flippedCards, setFlippedCards] = useState<Set<string>>(new Set());
+  const { vocabularies, loading, error } = useAllVocabulary();
+  const [flippedCards, setFlippedCards] = useState<Set<number>>(new Set());
 
-  const toggleFlip = (wordId: string) => {
+  const toggleFlip = (wordId: number) => {
     const newFlipped = new Set(flippedCards);
     if (newFlipped.has(wordId)) {
       newFlipped.delete(wordId);
@@ -19,6 +20,22 @@ export function VocabularyScreen() {
     }
     setFlippedCards(newFlipped);
   };
+
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-500"></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <p className="text-red-500">Lỗi: {error}</p>
+      </div>
+    );
+  }
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -36,14 +53,15 @@ export function VocabularyScreen() {
       <div className="mb-8">
         <h1 className="mb-2 text-3xl font-bold">Từ vựng của tôi</h1>
         <p className="text-gray-600 dark:text-gray-400">
-          Ôn tập các từ vựng bạn đã học
+          Ôn tập các từ vựng bạn đã học ({vocabularies.length} từ)
         </p>
       </div>
 
       {/* Vocabulary Grid */}
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-        {mockVocabulary.map((word) => {
+        {vocabularies.map((word: VocabularyInfo) => {
           const isFlipped = flippedCards.has(word.id);
+          const meaning = word.meanings?.[0];
           
           return (
             <motion.div
@@ -75,7 +93,7 @@ export function VocabularyScreen() {
                       <span className="text-3xl">📖</span>
                     </div>
                     <h3 className="mb-2 text-center text-2xl font-bold">{word.word}</h3>
-                    <p className="mb-4 text-center text-sm text-gray-500">{word.pronunciation}</p>
+                    <p className="mb-4 text-center text-sm text-gray-500">{word.phonetic}</p>
                     <Button variant="ghost" size="sm">
                       <Volume2 className="h-4 w-4" />
                     </Button>
@@ -90,13 +108,11 @@ export function VocabularyScreen() {
                       transform: 'rotateY(180deg)',
                     }}
                   >
-                    <h3 className="mb-4 text-center text-2xl font-bold">{word.meaning}</h3>
-                    <p className="mb-4 text-center italic opacity-90">"{word.example}"</p>
-                    {word.learned && (
-                      <div className="mt-4 rounded-full bg-white/20 px-3 py-1 text-sm">
-                        ✓ Đã học
-                      </div>
-                    )}
+                    <h3 className="mb-4 text-center text-2xl font-bold">{meaning?.def || ''}</h3>
+                    <p className="mb-4 text-center italic opacity-90">{meaning?.ex || ''}</p>
+                    <div className="mt-4 rounded-full bg-white/20 px-3 py-1 text-sm">
+                      {meaning?.pos || ''}
+                    </div>
                   </div>
                 </motion.div>
               </Card>

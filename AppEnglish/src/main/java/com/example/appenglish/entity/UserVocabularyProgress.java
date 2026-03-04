@@ -2,7 +2,6 @@ package com.example.appenglish.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
-import java.io.Serializable;
 import java.time.LocalDateTime;
 
 /**
@@ -13,38 +12,26 @@ import java.time.LocalDateTime;
 @Entity
 @Table(name = "user_vocabulary_progress")
 @Getter @Setter
-public class UserVocabularyProgress {
-
-    @EmbeddedId
-    private UserVocabId id; // Composite Key (User + Vocab)
+public class UserVocabularyProgress extends BaseEntity {
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @MapsId("userId")
+    @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @MapsId("vocabId")
+    @JoinColumn(name = "vocabulary_id", nullable = false)
     private Vocabulary vocabulary;
 
-    @Enumerated(EnumType.STRING)
-    private LearningStatus status; // NEW, LEARNING, MASTERED
+    @Column(name = "status")
+    private String status; // NEW, LEARNING, MASTERED
 
-    // --- THUẬT TOÁN SM-2 ---
-    @Column(name = "easiness_factor")
-    private Double easinessFactor = 2.5; // Độ khó của từ (càng cao càng dễ)
+    @Column(name = "times_reviewed")
+    private Integer timesReviewed = 0;
 
-    @Column(name = "interval_days")
-    private Integer intervalDays = 0; // Số ngày chờ đến lần ôn tiếp
+    @Column(name = "correct_count")
+    private Integer correctCount = 0;
 
+    // Optional fields (not always present in seed) - keep nullable
     @Column(name = "next_review_at")
-    private LocalDateTime nextReviewAt; // Ngày giờ chính xác phải ôn tập
+    private LocalDateTime nextReviewAt;
 }
-
-@Embeddable
-@Getter @Setter @EqualsAndHashCode
-class UserVocabId implements Serializable {
-    private Long userId;
-    private Long vocabId;
-}
-
-enum LearningStatus { NEW, LEARNING, REVIEW, MASTERED }

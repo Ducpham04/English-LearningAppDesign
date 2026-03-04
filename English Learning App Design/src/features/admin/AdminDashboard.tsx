@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { Card } from '@/app/components/ui/card';
 import { Button } from '@/app/components/ui/button';
 import { motion } from 'motion/react';
@@ -13,28 +14,58 @@ import {
   Clock
 } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
+import apiService from '@/services/apiService';
 
 export function AdminDashboard() {
   const { user } = useAuthStore();
 
+  const [totalUsers, setTotalUsers] = useState(0);
+  const [activeCourses, setActiveCourses] = useState(0);
+  const [recentUsers, setRecentUsers] = useState<
+    { name: string; email: string; role: string; time: string }[]
+  >([]);
+
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        const [usersRes, coursesRes] = await Promise.all([
+          apiService.user.getAllUsers(),
+          apiService.curriculum.getAll(),
+        ]);
+        const users = usersRes.data.data || [];
+        const courses = coursesRes.data.data || [];
+        setTotalUsers(users.length);
+        setActiveCourses(courses.length);
+
+        const mappedRecent = users
+          .slice(0, 3)
+          .map((u: any) => ({
+            name: u.fullName || u.email,
+            email: u.email,
+            role: u.role || 'User',
+            time: '',
+          }));
+        setRecentUsers(mappedRecent);
+      } catch (e) {
+        // swallow errors, show zeros
+      }
+    };
+
+    loadData();
+  }, []);
+
   const stats = [
-    { label: 'Total Users', value: '1,321', change: '+12%', icon: Users, color: 'from-green-400 to-green-600' },
-    { label: 'Active Courses', value: '245', change: '+5%', icon: BookOpen, color: 'from-blue-400 to-blue-600' },
-    { label: 'Revenue', value: '$45.2K', change: '+18%', icon: DollarSign, color: 'from-purple-400 to-purple-600' },
-    { label: 'Engagement', value: '87%', change: '+3%', icon: TrendingUp, color: 'from-orange-400 to-orange-600' },
+    { label: 'Total Users', value: String(totalUsers), change: '', icon: Users, color: 'from-green-400 to-green-600' },
+    { label: 'Active Courses', value: String(activeCourses), change: '', icon: BookOpen, color: 'from-blue-400 to-blue-600' },
+    { label: 'Revenue', value: '$0', change: '', icon: DollarSign, color: 'from-purple-400 to-purple-600' },
+    { label: 'Engagement', value: '-', change: '', icon: TrendingUp, color: 'from-orange-400 to-orange-600' },
   ];
 
   const systemStatus = [
     { label: 'API Server', status: 'operational', icon: CheckCircle, color: 'text-green-600' },
     { label: 'Database', status: 'operational', icon: CheckCircle, color: 'text-green-600' },
-    { label: 'AI Service', status: 'warning', icon: AlertTriangle, color: 'text-orange-600' },
+    { label: 'AI Service', status: 'operational', icon: CheckCircle, color: 'text-green-600' },
     { label: 'Storage', status: 'operational', icon: CheckCircle, color: 'text-green-600' },
-  ];
-
-  const recentUsers = [
-    { name: 'John Student', email: 'john@example.com', role: 'Student', status: 'active', time: '5 min ago' },
-    { name: 'Jane Teacher', email: 'jane@example.com', role: 'Teacher', status: 'active', time: '10 min ago' },
-    { name: 'Bob Student', email: 'bob@example.com', role: 'Student', status: 'active', time: '1 hour ago' },
   ];
 
   return (

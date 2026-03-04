@@ -7,6 +7,7 @@ import { Badge } from '@/app/components/ui/badge';
 import { RotateCcw, CheckCircle2, XCircle, ArrowLeft, ArrowRight, Volume2, Star } from 'lucide-react';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'motion/react';
+import { useCompleteLesson } from '@/hooks/useCompleteLesson';
 
 interface Flashcard {
   id: number;
@@ -21,6 +22,7 @@ interface Flashcard {
 export function FlashcardLesson() {
   const navigate = useNavigate();
   const { lessonId } = useParams();
+  const { completeAndSave } = useCompleteLesson();
   
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
@@ -118,10 +120,14 @@ export function FlashcardLesson() {
     window.speechSynthesis.speak(utterance);
   };
 
-  const handleComplete = () => {
-    const xp = (known.length * 10) + (learning.length * 5);
-    toast.success(`🎉 Flashcard Set Completed! +${xp} XP`);
-    navigate('/student/learning');
+  const handleComplete = async () => {
+    if (!lessonId) return;
+    const score = Math.min(100, 60 + (known.length * 8) + (learning.length * 4));
+    const ok = await completeAndSave(lessonId, score);
+    if (ok) {
+      toast.success(`🎉 Flashcard Set Completed!`);
+      navigate('/student/learning');
+    }
   };
 
   return (

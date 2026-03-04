@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
 import apiService from '@/services/apiService';
+import { logError } from '@/utils/errorHandler';
 import type { AuthUser } from '@/types/auth';
 
 interface UserProfile extends AuthUser {
@@ -51,7 +52,7 @@ export function Profile() {
       const response = await apiService.user.getMe();
       setProfile(response.data.data);
     } catch (error) {
-      console.error('Failed to fetch profile:', error);
+      logError('Profile.fetchUserProfile', error);
     } finally {
       setIsLoading(false);
     }

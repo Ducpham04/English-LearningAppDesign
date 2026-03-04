@@ -1,0 +1,19 @@
+package com.example.appenglish.modules.vocabulary.dto;
+
+import lombok.*;
+
+import java.util.List;
+import java.util.Map;
+
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class VocabularyDto {
+    private Long id;
+    private String word;
+    private String phonetic;
+    private String audioUrl;
+    private List<Map<String, String>> meanings;
+    private List<String> tags;
+}

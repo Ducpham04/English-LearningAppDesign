@@ -25,11 +25,22 @@ import {
   SelectValue,
 } from '@/app/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/app/components/ui/tabs';
+import apiService from '@/services/apiService';
+import { toast } from 'sonner';
 
-export function CreateLesson() {
+interface CreateLessonProps {
+  courseId: number;
+  sessionId: number;
+}
+
+export function CreateLesson({ courseId, sessionId }: CreateLessonProps) {
   const [lessonType, setLessonType] = useState<'video' | 'pronunciation' | 'conversation' | 'vocabulary'>('video');
   const [tags, setTags] = useState<string[]>([]);
   const [newTag, setNewTag] = useState('');
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [level, setLevel] = useState('');
+  const [duration, setDuration] = useState<string>('');
 
   const lessonTypes = [
     { value: 'video', label: 'Video Lesson', icon: Video, color: 'blue' },
@@ -47,6 +58,49 @@ export function CreateLesson() {
 
   const removeTag = (tag: string) => {
     setTags(tags.filter((t) => t !== tag));
+  };
+
+  const handlePublish = async () => {
+    if (!title || !level || !duration) {
+      toast.error('Please fill in required fields (title, level, duration)');
+      return;
+    }
+
+    try {
+      // Map FE type to BE LessonType
+      const mapType = (t: typeof lessonType) => {
+        switch (t) {
+          case 'video':
+            return 'VIDEO';
+          case 'pronunciation':
+            return 'SPEAKING';
+          case 'vocabulary':
+            return 'VOCAB';
+          case 'conversation':
+          default:
+            return 'QUIZ';
+        }
+      };
+
+      const contentPayload: Record<string, any> = {
+        description,
+        tags,
+      };
+
+      await apiService.lesson.create({
+        title,
+        courseId,
+        sessionId,
+        type: mapType(lessonType),
+        orderIndex: 0,
+        contentPayload,
+      });
+
+      toast.success('Lesson published successfully! 🎉');
+    } catch (error: any) {
+      console.error('Failed to publish lesson', error);
+      toast.error(error?.message || 'Failed to publish lesson');
+    }
   };
 
   return (
@@ -121,6 +175,8 @@ export function CreateLesson() {
                     id="title"
                     placeholder="Enter a clear, descriptive title"
                     className="mt-2"
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
                   />
                 </div>
 
@@ -131,6 +187,8 @@ export function CreateLesson() {
                     id="description"
                     placeholder="What will students learn in this lesson?"
                     className="mt-2 min-h-[100px]"
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
                   />
                 </div>
 
@@ -138,7 +196,7 @@ export function CreateLesson() {
                 <div className="grid md:grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="level">Level *</Label>
-                    <Select>
+                    <Select value={level} onValueChange={setLevel}>
                       <SelectTrigger className="mt-2">
                         <SelectValue placeholder="Select level" />
                       </SelectTrigger>
@@ -156,6 +214,8 @@ export function CreateLesson() {
                       type="number"
                       placeholder="15"
                       className="mt-2"
+                      value={duration}
+                      onChange={(e) => setDuration(e.target.value)}
                     />
                   </div>
                 </div>
@@ -367,7 +427,7 @@ export function CreateLesson() {
               <Save className="h-4 w-4" />
               Save Draft
             </Button>
-            <Button className="bg-green-500 hover:bg-green-600 gap-2">
+            <Button className="bg-green-500 hover:bg-green-600 gap-2" onClick={handlePublish}>
               <Sparkles className="h-4 w-4" />
               Publish Lesson
             </Button>

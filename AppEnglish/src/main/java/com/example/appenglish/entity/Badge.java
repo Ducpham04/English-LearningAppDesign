@@ -13,6 +13,7 @@ import java.util.Map;
 @Getter @Setter
 public class Badge extends BaseEntity {
     private String name;
+
     private String iconUrl;
 
     // JSONB: Điều kiện nhận huy hiệu { "streak": 7 }

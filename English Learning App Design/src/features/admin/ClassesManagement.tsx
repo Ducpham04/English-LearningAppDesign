@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { Card } from '@/app/components/ui/card';
 import { Button } from '@/app/components/ui/button';
 import { Badge } from '@/app/components/ui/badge';
@@ -20,46 +21,57 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/app/components/ui/dropdown-menu';
+import apiService from '@/services/apiService';
+import { CreateClassModal } from '@/features/teacher/CreateClassModal';
+
+interface AdminClassItem {
+  id: string;
+  name: string;
+  teacher: string;
+  students: number;
+  maxStudents: number;
+  progress: number;
+  status: string;
+  schedule: string[];
+}
 
 export function AdminClassesManagement() {
-  const classes = [
-    {
-      id: '1',
-      name: 'Class 10A - English Fundamentals',
-      teacher: 'Teacher Trần Thị B',
-      students: 28,
-      maxStudents: 30,
-      progress: 72,
-      status: 'active',
-      schedule: ['Mon 8:00 AM', 'Wed 8:00 AM', 'Fri 8:00 AM'],
-    },
-    {
-      id: '2',
-      name: 'Class 10B - English Fundamentals',
-      teacher: 'Teacher Nguyễn Văn C',
-      students: 25,
-      maxStudents: 30,
-      progress: 68,
-      status: 'active',
-      schedule: ['Tue 10:00 AM', 'Thu 10:00 AM'],
-    },
-    {
-      id: '3',
-      name: 'Class 11A - Advanced English',
-      teacher: 'Teacher Lê Thị D',
-      students: 22,
-      maxStudents: 25,
-      progress: 78,
-      status: 'active',
-      schedule: ['Mon 2:00 PM', 'Wed 2:00 PM', 'Fri 2:00 PM'],
-    },
-  ];
+  const [classes, setClasses] = useState<AdminClassItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [openCreate, setOpenCreate] = useState(false);
+
+  useEffect(() => {
+    const fetchClasses = async () => {
+      try {
+        setLoading(true);
+        const res = await apiService.classroom.getAll();
+        const data = res.data.data || [];
+        const mapped: AdminClassItem[] = data.map((c: any) => ({
+          id: String(c.id),
+          name: c.name,
+          teacher: c.teacherName || 'Unknown',
+          students: c.studentCount ?? 0,
+          maxStudents: c.maxStudents ?? 30,
+          progress: 0,
+          status: c.status || 'active',
+          schedule: [],
+        }));
+        setClasses(mapped);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchClasses();
+  }, []);
 
   const stats = {
     total: classes.length,
     active: classes.filter((c) => c.status === 'active').length,
     students: classes.reduce((sum, c) => sum + c.students, 0),
-    avgProgress: Math.round(classes.reduce((sum, c) => sum + c.progress, 0) / classes.length),
+    avgProgress: classes.length
+      ? Math.round(classes.reduce((sum, c) => sum + c.progress, 0) / classes.length)
+      : 0,
   };
 
   return (
@@ -76,7 +88,7 @@ export function AdminClassesManagement() {
                 <p className="text-purple-50">Monitor all platform classes</p>
               </div>
             </div>
-            <Button className="bg-white text-purple-600 hover:bg-purple-50 gap-2">
+            <Button className="bg-white text-purple-600 hover:bg-purple-50 gap-2" onClick={() => setOpenCreate(true)}>
               <Plus className="h-5 w-5" />
               Create Class
             </Button>
@@ -124,6 +136,12 @@ export function AdminClassesManagement() {
       </div>
 
       <div className="max-w-7xl mx-auto p-4 md:p-6">
+        {loading && (
+          <div className="py-10 text-center text-gray-500 dark:text-gray-400">
+            Loading classes...
+          </div>
+        )}
+
         <div className="grid gap-4">
           {classes.map((classItem) => (
             <Card key={classItem.id} className="p-6 hover:shadow-lg transition-all duration-300">

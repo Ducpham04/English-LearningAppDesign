@@ -8,6 +8,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/app/components/ui/badge';
 import { Copy, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
+import { useAuthStore } from '@/store/authStore';
+import apiService from '@/services/apiService';
 
 interface CreateClassModalProps {
   open: boolean;
@@ -16,6 +18,7 @@ interface CreateClassModalProps {
 }
 
 export function CreateClassModal({ open, onOpenChange, onSuccess }: CreateClassModalProps) {
+  const { user } = useAuthStore();
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -43,7 +46,7 @@ export function CreateClassModal({ open, onOpenChange, onSuccess }: CreateClassM
     return code;
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!formData.name || !formData.level) {
@@ -51,10 +54,24 @@ export function CreateClassModal({ open, onOpenChange, onSuccess }: CreateClassM
       return;
     }
 
-    toast.success(`Class created successfully! Code: ${formData.classCode} 🎉`);
-    onOpenChange(false);
-    onSuccess?.();
-    resetForm();
+    try {
+      // Hiện tại ClassroomRequest yêu cầu: name, teacherId, startDate, endDate, status.
+      // Ở đây ta chỉ gửi name, teacherId tạm thời; các trường khác BE có thể mặc định.
+      const teacherId = user?.id ? Number(user.id) : 1;
+
+      await apiService.classroom.create({
+        name: formData.name,
+        teacherId,
+      });
+
+      toast.success(`Class created successfully! Code: ${formData.classCode} 🎉`);
+      onOpenChange(false);
+      onSuccess?.();
+      resetForm();
+    } catch (error: any) {
+      console.error('Failed to create classroom', error);
+      toast.error(error?.message || 'Failed to create classroom');
+    }
   };
 
   const resetForm = () => {

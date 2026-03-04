@@ -1,36 +1,80 @@
+import { useState } from 'react';
 import { Button } from '@/app/components/ui/button';
 import { Progress } from '@/app/components/ui/progress';
 import { LevelBadge } from '@/shared/ui/LevelBadge';
 import { LessonItem } from '@/features/lesson/LessonItem';
 import { useAppStore } from '@/store/appStore';
-import { getLessonsBySessionId, getSessionById } from '@/services/mockData';
+import { useLessonsBySession, useSessionById, type SessionInfo, type LessonInfo } from '@/hooks/useStudentData';
 import { ArrowLeft, Clock, BookOpen } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 
 export function SessionDetail() {
   const { sessionId } = useParams<{ sessionId: string }>();
-  const { selectedSessionId, setCurrentView } = useAppStore();
+  const { selectedSessionId } = useAppStore();
   const navigate = useNavigate();
 
   // Use sessionId from URL params first, fallback to store
   const currentSessionId = sessionId || selectedSessionId;
+  const numericSessionId = currentSessionId ? Number(currentSessionId) : null;
+  const { session, loading: sessionLoading, error: sessionError } = useSessionById(numericSessionId);
 
-  console.log('SessionDetail - sessionId from URL:', sessionId);
-  console.log('SessionDetail - selectedSessionId from store:', selectedSessionId);
-  console.log('SessionDetail - using currentSessionId:', currentSessionId);
+  // Fetch lessons for this session
+  const { lessons, loading: lessonsLoading, error: lessonsError } = useLessonsBySession(numericSessionId || 0);
 
-  if (!currentSessionId) {
-    return <div>Session not found</div>;
+  if (sessionLoading || lessonsLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-500"></div>
+      </div>
+    );
   }
 
-  const session = getSessionById(currentSessionId);
-  const lessons = getLessonsBySessionId(currentSessionId);
-
-  if (!session) {
-    return <div>Session not found</div>;
+  if (!currentSessionId || !session) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <Button
+          variant="ghost"
+          size="sm"
+          className="mb-4"
+          onClick={() => navigate('/sessions')}
+        >
+          <ArrowLeft className="mr-2 h-4 w-4" />
+          Quay lại
+        </Button>
+        <p className="text-red-500">Không tìm thấy session.</p>
+      </div>
+    );
   }
 
-  const progress = (session.completedLessons / session.totalLessons) * 100;
+  const completedLessons = 0; // TODO: Get from user progress
+  const progress = (completedLessons / (session.lessonCount || 1)) * 100;
+
+  const mapLessonType = (backendType: LessonInfo['type']) => {
+    switch (backendType) {
+      case 'VIDEO':
+        return 'video' as const;
+      case 'SPEAKING':
+        return 'pronunciation' as const;
+      case 'VOCAB':
+        return 'flashcard' as const;
+      case 'QUIZ':
+        return 'flashcard' as const;
+      default:
+        return 'video' as const;
+    }
+  };
+
+  // Map API lessons to FE format
+  const mappedLessons = lessons.map((lesson: LessonInfo) => ({
+    id: String(lesson.id),
+    sessionId: String(lesson.sessionId),
+    title: lesson.title,
+    type: mapLessonType(lesson.type),
+    description: '',
+    duration: lesson.contentPayload?.duration || 25,
+    status: 'available' as any,
+    order: lesson.orderIndex || 0,
+  }));
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -39,10 +83,7 @@ export function SessionDetail() {
         variant="ghost"
         size="sm"
         className="mb-4"
-        onClick={() => {
-          console.log('SessionDetail - Back button clicked, navigating to /sessions');
-          navigate('/sessions');
-        }}
+        onClick={() => navigate('/sessions')}
       >
         <ArrowLeft className="mr-2 h-4 w-4" />
         Quay lại
@@ -51,20 +92,20 @@ export function SessionDetail() {
       {/* Session Info */}
       <div className="mb-8 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 p-8 text-white">
         <div className="mb-3">
-          <LevelBadge level={session.level} />
+          <LevelBadge level="beginner" />
         </div>
         <h1 className="mb-3 text-3xl font-bold">{session.title}</h1>
-        <p className="mb-6 text-lg opacity-90">{session.description}</p>
+        <p className="mb-6 text-lg opacity-90">{session.courseName || ''}</p>
 
         {/* Stats */}
         <div className="mb-6 flex flex-wrap gap-6">
           <div className="flex items-center gap-2">
             <BookOpen className="h-5 w-5" />
-            <span>{session.totalLessons} bài học</span>
+            <span>{session.lessonCount || 0} bài học</span>
           </div>
           <div className="flex items-center gap-2">
             <Clock className="h-5 w-5" />
-            <span>~{session.estimatedTime} phút</span>
+            <span>~{(session.lessonCount || 0) * 25} phút</span>
           </div>
         </div>
 
@@ -72,7 +113,7 @@ export function SessionDetail() {
         <div className="space-y-2">
           <div className="flex justify-between text-sm">
             <span>Tiến độ</span>
-            <span>{session.completedLessons}/{session.totalLessons} bài</span>
+            <span>{completedLessons}/{session.lessonCount || 0} bài</span>
           </div>
           <Progress value={progress} className="h-3 bg-white/20" />
         </div>
@@ -81,15 +122,11 @@ export function SessionDetail() {
       {/* Lessons List */}
       <div className="space-y-4">
         <h2 className="mb-4 text-2xl font-bold">Danh sách bài học</h2>
-        {lessons.map((lesson) => (
+        {mappedLessons.map((lesson) => (
           <LessonItem
             key={lesson.id}
             lesson={lesson}
-            onClick={() => {
-              console.log('SessionDetail - Clicked lesson:', lesson.id, lesson.title);
-              console.log('SessionDetail - Navigating to:', `/lessons/${lesson.id}`);
-              navigate(`/lessons/${lesson.id}`);
-            }}
+            onClick={() => navigate(`/lessons/${lesson.id}`)}
           />
         ))}
       </div>

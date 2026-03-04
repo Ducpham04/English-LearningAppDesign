@@ -6,6 +6,7 @@ import { Progress } from '@/app/components/ui/progress';
 import { Badge } from '@/app/components/ui/badge';
 import { Play, Pause, RotateCcw, Volume2, VolumeX, CheckCircle2, ArrowLeft, ArrowRight } from 'lucide-react';
 import { toast } from 'sonner';
+import { useCompleteLesson } from '@/hooks/useCompleteLesson';
 
 interface Subtitle {
   time: number;
@@ -17,6 +18,7 @@ interface Subtitle {
 export function VideoConversationLesson() {
   const navigate = useNavigate();
   const { lessonId } = useParams();
+  const { completeAndSave } = useCompleteLesson();
   const videoRef = useRef<HTMLVideoElement>(null);
   
   const [isPlaying, setIsPlaying] = useState(false);
@@ -111,9 +113,13 @@ export function VideoConversationLesson() {
     }
   };
 
-  const handleComplete = () => {
-    toast.success(`🎉 Completed! +${lesson.xp} XP`);
-    navigate('/student/learning');
+  const handleComplete = async () => {
+    if (!lessonId) return;
+    const ok = await completeAndSave(lessonId, 85);
+    if (ok) {
+      toast.success(`🎉 Completed! +${lesson.xp} XP`);
+      navigate('/student/learning');
+    }
   };
 
   return (

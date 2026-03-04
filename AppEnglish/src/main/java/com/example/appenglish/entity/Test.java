@@ -9,6 +9,9 @@ import lombok.*;
         @Index(name = "idx_test_lesson", columnList = "lesson_id")
 })
 @Getter @Setter
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class Test extends BaseEntity {
     private String title;
     private Integer duration; // Phút (null = không giới hạn)

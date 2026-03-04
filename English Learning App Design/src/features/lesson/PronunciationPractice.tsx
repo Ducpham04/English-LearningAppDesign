@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { useAppStore } from '@/store/appStore';
+import { useCompleteLesson } from '@/hooks/useCompleteLesson';
 import { Card } from '@/app/components/ui/card';
 import { Button } from '@/app/components/ui/button';
 import { Badge } from '@/app/components/ui/badge';
@@ -89,7 +90,8 @@ const generateMockAnalysis = (targetText: string): PronunciationResult => {
 };
 
 export function PronunciationPractice() {
-  const { selectedLessonId, setCurrentView, completeLesson, addXP } = useAppStore();
+  const { selectedLessonId, setCurrentView } = useAppStore();
+  const { completeAndSave } = useCompleteLesson();
   const lesson = getLessonById(selectedLessonId || '');
   
   const [currentPhraseIndex, setCurrentPhraseIndex] = useState(0);
@@ -153,7 +155,7 @@ export function PronunciationPractice() {
     console.log('Playing example audio');
   };
 
-  const handleNextPhrase = () => {
+  const handleNextPhrase = async () => {
     if (currentPhraseIndex < totalPhrases - 1) {
       setCurrentPhraseIndex(currentPhraseIndex + 1);
       setRecordingTime(0);
@@ -163,9 +165,13 @@ export function PronunciationPractice() {
     } else {
       // Complete lesson
       const avgScore = analysisResult?.score.overall || 85;
-      completeLesson(selectedLessonId || '', avgScore);
-      addXP(75);
-      setCurrentView('session-detail');
+      const lid = selectedLessonId || '';
+      if (lid) {
+        const ok = await completeAndSave(lid, avgScore);
+        if (ok) setCurrentView('session-detail');
+      } else {
+        setCurrentView('session-detail');
+      }
     }
   };
 

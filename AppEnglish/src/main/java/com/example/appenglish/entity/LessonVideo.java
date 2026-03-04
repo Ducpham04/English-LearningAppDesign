@@ -15,6 +15,8 @@ import java.util.Map;
 @Entity
 @Table(name = "lesson_videos")
 @Getter @Setter
+@NoArgsConstructor
+@AllArgsConstructor
 public class LessonVideo {
 
     @Id

@@ -2,8 +2,7 @@ package com.example.appenglish.entity;
 
 import io.hypersistence.utils.hibernate.type.json.JsonType;
 import jakarta.persistence.*;
-import lombok.Getter;
-import lombok.Setter;
+import lombok.*;
 import org.hibernate.annotations.Type;
 
 import java.util.ArrayList;
@@ -20,6 +19,9 @@ import java.util.Map;
 })
 @Getter
 @Setter
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class Vocabulary extends BaseEntity {
 
     @Column(nullable = false)
@@ -39,5 +41,6 @@ public class Vocabulary extends BaseEntity {
     private List<String> tags;
 
     @OneToMany(mappedBy = "vocabulary")
+    @Builder.Default
     private List<LessonVocabulary> lessonVocabularies = new ArrayList<>();
 }

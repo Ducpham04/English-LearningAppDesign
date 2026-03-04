@@ -1,9 +1,19 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAppStore } from '@/store/appStore';
-import { getLessonById } from '@/services/mockData';
 import { Card } from '@/app/components/ui/card';
 import { Loader2 } from 'lucide-react';
+import apiService from '@/services/apiService';
+
+interface LessonInfo {
+  id: number;
+  title: string;
+  courseId: number;
+  sessionId: number;
+  type: 'VIDEO' | 'QUIZ' | 'VOCAB' | 'SPEAKING';
+  orderIndex: number;
+  contentPayload: Record<string, any>;
+}
 
 /**
  * LessonRouter - Component trung gian để route đến đúng loại bài học
@@ -13,61 +23,69 @@ export function LessonRouter() {
   const { lessonId } = useParams<{ lessonId: string }>();
   const navigate = useNavigate();
   const { selectedLessonId } = useAppStore();
+  const [loading, setLoading] = useState(true);
+  const [lesson, setLesson] = useState<LessonInfo | null>(null);
 
   useEffect(() => {
-    const id = lessonId || selectedLessonId;
-    
-    console.log('LessonRouter - lessonId from URL:', lessonId);
-    console.log('LessonRouter - selectedLessonId from store:', selectedLessonId);
-    console.log('LessonRouter - using id:', id);
-    
-    if (!id) {
-      console.log('LessonRouter - No ID found, redirecting to sessions');
-      navigate('/sessions');
-      return;
-    }
-
-    const lesson = getLessonById(id);
-    
-    console.log('LessonRouter - Found lesson:', lesson);
-
-    if (!lesson) {
-      console.log('LessonRouter - Lesson not found, redirecting to sessions');
-      navigate('/sessions');
-      return;
-    }
-
-    // Route đến đúng loại bài học dựa trên lesson type
-    console.log('LessonRouter - Navigating to lesson type:', lesson.type);
-    switch (lesson.type) {
-      case 'video':
-        console.log('LessonRouter - Navigating to video-conversation');
-        navigate(`/lessons/video-conversation/${id}`, { replace: true });
-        break;
-      case 'pronunciation':
-        console.log('LessonRouter - Navigating to pronunciation-lesson');
-        navigate(`/lessons/pronunciation-lesson/${id}`, { replace: true });
-        break;
-      case 'ai-conversation':
-        console.log('LessonRouter - Navigating to ai-conversation-lesson');
-        navigate(`/lessons/ai-conversation-lesson/${id}`, { replace: true });
-        break;
-      case 'flashcard':
-        console.log('LessonRouter - Navigating to flashcard-lesson');
-        navigate(`/lessons/flashcard-lesson/${id}`, { replace: true });
-        break;
-      default:
-        console.log('LessonRouter - Unknown lesson type, redirecting to sessions');
+    const fetchLesson = async () => {
+      const id = lessonId || selectedLessonId;
+      
+      if (!id) {
         navigate('/sessions');
-    }
+        return;
+      }
+
+      try {
+        // Try to fetch from API
+        const response = await apiService.lesson.getById(Number(id));
+        const lessonData = response.data.data;
+        setLesson(lessonData);
+      } catch (err) {
+        console.error('Failed to fetch lesson:', err);
+        navigate('/sessions');
+        return;
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchLesson();
   }, [lessonId, selectedLessonId, navigate]);
 
-  return (
-    <div className="flex min-h-screen items-center justify-center">
-      <Card className="p-8 text-center">
-        <Loader2 className="h-12 w-12 animate-spin mx-auto mb-4 text-green-500" />
-        <p className="text-lg font-semibold">Đang tải bài học...</p>
-      </Card>
-    </div>
-  );
+  useEffect(() => {
+    if (!lesson || loading) return;
+
+    console.log('LessonRouter - Navigating to lesson type:', lesson.type);
+    switch (lesson.type) {
+      case 'VIDEO':
+        navigate(`/lessons/video-conversation/${lesson.id}`, { replace: true });
+        break;
+      case 'SPEAKING':
+      case 'pronunciation':
+        navigate(`/lessons/pronunciation-lesson/${lesson.id}`, { replace: true });
+        break;
+      case 'VOCAB':
+      case 'flashcard':
+        navigate(`/lessons/flashcard-lesson/${lesson.id}`, { replace: true });
+        break;
+      case 'QUIZ':
+        navigate(`/lessons/quiz/${lesson.id}`, { replace: true });
+        break;
+      default:
+        navigate('/sessions');
+    }
+  }, [lesson, loading, navigate]);
+
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <Card className="p-8 text-center">
+          <Loader2 className="h-12 w-12 animate-spin mx-auto mb-4 text-green-500" />
+          <p className="text-lg font-semibold">Đang tải bài học...</p>
+        </Card>
+      </div>
+    );
+  }
+
+  return null;
 }

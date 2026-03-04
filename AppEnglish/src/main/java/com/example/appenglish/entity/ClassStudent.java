@@ -14,19 +14,14 @@ public class ClassStudent {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @MapsId("classId")
+    @JoinColumn(name = "class_id")
     private Classroom classroom;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @MapsId("studentId")
+    @JoinColumn(name = "student_id")
     private User student;
 
     private LocalDateTime joinedAt;
     private Boolean isFaceVerified;
-}
-
-@Embeddable
-@Getter @Setter @EqualsAndHashCode
-class ClassStudentId implements Serializable {
-    private Long classId;
-    private Long studentId;
 }

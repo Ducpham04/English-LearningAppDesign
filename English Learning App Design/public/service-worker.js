@@ -1,4 +1,4 @@
-const CACHE_NAME = 'english-ai-v1';
+const CACHE_NAME = 'english-ai-v2';
 const urlsToCache = [
   '/',
   '/index.html',
@@ -24,6 +24,24 @@ self.addEventListener('install', (event) => {
 
 // Fetch event - serve from cache, fallback to network
 self.addEventListener('fetch', (event) => {
+  const url = new URL(event.request.url);
+
+  // Never cache API calls (avoid breaking auth and preventing CORS/debugging issues)
+  // Backend runs with context-path "/api" (e.g. /api/v1/auth/login).
+  // Also bypass any direct "/v1/*" calls in case the client is misconfigured.
+  if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/v1/')) {
+    event.respondWith(
+      fetch(event.request).catch((error) => {
+        console.error('API fetch failed:', error);
+        return new Response('API network error', {
+          status: 502,
+          headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+        });
+      })
+    );
+    return;
+  }
+
   event.respondWith(
     caches.match(event.request)
       .then((response) => {
@@ -49,8 +67,11 @@ self.addEventListener('fetch', (event) => {
           return response;
         }).catch((error) => {
           console.error('Fetch failed:', error);
-          // Return offline page if available
-          return caches.match('/offline.html');
+          // Always return a valid Response object (never undefined)
+          return new Response('Offline or network error', {
+            status: 503,
+            headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+          });
         });
       })
   );

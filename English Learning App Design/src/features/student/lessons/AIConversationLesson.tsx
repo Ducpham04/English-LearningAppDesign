@@ -6,6 +6,7 @@ import { Badge } from '@/app/components/ui/badge';
 import { Mic, Send, Volume2, ArrowLeft, CheckCircle2, Bot, User } from 'lucide-react';
 import { toast } from 'sonner';
 import { Avatar, AvatarFallback, AvatarImage } from '@/app/components/ui/avatar';
+import { useCompleteLesson } from '@/hooks/useCompleteLesson';
 
 interface Message {
   id: number;
@@ -18,6 +19,7 @@ interface Message {
 export function AIConversationLesson() {
   const navigate = useNavigate();
   const { lessonId } = useParams();
+  const { completeAndSave } = useCompleteLesson();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   
   const [messages, setMessages] = useState<Message[]>([]);
@@ -132,9 +134,13 @@ export function AIConversationLesson() {
     }, 1000);
   };
 
-  const handleComplete = () => {
-    toast.success(`🎉 Conversation Completed! +${scenario.xp} XP`);
-    navigate('/student/learning');
+  const handleComplete = async () => {
+    if (!lessonId) return;
+    const ok = await completeAndSave(lessonId, 85);
+    if (ok) {
+      toast.success(`🎉 Conversation Completed! +${scenario.xp} XP`);
+      navigate('/student/learning');
+    }
   };
 
   const progress = (turnCount / scenario.targetTurns) * 100;

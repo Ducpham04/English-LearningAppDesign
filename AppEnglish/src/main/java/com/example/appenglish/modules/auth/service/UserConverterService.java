@@ -17,7 +17,7 @@ public class UserConverterService {
                 .name(user.getFullName())
                 .email(user.getEmail())
                 .avatar(user.getAvatarUrl())
-                .role(user.getRole() != null ? user.getRole().getName() : "student")
+                .role(user.getRole() != null ? user.getRole().getName() : "ROLE_USER")
                 .level(5) // TODO: Get from UserProfile or Achievement
                 .xp(1250) // TODO: Get from UserProfile
                 .streak(7) // TODO: Get from streak logic

@@ -79,7 +79,8 @@ export default function App() {
 
   useEffect(() => {
     // Initialize PWA features
-    registerServiceWorker();
+    // TODO: Fix service worker CORS issue before enabling
+    // registerServiceWorker();
     initInstallPrompt();
     initNetworkListeners();
     

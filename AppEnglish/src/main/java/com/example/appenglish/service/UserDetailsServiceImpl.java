@@ -1,7 +1,10 @@
 package com.example.appenglish.service;
 
-
-import com.example.appenglish.entity.*;
+import com.example.appenglish.entity.User;
+import com.example.appenglish.entity.UserProfile;
+import com.example.appenglish.entity.XPLog;
+import com.example.appenglish.entity.FaceVerificationLog;
+import com.example.appenglish.entity.Role;
 import com.example.appenglish.modules.auth.dto.RegisterRequest;
 import com.example.appenglish.repository.*;
 import lombok.RequiredArgsConstructor;
@@ -13,6 +16,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -22,11 +26,11 @@ import java.util.Set;
 public class UserDetailsServiceImpl implements UserDetailsService {
 
     private final UserRepository userRepository;
-    private final PasswordEncoder  passwordEncoder;
     private final RoleRepository roleRepository;
     private final UserProfileRepository userProfileRepository;
     private final XpRepository xpRepository;
     private final FaceIdRepository faceIdRepository;
+    private final PasswordEncoder passwordEncoder;
 
     @Override
     @Transactional(readOnly = true)
@@ -35,11 +39,9 @@ public class UserDetailsServiceImpl implements UserDetailsService {
                 .orElseThrow(() -> new UsernameNotFoundException("User not found: " + email));
 
         Set<SimpleGrantedAuthority> authorities = new HashSet<>();
-        if (user.getRole() != null && user.getRole().getName() != null) {
-            authorities.add(new SimpleGrantedAuthority("ROLE_" + user.getRole().getName()));
-        }
-        if (user.getRole() != null && user.getRole().getPermissions() != null) {
-            user.getRole().getPermissions().forEach(p -> authorities.add(new SimpleGrantedAuthority(p.getCode())));
+        if (user.getRole() != null) {
+            // Role entity có trường name (String), dùng trực tiếp
+            authorities.add(new SimpleGrantedAuthority(user.getRole().getName()));
         }
 
         return org.springframework.security.core.userdetails.User
@@ -61,53 +63,52 @@ public class UserDetailsServiceImpl implements UserDetailsService {
             return false;
         }
 
-        // 1. Map role name
-        String roleName;
+        // Map role string to Role entity (dùng role_id)
+        Role role;
         if ("STUDENT".equalsIgnoreCase(req.getRole())) {
-            roleName = "STUDENT";
+            role = roleRepository.findByName("ROLE_USER")
+                    .orElseThrow(() -> new RuntimeException("Role not found: ROLE_USER"));
         } else if ("TEACHER".equalsIgnoreCase(req.getRole())) {
-            roleName = "TEACHER";
+            role = roleRepository.findByName("ROLE_TEACHER")
+                    .orElseThrow(() -> new RuntimeException("Role not found: ROLE_TEACHER"));
+        } else if ("ADMIN".equalsIgnoreCase(req.getRole())) {
+            role = roleRepository.findByName("ROLE_ADMIN")
+                    .orElseThrow(() -> new RuntimeException("Role not found: ROLE_ADMIN"));
         } else {
             return false;
         }
 
-        // 2. LẤY ROLE TỪ DB (KHÔNG new)
-        Role role = roleRepository.findByName(roleName)
-                .orElseThrow(() ->
-                        new RuntimeException("Role not found in DB: " + roleName)
-                );
-        // 3. Tạo user
-        User newUser = new User();
-        newUser.setEmail(req.getEmail());
-        newUser.setFullName(req.getFullName());
-        newUser.setPasswordHash(passwordEncoder.encode(req.getPassword()));
-        newUser.setRole(role);
-        newUser.setProvider(User.AuthProvider.LOCAL);
+        // Create user với Role entity (dùng role_id)
+        User newUser = User.builder()
+                .email(req.getEmail())
+                .fullName(req.getFullName())
+                .passwordHash(passwordEncoder.encode(req.getPassword()))
+                .role(role)
+                .level(1)
+                .xp(0)
+                .streak(0)
+                .totalLessonsCompleted(0)
+                .faceIdEnrolled(false)
+                .build();
 
         userRepository.save(newUser);
 
+        // Create user profile
         UserProfile profile = new UserProfile();
         profile.setUser(newUser);
-
-        // Set level with default value if not provided
-        String levelSelection = req.getLevelSelection();
-        if (levelSelection == null || levelSelection.trim().isEmpty()) {
-            levelSelection = "Beginner"; // Default level
-        }
-        profile.setLevel(UserProfile.Level.valueOf(levelSelection));
-        profile.setLearningGoal(req.getLearningGoal());
+        profile.setLevel(UserProfile.Level.Beginner);
         profile.setCurrentStreak(0);
         userProfileRepository.save(profile);
 
+        // Create XP log
         XPLog xpLog = new XPLog();
         xpLog.setUser(newUser);
-
         xpRepository.save(xpLog);
 
+        // Create face verification log
         FaceVerificationLog faceVerificationLog = new FaceVerificationLog();
         faceVerificationLog.setUser(newUser);
-
-        faceIdRepository .save(faceVerificationLog);
+        faceIdRepository.save(faceVerificationLog);
 
         return true;
     }
@@ -119,4 +120,3 @@ public class UserDetailsServiceImpl implements UserDetailsService {
 
 
 }
-

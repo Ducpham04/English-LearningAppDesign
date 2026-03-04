@@ -6,6 +6,9 @@ import lombok.*;
 @Entity
 @Table(name = "courses")
 @Getter @Setter
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class Curriculum extends BaseEntity {
 
     private String title;

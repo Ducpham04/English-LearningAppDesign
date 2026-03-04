@@ -7,8 +7,8 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { AuthUser, UserRole, LoginCredentials } from '@/types/auth';
 import axiosInstance from '@/services/axiosConfig';
-
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api';
+import { API_BASE_URL } from '@/services/baseUrl';
+import { logError } from '@/utils/errorHandler';
 
 interface AuthTokens {
   accessToken: string;
@@ -32,11 +32,17 @@ interface AuthState {
 
 // Helper function to normalize role from backend
 const normalizeRole = (backendRole: string): UserRole => {
-  const role = (backendRole ?? '').toString().toLowerCase();
-  if (['student', 'teacher', 'admin'].includes(role)) {
-    return role as UserRole;
-  }
-  return 'student'; // Default fallback
+  const raw = (backendRole ?? '').toString().toLowerCase();
+
+  // Direct matches (e.g. FE-created accounts)
+  if (raw === 'student' || raw === 'role_user' || raw === 'user') return 'student';
+  if (raw === 'teacher' || raw === 'role_teacher') return 'teacher';
+  if (raw === 'admin' || raw === 'role_admin') return 'admin';
+
+  // Fallback: contains-based (handles variants like "ROLE_STUDENT", "STUDENT", etc.)
+  if (raw.includes('teacher')) return 'teacher';
+  if (raw.includes('admin')) return 'admin';
+  return 'student';
 };
 
 export const useAuthStore = create<AuthState>()(
@@ -63,7 +69,7 @@ export const useAuthStore = create<AuthState>()(
             refreshToken: string;
           };
 
-          const backendRole = (data.user.role ?? '').toString().toLowerCase();
+          const backendRole = (data.user.role ?? '').toString();
           const normalizedRole = normalizeRole(backendRole);
 
           const mappedUser: AuthUser = {
@@ -99,6 +105,7 @@ export const useAuthStore = create<AuthState>()(
           });
         } catch (error) {
           set({ isLoading: false });
+          logError('AuthStore.login', error, { email: credentials.email });
           throw error;
         }
       },
@@ -140,8 +147,8 @@ export const useAuthStore = create<AuthState>()(
           await get().login({ email, password });
           set({ isLoading: false });
         } catch (error) {
-          console.error('--- AuthStore: Register exception:', error);
           set({ isLoading: false });
+          logError('AuthStore.register', error, { email, role });
           throw error;
         }
       },

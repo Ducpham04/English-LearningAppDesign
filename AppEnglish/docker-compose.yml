@@ -7,9 +7,9 @@ services:
         ports:
           - "5432:5432"
         environment:
-          POSTGRES_USER: admin
-          POSTGRES_PASSWORD: admin123
-          POSTGRES_DB : lms_database
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB : learning_english
         volumes:
           - postgres_data:/var/lib/postgresql/data # nơi lưu trữ dữ liệu vĩnh viễn
         restart: always                             # Tự động khởi động lại nếu bị crash

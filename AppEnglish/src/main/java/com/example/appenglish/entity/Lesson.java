@@ -20,6 +20,9 @@ import java.util.Map;
 @Entity
 @Table(name = "lessons")
 @Getter @Setter
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class Lesson extends BaseEntity {
 
     private String title;
@@ -48,5 +51,6 @@ public class Lesson extends BaseEntity {
 
     @OneToMany(mappedBy = "lesson", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("orderIndex ASC")
+    @Builder.Default
     private List<LessonVocabulary> lessonVocabularies = new ArrayList<>();
 }

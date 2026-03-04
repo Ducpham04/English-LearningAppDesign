@@ -1,5 +1,6 @@
 package com.example.appenglish.entity;
 
+import com.example.appenglish.enums.QuestionType;
 import io.hypersistence.utils.hibernate.type.json.JsonType;
 import jakarta.persistence.*;
 import lombok.*;
@@ -32,4 +33,3 @@ public class TestQuestion extends BaseEntity {
     @Column(name = "correct_schema", columnDefinition = "jsonb")
     private Map<String, Object> correctSchema;
 }
-enum QuestionType { MCQ, FILL_BLANK, SPEAKING }

@@ -1,5 +1,6 @@
 package com.example.appenglish.entity;
 
+import com.example.appenglish.enums.ClassStatus;
 import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDate;
@@ -7,6 +8,9 @@ import java.time.LocalDate;
 @Entity
 @Table(name = "classrooms")
 @Getter @Setter
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class Classroom extends BaseEntity {
     private String name;
 
@@ -20,4 +24,3 @@ public class Classroom extends BaseEntity {
     @Enumerated(EnumType.STRING)
     private ClassStatus status;
 }
-enum ClassStatus { UPCOMING, ACTIVE, FINISHED }

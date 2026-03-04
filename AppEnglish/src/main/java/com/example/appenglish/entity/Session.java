@@ -7,6 +7,9 @@ import java.util.List;
 @Entity
 @Table(name = "sessions")
 @Getter @Setter
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class Session extends BaseEntity {
 
     private String title;
