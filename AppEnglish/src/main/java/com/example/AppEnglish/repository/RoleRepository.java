@@ -1,6 +1,6 @@
-package com.example.appenglish.repository;
+package com.example.AppEnglish.repository;
 
-import com.example.appenglish.entity.Role;
+import com.example.AppEnglish.entity.Role;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;

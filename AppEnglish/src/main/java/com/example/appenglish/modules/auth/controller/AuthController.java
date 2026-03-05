@@ -1,10 +1,10 @@
-package com.example.appenglish.modules.auth.controller;
+package com.example.AppEnglish.modules.auth.controller;
 
-import com.example.appenglish.common.dto.BaseResponse;
-import com.example.appenglish.modules.auth.dto.*;
-import com.example.appenglish.modules.auth.service.AuthService;
-import com.example.appenglish.security.JwtUtils;
-import com.example.appenglish.service.UserDetailsServiceImpl;
+import com.example.AppEnglish.common.dto.BaseResponse;
+import com.example.AppEnglish.modules.auth.dto.*;
+import com.example.AppEnglish.modules.auth.service.AuthService;
+import com.example.AppEnglish.security.JwtUtils;
+import com.example.AppEnglish.service.UserDetailsServiceImpl;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;

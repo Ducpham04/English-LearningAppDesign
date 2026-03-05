@@ -1,13 +1,13 @@
-package com.example.appenglish.modules.transcribe.service.kafka.consumer;
+package com.example.AppEnglish.modules.transcribe.service.kafka.consumer;
 
-import com.example.appenglish.modules.transcribe.dto.TranscriptSentence;
-import com.example.appenglish.modules.transcribe.dto.event.UploadTranscribeEvent;
-import com.example.appenglish.modules.transcribe.service.s3.StorageService;
-import com.example.appenglish.modules.transcribe.service.transcript.AwsTranscribeTranscriptParser;
-import com.example.appenglish.modules.transcribe.service.transcript.LessonVideoTranscriptPersistenceService;
-import com.example.appenglish.modules.transcribe.service.transcript.TranscriptionService;
-import com.example.appenglish.modules.transcribe.service.transcript.EspeakIpaService;
-import com.example.appenglish.modules.transcribe.service.translate.AwsTranslateService;
+import com.example.AppEnglish.modules.transcribe.dto.TranscriptSentence;
+import com.example.AppEnglish.modules.transcribe.dto.event.UploadTranscribeEvent;
+import com.example.AppEnglish.modules.transcribe.service.s3.StorageService;
+import com.example.AppEnglish.modules.transcribe.service.transcript.AwsTranscribeTranscriptParser;
+import com.example.AppEnglish.modules.transcribe.service.transcript.LessonVideoTranscriptPersistenceService;
+import com.example.AppEnglish.modules.transcribe.service.transcript.TranscriptionService;
+import com.example.AppEnglish.modules.transcribe.service.transcript.EspeakIpaService;
+import com.example.AppEnglish.modules.transcribe.service.translate.AwsTranslateService;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;

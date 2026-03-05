@@ -1,4 +1,4 @@
-package com.example.appenglish.modules.pronunciation.dto.event;
+package com.example.AppEnglish.modules.pronunciation.dto.event;
 
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;

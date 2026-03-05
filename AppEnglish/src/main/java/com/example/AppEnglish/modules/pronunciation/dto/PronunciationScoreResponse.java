@@ -1,7 +1,7 @@
-package com.example.appenglish.modules.pronunciation.dto;
+package com.example.AppEnglish.modules.pronunciation.dto;
 
-import com.example.appenglish.enums.PronunciationAttemptStatus;
-import com.example.appenglish.enums.S3UploadStatus;
+import com.example.AppEnglish.enums.PronunciationAttemptStatus;
+import com.example.AppEnglish.enums.S3UploadStatus;
 import lombok.Builder;
 import lombok.Value;
 

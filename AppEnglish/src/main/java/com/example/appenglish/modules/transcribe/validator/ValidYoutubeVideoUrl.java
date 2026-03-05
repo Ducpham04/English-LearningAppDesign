@@ -1,4 +1,4 @@
-package com.example.appenglish.modules.transcribe.validator;
+package com.example.AppEnglish.modules.transcribe.validator;
 
 import jakarta.validation.Constraint;
 import jakarta.validation.Payload;

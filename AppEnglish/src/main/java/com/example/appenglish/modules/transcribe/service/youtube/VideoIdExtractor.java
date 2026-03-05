@@ -1,6 +1,6 @@
-package com.example.appenglish.modules.transcribe.service.youtube;
+package com.example.AppEnglish.modules.transcribe.service.youtube;
 
-import com.example.appenglish.common.exception.ApiException;
+import com.example.AppEnglish.common.exception.ApiException;
 import org.springframework.stereotype.Component;
 
 @Component

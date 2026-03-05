@@ -1,11 +1,11 @@
-package com.example.appenglish.modules.transcribe.service.transcript;
+package com.example.AppEnglish.modules.transcribe.service.transcript;
 
-import com.example.appenglish.common.exception.ApiException;
-import com.example.appenglish.entity.Lesson;
-import com.example.appenglish.entity.LessonVideo;
-import com.example.appenglish.modules.transcribe.dto.TranscriptSentence;
-import com.example.appenglish.repository.LessonRepository;
-import com.example.appenglish.repository.LessonVideoRepository;
+import com.example.AppEnglish.common.exception.ApiException;
+import com.example.AppEnglish.entity.Lesson;
+import com.example.AppEnglish.entity.LessonVideo;
+import com.example.AppEnglish.modules.transcribe.dto.TranscriptSentence;
+import com.example.AppEnglish.repository.LessonRepository;
+import com.example.AppEnglish.repository.LessonVideoRepository;
 import jakarta.transaction.Transactional;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;

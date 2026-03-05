@@ -1,4 +1,4 @@
-package com.example.appenglish.modules.course;
+package com.example.AppEnglish.modules.course;
 
 /**
  * Placeholder marker class for the course module package.

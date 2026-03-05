@@ -1,6 +1,6 @@
-package com.example.appenglish.modules.transcribe.service.kafka.producer;
+package com.example.AppEnglish.modules.transcribe.service.kafka.producer;
 
-import com.example.appenglish.modules.transcribe.dto.event.UploadTranscribeEvent;
+import com.example.AppEnglish.modules.transcribe.dto.event.UploadTranscribeEvent;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;

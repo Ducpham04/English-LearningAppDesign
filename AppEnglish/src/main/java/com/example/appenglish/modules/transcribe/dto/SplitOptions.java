@@ -1,4 +1,4 @@
-package com.example.appenglish.modules.transcribe.dto;
+package com.example.AppEnglish.modules.transcribe.dto;
 
 public class SplitOptions {
     private Integer maxChars;

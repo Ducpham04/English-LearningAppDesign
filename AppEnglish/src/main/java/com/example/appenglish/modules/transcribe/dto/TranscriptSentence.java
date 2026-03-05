@@ -1,4 +1,4 @@
-package com.example.appenglish.modules.transcribe.dto;
+package com.example.AppEnglish.modules.transcribe.dto;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;

@@ -1,6 +1,6 @@
-package com.example.appenglish.config;
+package com.example.AppEnglish.config;
 
-import com.example.appenglish.security.JwtAuthFilter;
+import com.example.AppEnglish.security.JwtAuthFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;

@@ -1,4 +1,4 @@
-package com.example.appenglish.modules.pronunciation.service;
+package com.example.AppEnglish.modules.pronunciation.service;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;

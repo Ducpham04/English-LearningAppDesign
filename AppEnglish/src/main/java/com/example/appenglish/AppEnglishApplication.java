@@ -1,4 +1,4 @@
-package com.example.appenglish;
+package com.example.AppEnglish;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;

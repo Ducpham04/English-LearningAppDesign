@@ -1,6 +1,6 @@
-package com.example.appenglish.modules.pronunciation.service;
+package com.example.AppEnglish.modules.pronunciation.service;
 
-import com.example.appenglish.entity.LessonVideo;
+import com.example.AppEnglish.entity.LessonVideo;
 import org.springframework.stereotype.Service;
 
 import java.util.List;

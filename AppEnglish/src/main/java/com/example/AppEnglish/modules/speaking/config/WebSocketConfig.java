@@ -1,6 +1,6 @@
-package com.example.appenglish.modules.speaking.config;
+package com.example.AppEnglish.modules.speaking.config;
 
-import com.example.appenglish.modules.speaking.handler.OpenAiRealtimeHandler;
+import com.example.AppEnglish.modules.speaking.handler.OpenAiRealtimeHandler;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.socket.config.annotation.EnableWebSocket;

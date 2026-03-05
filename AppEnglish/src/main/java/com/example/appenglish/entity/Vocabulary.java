@@ -1,4 +1,4 @@
-package com.example.appenglish.entity;
+package com.example.AppEnglish.entity;
 
 import io.hypersistence.utils.hibernate.type.json.JsonType;
 import jakarta.persistence.*;
@@ -25,8 +25,9 @@ public class Vocabulary extends BaseEntity {
     @Column(nullable = false)
     private String word;
 
-    private String phonetic; // Phiên âm IPA
-    private String audioUrl; // Phát âm chuẩn
+    private String phonetic;
+    private String audioUrl;
+    private String imageUrl;
 
     // Cấu trúc: [{"pos": "noun", "def": "...", "ex": "..."}]
     @Type(JsonType.class)
@@ -37,6 +38,10 @@ public class Vocabulary extends BaseEntity {
     @Type(JsonType.class)
     @Column(columnDefinition = "jsonb")
     private List<String> tags;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "session_id")
+    private Session session;
 
     @OneToMany(mappedBy = "vocabulary")
     private List<LessonVocabulary> lessonVocabularies = new ArrayList<>();

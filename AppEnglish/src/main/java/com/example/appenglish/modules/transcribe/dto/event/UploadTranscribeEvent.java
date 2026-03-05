@@ -1,4 +1,4 @@
-package com.example.appenglish.modules.transcribe.dto.event;
+package com.example.AppEnglish.modules.transcribe.dto.event;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;

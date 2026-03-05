@@ -1,6 +1,6 @@
-package com.example.appenglish.common.exception;
+package com.example.AppEnglish.common.exception;
 
-import com.example.appenglish.common.dto.BaseResponse;
+import com.example.AppEnglish.common.dto.BaseResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;

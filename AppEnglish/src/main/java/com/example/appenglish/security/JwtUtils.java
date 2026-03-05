@@ -1,4 +1,4 @@
-package com.example.appenglish.security;
+package com.example.AppEnglish.security;
 
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;

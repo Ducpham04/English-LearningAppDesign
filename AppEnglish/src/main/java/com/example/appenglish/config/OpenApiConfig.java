@@ -1,4 +1,4 @@
-package com.example.appenglish.config;
+package com.example.AppEnglish.config;
 
 import io.swagger.v3.oas.models.Components;
 import io.swagger.v3.oas.models.OpenAPI;

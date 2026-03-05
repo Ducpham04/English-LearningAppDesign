@@ -1,5 +1,6 @@
-package com.example.appenglish.entity;
+package com.example.AppEnglish.entity;
 
+import com.example.AppEnglish.enums.LearningStatus;
 import jakarta.persistence.*;
 import lombok.*;
 import java.io.Serializable;
@@ -47,4 +48,3 @@ class UserVocabId implements Serializable {
     private Long vocabId;
 }
 
-enum LearningStatus { NEW, LEARNING, REVIEW, MASTERED }

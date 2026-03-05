@@ -1,11 +1,11 @@
-package com.example.appenglish.modules.transcribe.controller;
+package com.example.AppEnglish.modules.transcribe.controller;
 
-import com.example.appenglish.common.dto.BaseResponse;
-import com.example.appenglish.common.exception.ApiException;
-import com.example.appenglish.entity.LessonVideo;
-import com.example.appenglish.modules.transcribe.dto.request.YoutubeTranscribeRequest;
-import com.example.appenglish.modules.transcribe.service.kafka.producer.YoutubeTranscribeProducer;
-import com.example.appenglish.repository.LessonVideoRepository;
+import com.example.AppEnglish.common.dto.BaseResponse;
+import com.example.AppEnglish.common.exception.ApiException;
+import com.example.AppEnglish.entity.LessonVideo;
+import com.example.AppEnglish.modules.transcribe.dto.request.YoutubeTranscribeRequest;
+import com.example.AppEnglish.modules.transcribe.service.kafka.producer.YoutubeTranscribeProducer;
+import com.example.AppEnglish.repository.LessonVideoRepository;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;

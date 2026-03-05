@@ -1,10 +1,10 @@
-package com.example.appenglish.modules.pronunciation.controller;
+package com.example.AppEnglish.modules.pronunciation.controller;
 
-import com.example.appenglish.common.dto.BaseResponse;
-import com.example.appenglish.entity.User;
-import com.example.appenglish.modules.pronunciation.dto.PronunciationScoreResponse;
-import com.example.appenglish.modules.pronunciation.service.PronunciationAttemptService;
-import com.example.appenglish.repository.UserRepository;
+import com.example.AppEnglish.common.dto.BaseResponse;
+import com.example.AppEnglish.entity.User;
+import com.example.AppEnglish.modules.pronunciation.dto.PronunciationScoreResponse;
+import com.example.AppEnglish.modules.pronunciation.service.PronunciationAttemptService;
+import com.example.AppEnglish.repository.UserRepository;
 import jakarta.validation.constraints.NotNull;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;

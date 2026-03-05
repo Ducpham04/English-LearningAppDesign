@@ -1,6 +1,6 @@
-package com.example.appenglish.modules.auth.dto;
+package com.example.AppEnglish.modules.auth.dto;
 
-import com.example.appenglish.modules.userDetail.dto.UserDataDto;
+import com.example.AppEnglish.modules.userDetail.dto.UserDataDto;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;

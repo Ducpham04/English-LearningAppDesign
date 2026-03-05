@@ -1,15 +1,15 @@
-package com.example.appenglish.modules.pronunciation.service;
+package com.example.AppEnglish.modules.pronunciation.service;
 
-import com.example.appenglish.entity.LessonVideo;
-import com.example.appenglish.entity.PronunciationAttempt;
-import com.example.appenglish.entity.User;
-import com.example.appenglish.enums.PronunciationAttemptStatus;
-import com.example.appenglish.enums.S3UploadStatus;
-import com.example.appenglish.modules.pronunciation.dto.AzureAssessmentResult;
-import com.example.appenglish.modules.pronunciation.dto.PronunciationScoreResponse;
-import com.example.appenglish.modules.pronunciation.dto.event.PronunciationAudioUploadEvent;
-import com.example.appenglish.repository.LessonVideoRepository;
-import com.example.appenglish.repository.PronunciationAttemptRepository;
+import com.example.AppEnglish.entity.LessonVideo;
+import com.example.AppEnglish.entity.PronunciationAttempt;
+import com.example.AppEnglish.entity.User;
+import com.example.AppEnglish.enums.PronunciationAttemptStatus;
+import com.example.AppEnglish.enums.S3UploadStatus;
+import com.example.AppEnglish.modules.pronunciation.dto.AzureAssessmentResult;
+import com.example.AppEnglish.modules.pronunciation.dto.PronunciationScoreResponse;
+import com.example.AppEnglish.modules.pronunciation.dto.event.PronunciationAudioUploadEvent;
+import com.example.AppEnglish.repository.LessonVideoRepository;
+import com.example.AppEnglish.repository.PronunciationAttemptRepository;
 import com.microsoft.cognitiveservices.speech.ResultReason;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;

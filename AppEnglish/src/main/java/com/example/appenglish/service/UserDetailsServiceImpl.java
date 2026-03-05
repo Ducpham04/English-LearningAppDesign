@@ -1,11 +1,11 @@
-package com.example.appenglish.service;
+package com.example.AppEnglish.service;
 
 
-import com.example.appenglish.entity.Role;
-import com.example.appenglish.entity.User;
-import com.example.appenglish.modules.auth.dto.RegisterRequest;
-import com.example.appenglish.repository.RoleRepository;
-import com.example.appenglish.repository.UserRepository;
+import com.example.AppEnglish.entity.Role;
+import com.example.AppEnglish.entity.User;
+import com.example.AppEnglish.modules.auth.dto.RegisterRequest;
+import com.example.AppEnglish.repository.RoleRepository;
+import com.example.AppEnglish.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

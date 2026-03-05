@@ -1,4 +1,4 @@
-package com.example.appenglish.modules.userDetail.dto;
+package com.example.AppEnglish.modules.userDetail.dto;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;

@@ -1,11 +1,15 @@
-package com.example.appenglish.entity;
+package com.example.AppEnglish.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.util.ArrayList;
+import java.util.List;
+
 @Entity
 @Table(name = "courses")
-@Getter @Setter
+@Getter
+@Setter
 public class Curriculum extends BaseEntity {
 
     private String title;
@@ -21,4 +25,8 @@ public class Curriculum extends BaseEntity {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "teacher_id")
     private User teacher; // Người tạo khóa học
+
+    @OneToMany(mappedBy = "course", cascade = CascadeType.ALL)
+    @OrderBy("orderIndex ASC")
+    private List<Session> sessions = new ArrayList<>();
 }

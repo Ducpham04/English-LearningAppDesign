@@ -1,6 +1,6 @@
-package com.example.appenglish.modules.transcribe.dto.request;
+package com.example.AppEnglish.modules.transcribe.dto.request;
 
-import com.example.appenglish.modules.transcribe.validator.ValidYoutubeVideoUrl;
+import com.example.AppEnglish.modules.transcribe.validator.ValidYoutubeVideoUrl;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;

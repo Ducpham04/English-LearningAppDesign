@@ -1,7 +1,7 @@
-package com.example.appenglish.entity;
+package com.example.AppEnglish.entity;
 
-import com.example.appenglish.enums.PronunciationAttemptStatus;
-import com.example.appenglish.enums.S3UploadStatus;
+import com.example.AppEnglish.enums.PronunciationAttemptStatus;
+import com.example.AppEnglish.enums.S3UploadStatus;
 import io.hypersistence.utils.hibernate.type.json.JsonType;
 import jakarta.persistence.*;
 import lombok.Getter;

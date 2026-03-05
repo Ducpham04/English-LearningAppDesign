@@ -1,6 +1,6 @@
-package com.example.appenglish.modules.transcribe.validator;
+package com.example.AppEnglish.modules.transcribe.validator;
 
-import com.example.appenglish.modules.transcribe.service.youtube.VideoIdExtractor;
+import com.example.AppEnglish.modules.transcribe.service.youtube.VideoIdExtractor;
 import jakarta.validation.ConstraintValidator;
 import jakarta.validation.ConstraintValidatorContext;
 

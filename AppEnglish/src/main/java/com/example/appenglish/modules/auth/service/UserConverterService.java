@@ -1,7 +1,7 @@
-package com.example.appenglish.modules.auth.service;
+package com.example.AppEnglish.modules.auth.service;
 
-import com.example.appenglish.entity.User;
-import com.example.appenglish.modules.userDetail.dto.UserDataDto;
+import com.example.AppEnglish.entity.User;
+import com.example.AppEnglish.modules.userDetail.dto.UserDataDto;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;

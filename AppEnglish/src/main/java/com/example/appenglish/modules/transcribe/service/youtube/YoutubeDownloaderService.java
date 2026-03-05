@@ -1,4 +1,4 @@
-package com.example.appenglish.modules.transcribe.service.youtube;
+package com.example.AppEnglish.modules.transcribe.service.youtube;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;

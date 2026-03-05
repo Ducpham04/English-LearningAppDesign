@@ -1,4 +1,4 @@
-package com.example.appenglish.entity;
+package com.example.AppEnglish.entity;
 
 import io.hypersistence.utils.hibernate.type.json.JsonType;
 import jakarta.persistence.*;
@@ -11,7 +11,7 @@ import java.util.Map;
 @Entity
 @Table(name = "notifications")
 @Getter @Setter
-public class Notification extends BaseEntity {
+public class Notification extends com.example.AppEnglish.entity.BaseEntity {
     @ManyToOne(fetch = FetchType.LAZY)
     private User user;
 

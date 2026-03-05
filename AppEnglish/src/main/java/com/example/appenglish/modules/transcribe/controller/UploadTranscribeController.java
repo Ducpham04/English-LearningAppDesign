@@ -1,8 +1,8 @@
-package com.example.appenglish.modules.transcribe.controller;
+package com.example.AppEnglish.modules.transcribe.controller;
 
-import com.example.appenglish.common.dto.BaseResponse;
-import com.example.appenglish.modules.transcribe.service.kafka.producer.UploadTranscribeProducer;
-import com.example.appenglish.modules.transcribe.service.s3.StorageService;
+import com.example.AppEnglish.common.dto.BaseResponse;
+import com.example.AppEnglish.modules.transcribe.service.kafka.producer.UploadTranscribeProducer;
+import com.example.AppEnglish.modules.transcribe.service.s3.StorageService;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;

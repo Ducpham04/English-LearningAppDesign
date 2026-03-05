@@ -1,10 +1,10 @@
-package com.example.appenglish.modules.pronunciation.service.kafka.consumer;
+package com.example.AppEnglish.modules.pronunciation.service.kafka.consumer;
 
-import com.example.appenglish.entity.PronunciationAttempt;
-import com.example.appenglish.enums.S3UploadStatus;
-import com.example.appenglish.modules.pronunciation.dto.event.PronunciationAudioUploadEvent;
-import com.example.appenglish.modules.pronunciation.dto.event.PronunciationAudioFinalizeEvent;
-import com.example.appenglish.repository.PronunciationAttemptRepository;
+import com.example.AppEnglish.entity.PronunciationAttempt;
+import com.example.AppEnglish.enums.S3UploadStatus;
+import com.example.AppEnglish.modules.pronunciation.dto.event.PronunciationAudioUploadEvent;
+import com.example.AppEnglish.modules.pronunciation.dto.event.PronunciationAudioFinalizeEvent;
+import com.example.AppEnglish.repository.PronunciationAttemptRepository;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;

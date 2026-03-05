@@ -1,10 +1,10 @@
-package com.example.appenglish.modules.userDetail.controller;
+package com.example.AppEnglish.modules.userDetail.controller;
 
-import com.example.appenglish.common.dto.BaseResponse;
-import com.example.appenglish.modules.userDetail.dto.UserDataDto;
-import com.example.appenglish.modules.userDetail.dto.UserProfileRequest;
-import com.example.appenglish.modules.userDetail.dto.UserProfileResponse;
-import com.example.appenglish.modules.userDetail.service.UserService;
+import com.example.AppEnglish.common.dto.BaseResponse;
+import com.example.AppEnglish.modules.userDetail.dto.UserDataDto;
+import com.example.AppEnglish.modules.userDetail.dto.UserProfileRequest;
+import com.example.AppEnglish.modules.userDetail.dto.UserProfileResponse;
+import com.example.AppEnglish.modules.userDetail.service.UserService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;

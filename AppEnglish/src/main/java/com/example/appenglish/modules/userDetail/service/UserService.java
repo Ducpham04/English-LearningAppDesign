@@ -1,11 +1,11 @@
-package com.example.appenglish.modules.userDetail.service;
+package com.example.AppEnglish.modules.userDetail.service;
 
-import com.example.appenglish.entity.User;
-import com.example.appenglish.modules.auth.service.UserConverterService;
-import com.example.appenglish.modules.userDetail.dto.UserDataDto;
-import com.example.appenglish.modules.userDetail.dto.UserProfileRequest;
-import com.example.appenglish.modules.userDetail.dto.UserProfileResponse;
-import com.example.appenglish.repository.UserRepository;
+import com.example.AppEnglish.entity.User;
+import com.example.AppEnglish.modules.auth.service.UserConverterService;
+import com.example.AppEnglish.modules.userDetail.dto.UserDataDto;
+import com.example.AppEnglish.modules.userDetail.dto.UserProfileRequest;
+import com.example.AppEnglish.modules.userDetail.dto.UserProfileResponse;
+import com.example.AppEnglish.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.Authentication;

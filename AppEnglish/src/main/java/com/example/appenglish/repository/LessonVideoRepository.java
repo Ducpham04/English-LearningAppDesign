@@ -1,6 +1,6 @@
-package com.example.appenglish.repository;
+package com.example.AppEnglish.repository;
 
-import com.example.appenglish.entity.LessonVideo;
+import com.example.AppEnglish.entity.LessonVideo;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;

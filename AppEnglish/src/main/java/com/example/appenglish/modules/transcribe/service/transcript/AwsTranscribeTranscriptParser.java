@@ -1,7 +1,7 @@
-package com.example.appenglish.modules.transcribe.service.transcript;
+package com.example.AppEnglish.modules.transcribe.service.transcript;
 
-import com.example.appenglish.modules.transcribe.dto.SplitOptions;
-import com.example.appenglish.modules.transcribe.dto.TranscriptSentence;
+import com.example.AppEnglish.modules.transcribe.dto.SplitOptions;
+import com.example.AppEnglish.modules.transcribe.dto.TranscriptSentence;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.AccessLevel;

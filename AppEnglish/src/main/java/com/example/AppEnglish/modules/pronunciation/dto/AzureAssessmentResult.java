@@ -1,4 +1,4 @@
-package com.example.appenglish.modules.pronunciation.dto;
+package com.example.AppEnglish.modules.pronunciation.dto;
 
 import com.microsoft.cognitiveservices.speech.ResultReason;
 import lombok.Builder;

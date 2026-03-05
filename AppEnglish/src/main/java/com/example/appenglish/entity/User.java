@@ -1,6 +1,6 @@
-package com.example.appenglish.entity;
+package com.example.AppEnglish.entity;
 
-import com.example.appenglish.entity.BaseEntity;
+import com.example.AppEnglish.entity.BaseEntity;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.SQLDelete;
@@ -39,7 +39,7 @@ public class User extends BaseEntity {
     // --- PHÂN QUYỀN & TRẠNG THÁI ---
     @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "role_id", nullable = false)
-    private Role role;
+    private com.example.AppEnglish.entity.Role role;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)

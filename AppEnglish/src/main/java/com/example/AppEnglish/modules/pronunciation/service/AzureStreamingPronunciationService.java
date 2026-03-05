@@ -1,6 +1,6 @@
-package com.example.appenglish.modules.pronunciation.service;
+package com.example.AppEnglish.modules.pronunciation.service;
 
-import com.example.appenglish.modules.pronunciation.dto.AzureAssessmentResult;
+import com.example.AppEnglish.modules.pronunciation.dto.AzureAssessmentResult;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.microsoft.cognitiveservices.speech.*;

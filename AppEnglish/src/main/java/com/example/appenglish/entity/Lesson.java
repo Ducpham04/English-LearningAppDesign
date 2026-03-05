@@ -1,6 +1,6 @@
-package com.example.appenglish.entity;
+package com.example.AppEnglish.entity;
 
-import com.example.appenglish.enums.LessonType;
+import com.example.AppEnglish.enums.LessonType;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.JdbcTypeCode;

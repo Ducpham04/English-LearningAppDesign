@@ -1,4 +1,4 @@
-package com.example.appenglish.modules.transcribe.service.translate;
+package com.example.AppEnglish.modules.transcribe.service.translate;
 
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
