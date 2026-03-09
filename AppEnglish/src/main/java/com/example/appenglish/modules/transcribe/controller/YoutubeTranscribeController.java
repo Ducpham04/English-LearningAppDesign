@@ -17,7 +17,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/youtube")
+@RequestMapping("/v1/youtube")
 @RequiredArgsConstructor
 @Tag(name = "YouTube Transcription", description = "APIs for YouTube video transcription")
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)

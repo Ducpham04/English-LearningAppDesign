@@ -5,26 +5,81 @@ import { SessionCard } from '@/features/session/SessionCard';
 import { FloatingParticles } from '@/shared/ui/FloatingParticles';
 import { AnimatedMascot } from '@/shared/ui/AnimatedMascot';
 import { useAppStore } from '@/store/appStore';
-import { getClassesByStudentId } from '@/services/mockData';
+import { useStudentDashboard } from '@/hooks/useStudentData';
 import { PlayCircle, BookOpen, Award, Sparkles, Zap, Target, Users, Calendar, GraduationCap } from 'lucide-react';
 import { motion } from 'motion/react';
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import apiService from '@/services/apiService';
+import type { Session } from '@/types';
 
 export function Dashboard() {
-  const { user, sessions, userProgress, setCurrentView, setSelectedSession, setSelectedLesson } = useAppStore();
+  const { user, sessions, userProgress, setCurrentView, setSelectedSession, setSessions, hydrateFromDashboard } = useAppStore();
   const navigate = useNavigate();
-  
+  const { data, loading } = useStudentDashboard();
+  const hydratedRef = useRef(false);
+
   const [showMascot, setShowMascot] = useState(true);
-  const currentSession = sessions.find(s => s.id === userProgress.currentSessionId);
-  const inProgressSessions = sessions.filter(s => s.status === 'in-progress');
-  const enrolledClasses = getClassesByStudentId(user.id);
+
+  // Hydrate user from API and load participated sessions (đã/đang tham gia) cho "Đang học"
+  useEffect(() => {
+    if (!data || hydratedRef.current) return;
+    hydratedRef.current = true;
+    if (data.user) {
+      hydrateFromDashboard({
+        user: {
+          id: String(data.user.id),
+          fullName: data.user.fullName,
+          avatarUrl: data.user.avatarUrl,
+          level: data.user.level ?? 1,
+          xp: data.user.xp ?? 0,
+          streak: data.user.streak ?? 0,
+          totalLessonsCompleted: data.user.totalLessonsCompleted ?? 0,
+        },
+      });
+    }
+    // Load sessions mà user đã/đang tham gia (có ít nhất 1 bài hoàn thành)
+    apiService.student
+      .getParticipatedSessions()
+      .then((res) => {
+        const list = res.data?.data ?? [];
+        const participated: Session[] = (Array.isArray(list) ? list : []).map((s: any) => ({
+          id: String(s.sessionId),
+          title: s.title || '',
+          description: s.topicName ? `Chủ đề: ${s.topicName}` : '',
+          level: 'beginner' as const,
+          totalLessons: s.totalLessons ?? 0,
+          completedLessons: s.completedLessons ?? 0,
+          estimatedTime: (s.totalLessons ?? 0) * 5,
+          status: s.sessionCompleted ? ('completed' as const) : ('in-progress' as const),
+          order: 0,
+        }));
+        participated.sort((a, b) => (b.completedLessons / Math.max(1, b.totalLessons)) - (a.completedLessons / Math.max(1, a.totalLessons)));
+        setSessions(participated);
+      })
+      .catch(() => setSessions([]));
+  }, [data, hydrateFromDashboard, setSessions]);
+
+  const enrolledClasses = data?.enrolledClasses ?? [];
+  const currentSession = sessions.find(s => s.status === 'in-progress') || sessions[0];
+  const inProgressSessions = sessions;
 
   const getMascotMessage = () => {
+    if (!user) return 'Chào bạn! Hôm nay chúng ta học gì nào? 😊';
     if (user.streak >= 7) return 'Wow! Bạn đã học liên tục 7 ngày! Tuyệt vời! 🔥';
     if (user.totalLessonsCompleted >= 10) return 'Bạn đã hoàn thành nhiều bài học rồi đấy! Tiếp tục phát huy nhé! 💪';
     return 'Chào bạn! Hôm nay chúng ta học gì nào? 😊';
   };
+
+  if (loading && !user) {
+    return (
+      <div className="container mx-auto px-4 py-8 flex items-center justify-center min-h-[50vh]">
+        <p className="text-gray-500">Đang tải...</p>
+      </div>
+    );
+  }
+
+  const displayUser = user ?? { id: '', name: 'Học viên', avatar: undefined, level: 1, xp: 0, streak: 0, totalLessonsCompleted: 0 };
 
   return (
     <div className="relative min-h-screen">
@@ -32,9 +87,9 @@ export function Dashboard() {
       <FloatingParticles count={15} />
       
       {/* Animated Mascot */}
-      {showMascot && (
+        {showMascot && (
         <AnimatedMascot
-          mood={user.streak >= 7 ? 'celebrating' : 'happy'}
+          mood={displayUser.streak >= 7 ? 'celebrating' : 'happy'}
           message={getMascotMessage()}
           position="bottom-right"
         />
@@ -64,7 +119,7 @@ export function Dashboard() {
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.4 }}
             >
-              Xin chào, {user.name}!
+              Xin chào, {displayUser.name}!
             </motion.h1>
             <motion.p
               className="text-lg md:text-xl opacity-90 mb-6"
@@ -76,7 +131,7 @@ export function Dashboard() {
             </motion.p>
             
             {/* Daily streak celebration */}
-            {user.streak > 0 && (
+            {displayUser.streak > 0 && (
               <motion.div
                 initial={{ opacity: 0, scale: 0.8 }}
                 animate={{ opacity: 1, scale: 1 }}
@@ -84,7 +139,7 @@ export function Dashboard() {
                 className="inline-flex items-center gap-2 bg-white/20 backdrop-blur-sm rounded-2xl px-6 py-3 border-2 border-white/30"
               >
                 <Sparkles className="h-5 w-5 text-yellow-300" />
-                <span className="font-bold">{user.streak} ngày streak!</span>
+                <span className="font-bold">{displayUser.streak} ngày streak!</span>
                 <div className="text-2xl">🔥</div>
               </motion.div>
             )}
@@ -118,65 +173,73 @@ export function Dashboard() {
               </h2>
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
-              {enrolledClasses.map((classItem, index) => (
+              {enrolledClasses.map((classItem: any, index: number) => {
+                const item = {
+                  id: String(classItem.id),
+                  name: classItem.name ?? '',
+                  description: classItem.description ?? '',
+                  teacherName: classItem.teacherName ?? '',
+                  studentCount: classItem.studentCount ?? 0,
+                  level: (classItem.level ?? 'beginner') as 'beginner' | 'intermediate' | 'advanced',
+                  schedule: classItem.startDate ? [classItem.startDate, classItem.endDate].filter(Boolean).join(' → ') : undefined,
+                };
+                return (
                 <motion.div
-                  key={classItem.id}
+                  key={item.id}
                   initial={{ opacity: 0, scale: 0.9 }}
                   animate={{ opacity: 1, scale: 1 }}
                   transition={{ delay: 0.3 + index * 0.1 }}
                   whileHover={{ y: -4, transition: { duration: 0.2 } }}
                 >
                   <Card className="group cursor-pointer overflow-hidden rounded-3xl border-2 border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-600 transition-all hover:shadow-xl">
-                    <div className={`h-3 bg-gradient-to-r ${classItem.color || 'from-blue-400 to-blue-500'}`} />
+                    <div className={`h-3 bg-gradient-to-r ${(classItem as any).color || 'from-blue-400 to-blue-500'}`} />
                     <div className="p-6">
                       <div className="mb-4">
                         <div className="flex items-start justify-between mb-2">
                           <h3 className="text-lg font-bold text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
-                            {classItem.name}
+                            {item.name}
                           </h3>
                           <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${
-                            classItem.level === 'beginner' 
+                            item.level === 'beginner' 
                               ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                              : classItem.level === 'intermediate'
+                              : item.level === 'intermediate'
                               ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
                               : 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400'
                           }`}>
-                            {classItem.level === 'beginner' ? 'Cơ bản' : classItem.level === 'intermediate' ? 'Trung cấp' : 'Nâng cao'}
+                            {item.level === 'beginner' ? 'Cơ bản' : item.level === 'intermediate' ? 'Trung cấp' : 'Nâng cao'}
                           </span>
                         </div>
                         <p className="text-sm text-gray-600 dark:text-gray-400 line-clamp-2">
-                          {classItem.description}
+                          {item.description}
                         </p>
                       </div>
 
                       <div className="space-y-3">
-                        {/* Teacher Info */}
                         <div className="flex items-center gap-3">
                           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-blue-400 to-blue-500 text-white font-bold shadow-md">
-                            {classItem.teacherName.charAt(0)}
+                            {item.teacherName.charAt(0)}
                           </div>
                           <div className="flex-1 min-w-0">
                             <p className="text-xs text-gray-500 dark:text-gray-400">Giáo viên</p>
                             <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">
-                              {classItem.teacherName}
+                              {item.teacherName}
                             </p>
                           </div>
                         </div>
 
-                        {/* Class Info */}
                         <div className="flex items-center gap-4 text-sm text-gray-600 dark:text-gray-400">
                           <div className="flex items-center gap-2">
                             <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-green-100 dark:bg-green-900/30">
                               <Users className="h-4 w-4 text-green-600 dark:text-green-400" />
                             </div>
-                            <span className="font-medium">{classItem.studentCount} học viên</span>
+                            <span className="font-medium">{item.studentCount} học viên</span>
                           </div>
-                          {classItem.schedule && (
+                          {item.schedule && (
                             <>
                               <div className="h-4 w-px bg-gray-300 dark:bg-gray-600" />
                               <div className="flex items-center gap-2">
                                 <Calendar className="h-4 w-4" />
-                                <span className="text-xs">{classItem.schedule}</span>
+                                <span className="text-xs">{item.schedule}</span>
                               </div>
                             </>
                           )}
@@ -185,7 +248,8 @@ export function Dashboard() {
                     </div>
                   </Card>
                 </motion.div>
-              ))}
+                );
+              })}
             </div>
           </motion.div>
         )}
@@ -245,10 +309,8 @@ export function Dashboard() {
                     onClick={() => {
                       console.log('Dashboard - Continue button clicked');
                       if (userProgress.currentLessonId) {
-                        console.log('Dashboard - Navigating to current lesson:', userProgress.currentLessonId);
                         navigate(`/lessons/${userProgress.currentLessonId}`);
                       } else {
-                        console.log('Dashboard - Navigating to current session:', currentSession.id);
                         setSelectedSession(currentSession.id);
                         navigate(`/sessions/${currentSession.id}`);
                       }
@@ -273,8 +335,8 @@ export function Dashboard() {
           {[
             {
               icon: BookOpen,
-              title: 'Lộ trình học',
-              description: 'Khám phá các chủ đề học tập',
+              title: 'Chủ đề',
+              description: 'Học theo chủ đề và session',
               gradient: 'from-green-400 to-green-500',
               bgColor: 'bg-green-100 dark:bg-green-900/30',
               iconColor: 'text-green-600 dark:text-green-400',
@@ -309,7 +371,6 @@ export function Dashboard() {
               <Card
                 className="cursor-pointer p-6 transition-all hover:shadow-xl group relative overflow-hidden rounded-3xl border-2 hover:border-green-300 dark:hover:border-green-700"
                 onClick={() => {
-                  console.log('Dashboard - Quick action clicked:', action.title, action.view);
                   if (action.view === 'sessions') {
                     navigate('/sessions');
                   } else if (action.view === 'vocabulary') {
@@ -349,7 +410,7 @@ export function Dashboard() {
               <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-green-100 dark:bg-green-900/30">
                 <Sparkles className="h-6 w-6 text-green-600 dark:text-green-400" />
               </div>
-              Đang học
+              Đang học / Đã tham gia
             </h2>
             <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
               {inProgressSessions.map((session, index) => (
@@ -363,7 +424,6 @@ export function Dashboard() {
                   <SessionCard
                     session={session}
                     onClick={() => {
-                      console.log('Dashboard - In-progress session clicked:', session.id, session.title);
                       setSelectedSession(session.id);
                       navigate(`/sessions/${session.id}`);
                     }}

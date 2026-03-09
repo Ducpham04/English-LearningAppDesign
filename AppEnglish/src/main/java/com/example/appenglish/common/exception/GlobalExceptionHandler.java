@@ -6,6 +6,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -17,7 +18,7 @@ import java.util.Map;
 @Slf4j
 public class GlobalExceptionHandler {
 
-    // 1. Xử lý lỗi logic API (Code cũ của bạn)
+    // 1. Xử lý lỗi logic API
     @ExceptionHandler(ApiException.class)
     public ResponseEntity<BaseResponse<Void>> handleApiException(ApiException ex, HttpServletRequest request) {
         log.warn("ApiException: {}", ex.getMessage());
@@ -44,7 +45,18 @@ public class GlobalExceptionHandler {
                         .build());
     }
 
-    // 3. Xử lý lỗi Trùng lặp (ĐÃ SỬA Ở ĐÂY)
+    // 3. Content-Type not supported / no handler found (e.g. wrong path or method)
+    @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
+    public ResponseEntity<BaseResponse<Void>> handleMediaTypeNotSupported(
+            HttpMediaTypeNotSupportedException ex, HttpServletRequest request) {
+        log.warn("Media type not supported: {} for {}", ex.getContentType(), request.getRequestURI());
+        String message = "No endpoint found for this URL and method. "
+                + "Check the path (e.g. POST /api/v1/auth/login for login) and Content-Type.";
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(BaseResponse.error(message, "ENDPOINT_NOT_FOUND", request.getRequestURI()));
+    }
+
+    // 4. Xử lý lỗi Trùng lặp (ĐÃ SỬA Ở ĐÂY)
     // Thay vì Exception.class, phải dùng đúng class DuplicateResourceException
     @ExceptionHandler(DuplicateResourceException.class)
     public ResponseEntity<BaseResponse<Void>> handleDuplicateResource(DuplicateResourceException ex, // Tham số cũng phải sửa
@@ -59,7 +71,25 @@ public class GlobalExceptionHandler {
                 ));
     }
 
-    // 4. Xử lý lỗi chung (Luôn để cuối cùng)
+    // 5. Bad request (e.g. LessonVideo not found, transcript missing for pronunciation)
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<BaseResponse<Void>> handleIllegalArgument(IllegalArgumentException ex, HttpServletRequest request) {
+        log.warn("Bad request: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(BaseResponse.error(ex.getMessage(), "BAD_REQUEST", request.getRequestURI()));
+    }
+
+    // 5b. DB constraint violation (e.g. cannot delete lesson with related data)
+    @ExceptionHandler(org.springframework.dao.DataIntegrityViolationException.class)
+    public ResponseEntity<BaseResponse<Void>> handleDataIntegrity(org.springframework.dao.DataIntegrityViolationException ex, HttpServletRequest request) {
+        log.warn("Data integrity violation: {}", ex.getMessage());
+        String message = ex.getMostSpecificCause() != null ? ex.getMostSpecificCause().getMessage() : ex.getMessage();
+        if (message != null && message.length() > 200) message = "Không thể thực hiện vì còn dữ liệu liên quan.";
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(BaseResponse.error(message != null ? message : "Constraint violation", "CONSTRAINT_VIOLATION", request.getRequestURI()));
+    }
+
+    // 6. Xử lý lỗi chung (Luôn để cuối cùng)
     @ExceptionHandler(Exception.class)
     public ResponseEntity<BaseResponse<Void>> handleGeneric(Exception ex, HttpServletRequest request) {
         log.error("Unhandled exception", ex);

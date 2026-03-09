@@ -38,6 +38,7 @@ public class LessonVideoTranscriptPersistenceService {
         }
 
         lessonVideo.setVideoUrl(s3Uri);
+        lessonVideo.setYoutubeUrl(youtubeUrl);
     }
 
     @Transactional
@@ -49,8 +50,9 @@ public class LessonVideoTranscriptPersistenceService {
         LessonVideo lessonVideo = getOrCreateLessonVideoLocked(lessonId);
 
         boolean hasExisting = lessonVideo.getTranscriptJson() != null && !lessonVideo.getTranscriptJson().isEmpty();
-        
+
         lessonVideo.setVideoUrl(s3Uri);
+        lessonVideo.setYoutubeUrl(youtubeUrl);
 
         List<Map<String, Object>> transcriptJson = new ArrayList<>(sentences != null ? sentences.size() : 0);
         if (sentences != null) {

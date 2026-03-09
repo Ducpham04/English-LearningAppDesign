@@ -1,0 +1,87 @@
+package com.example.appenglish.modules.lesson.controller;
+
+import com.example.appenglish.common.dto.BaseResponse;
+import com.example.appenglish.modules.lesson.dto.LessonCreateRequest;
+import com.example.appenglish.modules.lesson.dto.LessonDto;
+import com.example.appenglish.modules.lesson.dto.LessonVideoRequest;
+import com.example.appenglish.modules.lesson.service.LessonService;
+import jakarta.servlet.http.HttpServletRequest;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+
+@RestController
+@RequestMapping("/v1/lessons")
+@RequiredArgsConstructor
+public class LessonController {
+
+    private final LessonService lessonService;
+
+    @GetMapping
+    public ResponseEntity<BaseResponse<List<LessonDto>>> getAll(HttpServletRequest req) {
+        return ResponseEntity.ok(BaseResponse.ok(lessonService.getAll(), "OK", req.getRequestURI()));
+    }
+
+    @GetMapping("/{id}")
+    public ResponseEntity<BaseResponse<LessonDto>> getById(@PathVariable Long id, HttpServletRequest req) {
+        try {
+            return ResponseEntity.ok(BaseResponse.ok(lessonService.getById(id), "OK", req.getRequestURI()));
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(404).body(BaseResponse.error(e.getMessage(), "NOT_FOUND", req.getRequestURI()));
+        }
+    }
+
+    @GetMapping("/session/{sessionId}")
+    public ResponseEntity<BaseResponse<List<LessonDto>>> getBySession(@PathVariable Long sessionId, HttpServletRequest req) {
+        return ResponseEntity.ok(BaseResponse.ok(lessonService.getBySession(sessionId), "OK", req.getRequestURI()));
+    }
+
+    @GetMapping("/course/{courseId}")
+    public ResponseEntity<BaseResponse<List<LessonDto>>> getByCourse(@PathVariable Long courseId, HttpServletRequest req) {
+        return ResponseEntity.ok(BaseResponse.ok(lessonService.getByCourse(courseId), "OK", req.getRequestURI()));
+    }
+
+    @PostMapping
+    public ResponseEntity<BaseResponse<LessonDto>> create(@RequestBody LessonCreateRequest body, HttpServletRequest req) {
+        try {
+            return ResponseEntity.ok(BaseResponse.ok(lessonService.create(body), "Lesson created", req.getRequestURI()));
+        } catch (Exception e) {
+            return ResponseEntity.status(400).body(BaseResponse.error(e.getMessage(), "BAD_REQUEST", req.getRequestURI()));
+        }
+    }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<BaseResponse<LessonDto>> update(@PathVariable Long id, @RequestBody LessonCreateRequest body, HttpServletRequest req) {
+        try {
+            return ResponseEntity.ok(BaseResponse.ok(lessonService.update(id, body), "Lesson updated", req.getRequestURI()));
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(404).body(BaseResponse.error(e.getMessage(), "NOT_FOUND", req.getRequestURI()));
+        }
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<BaseResponse<Void>> delete(@PathVariable Long id, HttpServletRequest req) {
+        lessonService.delete(id);
+        return ResponseEntity.ok(BaseResponse.ok(null, "Lesson deleted", req.getRequestURI()));
+    }
+
+    @PutMapping("/{id}/video")
+    public ResponseEntity<BaseResponse<LessonDto>> saveVideo(@PathVariable Long id, @RequestBody LessonVideoRequest body, HttpServletRequest req) {
+        try {
+            return ResponseEntity.ok(BaseResponse.ok(lessonService.saveVideo(id, body), "Video saved", req.getRequestURI()));
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(404).body(BaseResponse.error(e.getMessage(), "NOT_FOUND", req.getRequestURI()));
+        }
+    }
+
+    @PostMapping("/{id}/ipa/regenerate")
+    public ResponseEntity<BaseResponse<LessonDto>> regenerateIpa(@PathVariable Long id, HttpServletRequest req) {
+        try {
+            return ResponseEntity.ok(BaseResponse.ok(lessonService.regenerateIpa(id), "IPA regenerated", req.getRequestURI()));
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(400).body(BaseResponse.error(e.getMessage(), "BAD_REQUEST", req.getRequestURI()));
+        }
+    }
+}

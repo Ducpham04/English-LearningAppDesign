@@ -39,8 +39,7 @@ public class StorageService {
                         .contentType(file.getContentType())
                         .build(),
                 RequestBody.fromInputStream(file.getInputStream(), file.getSize())
-            );
+        );
         return "s3://" + bucket + "/" + key;
     }
 }
-

@@ -5,6 +5,15 @@ export function registerServiceWorker() {
   if (typeof window === 'undefined' || !('serviceWorker' in navigator)) {
     return;
   }
+
+  // Không đăng ký SW trong môi trường dev để tránh cache chặn API calls
+  if (import.meta.env.DEV) {
+    // Hủy bất kỳ SW nào đang chạy từ lần trước
+    navigator.serviceWorker.getRegistrations().then((registrations) => {
+      registrations.forEach((r) => r.unregister());
+    });
+    return;
+  }
   
   try {
     window.addEventListener('load', () => {

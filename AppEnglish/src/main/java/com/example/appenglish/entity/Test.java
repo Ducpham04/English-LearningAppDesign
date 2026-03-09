@@ -3,6 +3,8 @@ package com.example.appenglish.entity;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.time.LocalDateTime;
+
 @Entity
 @Table(name = "tests", indexes = {
         @Index(name = "idx_test_course", columnList = "course_id"),
@@ -12,7 +14,13 @@ import lombok.*;
 public class Test extends BaseEntity {
     private String title;
     private Integer duration; // Phút (null = không giới hạn)
-    private Integer passScore; // Điểm sàn
+    private Integer passScore; // Điểm sàn (phần trăm hoặc điểm tuyệt đối, tùy logic)
+
+    @Column(name = "max_attempts")
+    private Integer maxAttempts; // null = không giới hạn
+
+    @Column(name = "deadline")
+    private LocalDateTime deadline; // null = không hạn nộp
 
     @Column(name = "is_face_required")
     private Boolean isFaceRequired; // Yêu cầu FaceID không?

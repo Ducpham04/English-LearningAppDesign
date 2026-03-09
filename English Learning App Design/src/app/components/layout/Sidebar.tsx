@@ -21,6 +21,8 @@ import {
   Sparkles,
   Target,
   ClipboardList,
+  ListOrdered,
+  Layers,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -40,7 +42,7 @@ export function Sidebar() {
   // Navigation items based on role
   const studentNavItems: NavItem[] = [
     { title: 'Dashboard', href: '/', icon: Home },
-    { title: 'Sessions', href: '/sessions', icon: BookOpen },
+    { title: 'Chủ đề', href: '/sessions', icon: BookOpen },
     { title: 'Vocabulary', href: '/vocabulary', icon: Book },
     { title: 'Tests', href: '/tests', icon: FileText },
     { title: 'Progress', href: '/progress', icon: BarChart3 },
@@ -64,7 +66,11 @@ export function Sidebar() {
   const adminNavItems: NavItem[] = [
     { title: 'Dashboard', href: '/admin', icon: Home },
     { title: 'User Management', href: '/admin/users', icon: Users },
-    { title: 'Content', href: '/admin/content', icon: BookOpen },
+    { title: 'Content Hub', href: '/admin/content', icon: BookOpen },
+    { title: 'Chủ đề học', href: '/admin/topics', icon: Target },
+    { title: 'Sessions', href: '/admin/sessions', icon: Layers },
+    { title: 'Lộ trình học', href: '/admin/curriculum', icon: ListOrdered },
+    { title: 'Bài test', href: '/admin/tests', icon: FileText },
     { title: 'Classes', href: '/admin/classes', icon: GraduationCap },
     { title: 'AI Usage', href: '/admin/ai-usage', icon: Sparkles },
     { title: 'Face ID', href: '/admin/face-id', icon: Shield },

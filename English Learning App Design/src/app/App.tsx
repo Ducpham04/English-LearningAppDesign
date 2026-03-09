@@ -69,6 +69,10 @@ import { AdminClassesManagement } from '@/features/admin/ClassesManagement';
 import { AIUsage } from '@/features/admin/AIUsage';
 import { FaceIDManagement } from '@/features/admin/FaceIDManagement';
 import { NotificationsManagement } from '@/features/admin/NotificationsManagement';
+import { AdminCurriculumManagement } from '@/features/admin/CurriculumManagement';
+import { AdminSessionManagement } from '@/features/admin/AdminSessionManagement';
+import AdminTopicManagement from '@/features/admin/AdminTopicManagement';
+import { AdminTestManagement } from '@/features/admin/AdminTestManagement';
 
 // Examples & Demo
 import { UXEnhancementsDemo } from '@/features/examples/UXEnhancementsDemo';
@@ -163,6 +167,10 @@ export default function App() {
               <Route path="/admin/ai-usage" element={<AIUsage />} />
               <Route path="/admin/face-id" element={<FaceIDManagement />} />
               <Route path="/admin/notifications" element={<NotificationsManagement />} />
+              <Route path="/admin/curriculum" element={<AdminCurriculumManagement />} />
+              <Route path="/admin/sessions" element={<AdminSessionManagement />} />
+              <Route path="/admin/topics" element={<AdminTopicManagement />} />
+              <Route path="/admin/tests" element={<AdminTestManagement />} />
             </Route>
           </Route>
 

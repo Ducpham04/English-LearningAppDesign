@@ -18,6 +18,10 @@ public class Session extends BaseEntity {
     @JoinColumn(name = "course_id")
     private Curriculum course;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "topic_id")
+    private Topic topic;
+
     // Một chương có nhiều bài học
     @OneToMany(mappedBy = "session", cascade = CascadeType.ALL)
     private List<Lesson> lessons;

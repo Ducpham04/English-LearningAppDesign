@@ -63,7 +63,7 @@ public class UserService {
         userRepository.save(user);
 
         return UserProfileResponse.builder()
-                .id(String.valueOf(user.getId()))
+                .id(user.getId())
                 .name(user.getFullName())
                 .email(user.getEmail())
                 .avatar(user.getAvatarUrl())

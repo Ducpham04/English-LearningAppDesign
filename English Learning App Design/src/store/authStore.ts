@@ -1,8 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { AuthUser, UserRole, LoginCredentials } from '@/types/auth';
-
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api';
+import { API_BASE_URL } from '@/services/baseUrl';
 
 interface AuthTokens {
   accessToken: string;
@@ -19,6 +18,7 @@ interface AuthState {
   logout: () => void;
   register: (name: string, email: string, password: string, role: UserRole) => Promise<void>;
   updateUser: (updates: Partial<AuthUser>) => void;
+  updateTokens: (tokens: AuthTokens) => void;
   checkPermission: (permission: string) => boolean;
 }
 
@@ -151,6 +151,10 @@ export const useAuthStore = create<AuthState>()(
         if (currentUser) {
           set({ user: { ...currentUser, ...updates } });
         }
+      },
+
+      updateTokens: (tokens) => {
+        set({ tokens });
       },
 
       checkPermission: (permission) => {

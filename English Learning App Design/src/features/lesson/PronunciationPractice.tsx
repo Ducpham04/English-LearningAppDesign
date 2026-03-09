@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { useAppStore } from '@/store/appStore';
+import { useCompleteLesson } from '@/hooks/useCompleteLesson';
 import { Card } from '@/app/components/ui/card';
 import { Button } from '@/app/components/ui/button';
 import { Badge } from '@/app/components/ui/badge';
@@ -7,91 +8,87 @@ import { Progress } from '@/app/components/ui/progress';
 import { ConfettiCelebration } from '@/shared/ui/ConfettiCelebration';
 import { RecordingButton } from '@/shared/ui/RecordingButton';
 import { LoadingSpinner, SuccessCheckmark, ScaleButton } from '@/shared/ui/AnimationComponents';
-import { 
-  Mic, 
-  MicOff, 
+import {
+  Mic,
   Play,
-  RotateCcw, 
+  RotateCcw,
   ChevronLeft,
   Volume2,
   Trophy,
   TrendingUp,
   CheckCircle,
-  XCircle,
-  AlertCircle
+  AlertCircle,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { getLessonById } from '@/services/mockData';
-import type { PronunciationResult, WordAnalysis, PronunciationScore } from '@/types';
+import apiService from '@/services/apiService';
+import { toast } from 'sonner';
+import type { PronunciationResult, WordAnalysis } from '@/types';
 
-// Mock pronunciation phrases
-const mockPhrases = [
-  {
-    id: 'phrase-1',
-    text: 'Hello! Nice to meet you.',
-    pronunciation: '/həˈloʊ naɪs tuː miːt juː/',
-  },
-  {
-    id: 'phrase-2',
-    text: 'My name is Sarah.',
-    pronunciation: '/maɪ neɪm ɪz ˈsærə/',
-  },
-  {
-    id: 'phrase-3',
-    text: "I'm from New York.",
-    pronunciation: '/aɪm frɒm nuː jɔːrk/',
-  },
-  {
-    id: 'phrase-4',
-    text: 'What about you?',
-    pronunciation: '/wɒt əˈbaʊt juː/',
-  },
+interface PhraseItem {
+  id: string;
+  text: string;
+  pronunciation?: string;
+}
+
+const MOCK_PHRASES: PhraseItem[] = [
+  { id: 'phrase-1', text: 'Hello! Nice to meet you.', pronunciation: '/həˈloʊ naɪs tuː miːt juː/' },
+  { id: 'phrase-2', text: 'My name is Sarah.', pronunciation: '/maɪ neɪm ɪz ˈsærə/' },
+  { id: 'phrase-3', text: "I'm from New York.", pronunciation: '/aɪm frɒm nuː jɔːrk/' },
+  { id: 'phrase-4', text: 'What about you?', pronunciation: '/wɒt əˈbaʊt juː/' },
 ];
 
-// Mock AI analysis function
-const generateMockAnalysis = (targetText: string): PronunciationResult => {
-  const words = targetText.split(' ');
-  const wordAnalysis: WordAnalysis[] = words.map((word) => {
-    const score = Math.floor(Math.random() * 30) + 70; // 70-100
-    return {
-      word: word.replace(/[,.!?]/g, ''),
-      isCorrect: score >= 80,
-      score,
-      expectedPronunciation: '/example/',
-      actualPronunciation: '/example/',
-      feedback: score >= 90 ? 'Tuyệt vời!' : score >= 80 ? 'Tốt' : 'Cần cải thiện',
-    };
-  });
-
-  const overall = Math.floor(wordAnalysis.reduce((sum, w) => sum + w.score, 0) / words.length);
-  
+function mapApiResponseToResult(
+  api: {
+    pronunciationScore?: number;
+    accuracyScore?: number;
+    fluencyScore?: number;
+    prosodyScore?: number;
+    completenessScore?: number;
+    expectedText?: string;
+    recognizedText?: string;
+  },
+  targetText: string
+): PronunciationResult {
+  const p = api.pronunciationScore ?? 0;
+  const a = api.accuracyScore ?? 0;
+  const f = api.fluencyScore ?? 0;
+  const pr = api.prosodyScore ?? 0;
+  const c = api.completenessScore ?? 0;
+  const overall = Math.round(
+    [p, a, f, pr, c].filter((x) => x != null && !Number.isNaN(x)).reduce((s, x) => s + x, 0) / 5
+  ) || 0;
+  const words = (api.expectedText || targetText).split(/\s+/).map((word) => ({
+    word: word.replace(/[,.!?]/g, ''),
+    isCorrect: true,
+    score: overall,
+    expectedPronunciation: '',
+    feedback: '',
+  })) as WordAnalysis[];
   return {
     score: {
-      overall,
-      pronunciation: overall + Math.floor(Math.random() * 5),
-      fluency: overall - Math.floor(Math.random() * 5),
-      intonation: overall + Math.floor(Math.random() * 3),
-      accuracy: overall - Math.floor(Math.random() * 3),
+      overall: Math.min(100, Math.max(0, overall)),
+      pronunciation: Math.min(100, Math.max(0, p)),
+      fluency: Math.min(100, Math.max(0, f)),
+      intonation: Math.min(100, Math.max(0, pr)),
+      accuracy: Math.min(100, Math.max(0, a)),
     },
-    transcript: targetText,
+    transcript: api.recognizedText || targetText,
     targetText,
-    wordAnalysis,
-    suggestions: overall < 85 
-      ? ['Nói chậm hơn một chút', 'Chú ý phát âm chính xác từng từ', 'Luyện tập thêm âm /θ/ và /ð/']
-      : ['Tiếp tục duy trì', 'Thử tăng tốc độ nói'],
-    strengths: overall >= 85
-      ? ['Phát âm rõ ràng', 'Ngữ điệu tự nhiên', 'Độ trôi chảy tốt']
-      : ['Cố gắng tốt', 'Âm thanh rõ ràng'],
-    weaknesses: overall < 85
-      ? ['Cần cải thiện độ chính xác', 'Ngữ điệu cần tự nhiên hơn']
-      : [],
+    wordAnalysis: words,
+    suggestions: overall < 85 ? ['Nói chậm hơn một chút', 'Chú ý phát âm chính xác từng từ'] : ['Tiếp tục duy trì'],
+    strengths: overall >= 85 ? ['Phát âm rõ ràng', 'Độ trôi chảy tốt'] : ['Cố gắng tốt'],
+    weaknesses: overall < 85 ? ['Cần cải thiện độ chính xác'] : [],
   };
-};
+}
 
 export function PronunciationPractice() {
-  const { selectedLessonId, setCurrentView, completeLesson, addXP } = useAppStore();
+  const { selectedLessonId, setCurrentView } = useAppStore();
+  const { completeAndSave } = useCompleteLesson();
   const lesson = getLessonById(selectedLessonId || '');
-  
+
+  const [phrases, setPhrases] = useState<PhraseItem[]>(MOCK_PHRASES);
+  const [phrasesLoading, setPhrasesLoading] = useState(true);
   const [currentPhraseIndex, setCurrentPhraseIndex] = useState(0);
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
@@ -99,10 +96,42 @@ export function PronunciationPractice() {
   const [analysisResult, setAnalysisResult] = useState<PronunciationResult | null>(null);
   const [showResult, setShowResult] = useState(false);
   const recordingTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
+  const streamRef = useRef<MediaStream | null>(null);
+  const lessonIdRef = useRef<string | null>(null);
+  const sentenceIndexRef = useRef(0);
+  const expectedTextRef = useRef('');
 
-  const currentPhrase = mockPhrases[currentPhraseIndex];
-  const totalPhrases = mockPhrases.length;
-  const progress = ((currentPhraseIndex + 1) / totalPhrases) * 100;
+  const currentPhrase = phrases[currentPhraseIndex];
+  const totalPhrases = phrases.length;
+  const progress = totalPhrases > 0 ? ((currentPhraseIndex + 1) / totalPhrases) * 100 : 0;
+
+  // Fetch transcript when lesson id is available (BE: LessonVideo id = Lesson id)
+  useEffect(() => {
+    const lid = selectedLessonId || '';
+    if (!lid) {
+      setPhrases(MOCK_PHRASES);
+      setPhrasesLoading(false);
+      return;
+    }
+    setPhrasesLoading(true);
+    apiService.transcribe
+      .getTranscript(Number(lid))
+      .then((res) => {
+        const data = res.data?.data;
+        if (data && Array.isArray(data)) {
+          const items: PhraseItem[] = data.map((s: any, i: number) => ({
+            id: `s-${i}`,
+            text: typeof s.text === 'string' ? s.text : String(s.text || ''),
+            pronunciation: s.ipa || undefined,
+          })).filter((p: PhraseItem) => p.text.trim());
+          if (items.length > 0) setPhrases(items);
+        }
+      })
+      .catch(() => setPhrases(MOCK_PHRASES))
+      .finally(() => setPhrasesLoading(false));
+  }, [selectedLessonId]);
 
   // Recording timer
   useEffect(() => {
@@ -129,23 +158,74 @@ export function PronunciationPractice() {
   }, [isRecording]);
 
   const handleStartRecording = async () => {
-    // In a real app, request microphone permission here
+    lessonIdRef.current = selectedLessonId || null;
+    sentenceIndexRef.current = currentPhraseIndex;
+    expectedTextRef.current = currentPhrase?.text ?? '';
     setIsRecording(true);
     setRecordingTime(0);
     setHasRecorded(false);
     setShowResult(false);
+    setAnalysisResult(null);
+    chunksRef.current = [];
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      streamRef.current = stream;
+      const mr = new MediaRecorder(stream);
+      mediaRecorderRef.current = mr;
+      mr.ondataavailable = (e) => {
+        if (e.data.size > 0) chunksRef.current.push(e.data);
+      };
+      mr.onstop = async () => {
+        stream.getTracks().forEach((t) => t.stop());
+        const lid = lessonIdRef.current;
+        const idx = sentenceIndexRef.current;
+        const expected = expectedTextRef.current;
+        if (!lid || chunksRef.current.length === 0) {
+          setHasRecorded(true);
+          setShowResult(true);
+          setAnalysisResult(
+            mapApiResponseToResult(
+              { pronunciationScore: 0, accuracyScore: 0, fluencyScore: 0, prosodyScore: 0, completenessScore: 0, expectedText: expected, recognizedText: '' },
+              expected
+            )
+          );
+          return;
+        }
+        const blob = new Blob(chunksRef.current, { type: mr.mimeType || 'audio/wav' });
+        try {
+          const res = await apiService.pronunciation.getScore(Number(lid), idx, blob);
+          const d = res.data?.data;
+          if (d) {
+            setAnalysisResult(mapApiResponseToResult(d, expected));
+            setShowResult(true);
+          } else {
+            toast.error('Không nhận được kết quả chấm điểm');
+          }
+        } catch (err: any) {
+          toast.error(err?.response?.data?.message || 'Chấm phát âm thất bại. Thử lại.');
+          setAnalysisResult(
+            mapApiResponseToResult(
+              { pronunciationScore: 70, accuracyScore: 70, fluencyScore: 70, prosodyScore: 70, completenessScore: 70, expectedText: expected, recognizedText: expected },
+              expected
+            )
+          );
+          setShowResult(true);
+        }
+        setHasRecorded(true);
+      };
+      mr.start(200);
+    } catch (e) {
+      toast.error('Không thể truy cập micro. Kiểm tra quyền trình duyệt.');
+      setIsRecording(false);
+    }
   };
 
   const handleStopRecording = () => {
     setIsRecording(false);
-    setHasRecorded(true);
-    
-    // Simulate AI analysis after a delay
-    setTimeout(() => {
-      const result = generateMockAnalysis(currentPhrase.text);
-      setAnalysisResult(result);
-      setShowResult(true);
-    }, 1500);
+    setHasRecorded(true); // show "Đang phân tích..." immediately
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      mediaRecorderRef.current.stop();
+    }
   };
 
   const handlePlayExample = () => {
@@ -153,7 +233,7 @@ export function PronunciationPractice() {
     console.log('Playing example audio');
   };
 
-  const handleNextPhrase = () => {
+  const handleNextPhrase = async () => {
     if (currentPhraseIndex < totalPhrases - 1) {
       setCurrentPhraseIndex(currentPhraseIndex + 1);
       setRecordingTime(0);
@@ -161,11 +241,14 @@ export function PronunciationPractice() {
       setShowResult(false);
       setAnalysisResult(null);
     } else {
-      // Complete lesson
       const avgScore = analysisResult?.score.overall || 85;
-      completeLesson(selectedLessonId || '', avgScore);
-      addXP(75);
-      setCurrentView('session-detail');
+      const lid = selectedLessonId || '';
+      if (lid) {
+        const ok = await completeAndSave(lid, avgScore);
+        if (ok) setCurrentView('session-detail');
+      } else {
+        setCurrentView('session-detail');
+      }
     }
   };
 
@@ -192,6 +275,17 @@ export function PronunciationPractice() {
     return (
       <div className="container mx-auto p-4">
         <p>Không tìm thấy bài học</p>
+      </div>
+    );
+  }
+
+  if (phrasesLoading || !currentPhrase) {
+    return (
+      <div className="container mx-auto p-4 flex items-center justify-center min-h-[40vh]">
+        <div className="text-center">
+          <LoadingSpinner size="lg" className="mx-auto mb-4" />
+          <p>Đang tải nội dung bài học...</p>
+        </div>
       </div>
     );
   }

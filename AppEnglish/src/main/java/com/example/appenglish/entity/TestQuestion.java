@@ -4,6 +4,9 @@ import io.hypersistence.utils.hibernate.type.json.JsonType;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.Type;
+
+import com.example.appenglish.enums.QuestionType;
+
 import java.util.Map;
 
 /**
@@ -19,11 +22,17 @@ public class TestQuestion extends BaseEntity {
     @JoinColumn(name = "test_id")
     private Test test;
 
+    @Column(name = "order_index")
+    private Integer orderIndex;
+
     @Column(columnDefinition = "TEXT")
     private String content; // Nội dung câu hỏi (HTML/Text)
 
     @Enumerated(EnumType.STRING)
-    private QuestionType type; // MCQ, FILL_BLANK
+    private QuestionType type; // MCQ, FILL_BLANK, SPEAKING
+
+    /** Điểm tối đa cho câu hỏi này. */
+    private Integer points = 1;
 
     // --- JSONB ANSWER KEY ---
     // VD MCQ: {"correct_option_id": 2}
@@ -32,4 +41,3 @@ public class TestQuestion extends BaseEntity {
     @Column(name = "correct_schema", columnDefinition = "jsonb")
     private Map<String, Object> correctSchema;
 }
-enum QuestionType { MCQ, FILL_BLANK, SPEAKING }

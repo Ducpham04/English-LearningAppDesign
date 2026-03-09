@@ -1,63 +1,105 @@
 import { useState, useRef, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router';
 import { useAppStore } from '@/store/appStore';
 import { Card } from '@/app/components/ui/card';
 import { Button } from '@/app/components/ui/button';
 import { Badge } from '@/app/components/ui/badge';
 import { Avatar } from '@/app/components/ui/avatar';
-import { 
-  Mic, 
+import {
+  Mic,
   MicOff,
   ChevronLeft,
   Send,
   Bot,
   User,
   CheckCircle,
-  Volume2
+  Volume2,
+  Loader2,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { getLessonById } from '@/services/mockData';
+import apiService from '@/services/apiService';
+import { toast } from 'sonner';
 
 interface Message {
   id: string;
   role: 'ai' | 'user';
   text: string;
-  audioUrl?: string;
   timestamp: Date;
 }
 
-const aiPrompts = [
-  "Hello! Nice to meet you. What's your name?",
-  "That's a lovely name! Where are you from?",
-  "Interesting! What do you do for a living?",
-  "That sounds exciting! What do you like to do in your free time?",
-  "Great conversation! Thanks for chatting with me!",
-];
+const FALLBACK_GREETING = "Hello! Let's practice English conversation. How can I help you?";
 
 export function AIConversation() {
-  const { selectedLessonId, setCurrentView, completeLesson, addXP } = useAppStore();
-  const lesson = getLessonById(selectedLessonId || '');
-  
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: '1',
-      role: 'ai',
-      text: aiPrompts[0],
-      timestamp: new Date(),
-    }
-  ]);
-  const [currentPromptIndex, setCurrentPromptIndex] = useState(0);
+  const { lessonId } = useParams<{ lessonId: string }>();
+  const navigate = useNavigate();
+  const { setCurrentView, invalidateProgress } = useAppStore();
+
+  const [lesson, setLesson] = useState<{ id: string | number; title: string; description?: string } | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
   const [inputText, setInputText] = useState('');
+  const [isAITyping, setIsAITyping] = useState(false);
+  const [turnCount, setTurnCount] = useState(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const recordingTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const recognitionRef = useRef<SpeechRecognition | null>(null);
 
-  // Auto scroll to bottom
+  const lessonContext = lesson ? [lesson.title, lesson.description].filter(Boolean).join('\n') : '';
+
+  // Load lesson and initial AI greeting
+  useEffect(() => {
+    if (!lessonId) return;
+    setLoading(true);
+    apiService.lesson.getById(Number(lessonId))
+      .then((res) => {
+        const data = (res.data as any)?.data ?? res.data;
+        setLesson(data);
+        const title = data?.title ?? 'Luyện hội thoại';
+        const desc = data?.description ?? '';
+        const ctx = [title, desc].filter(Boolean).join('\n');
+        return apiService.ai.chat({
+          messages: [{ role: 'user', content: `Start with a short greeting for this English conversation practice. Lesson: ${title}. ${desc ? `Description: ${desc}` : ''}` }],
+          lessonContext: ctx,
+        }).then((chatRes) => {
+          const raw = chatRes.data as any;
+          const content = raw?.data?.content ?? raw?.content ?? '';
+          const greeting = (typeof content === 'string' && content.trim()) ? content.trim() : FALLBACK_GREETING;
+          setMessages([{ id: '1', role: 'ai', text: greeting, timestamp: new Date() }]);
+        }).catch(() => {
+          setMessages([{ id: '1', role: 'ai', text: FALLBACK_GREETING, timestamp: new Date() }]);
+        });
+      })
+      .catch(() => {
+        setMessages([{ id: '1', role: 'ai', text: FALLBACK_GREETING, timestamp: new Date() }]);
+      })
+      .finally(() => setLoading(false));
+  }, [lessonId]);
+
+  // Speech recognition
+  useEffect(() => {
+    if (!('SpeechRecognition' in window) && !('webkitSpeechRecognition' in window)) return;
+    const SpeechRec = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    const rec = new SpeechRec();
+    rec.lang = 'en-US';
+    rec.continuous = false;
+    rec.interimResults = false;
+    rec.onresult = (e: any) => {
+      const text = e.results[0][0].transcript;
+      setIsRecording(false);
+      if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
+      handleSendMessage(text);
+    };
+    rec.onerror = () => { setIsRecording(false); toast.error('Không nhận được giọng nói'); };
+    rec.onend = () => setIsRecording(false);
+    recognitionRef.current = rec;
+  }, []);
+
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // Recording timer
   useEffect(() => {
     if (isRecording) {
       recordingTimerRef.current = setInterval(() => {
@@ -75,83 +117,99 @@ export function AIConversation() {
       }
     }
     return () => {
-      if (recordingTimerRef.current) {
-        clearInterval(recordingTimerRef.current);
-      }
+      if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
     };
   }, [isRecording]);
 
+  const speakText = (text: string) => {
+    if (!window.speechSynthesis) return;
+    window.speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = 'en-US';
+    u.rate = 0.85;
+    window.speechSynthesis.speak(u);
+  };
+
   const handleStartRecording = () => {
+    if (!recognitionRef.current) { toast.error('Trình duyệt không hỗ trợ nhận diện giọng nói'); return; }
     setIsRecording(true);
     setRecordingTime(0);
+    recognitionRef.current.start();
   };
 
   const handleStopRecording = () => {
     setIsRecording(false);
-    
-    // Simulate transcription
-    setTimeout(() => {
-      handleSendMessage("Yes, I understand. Thank you!");
-    }, 800);
+    if (recognitionRef.current) recognitionRef.current.stop();
+    if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
   };
 
   const handleSendMessage = (text?: string) => {
-    const messageText = text || inputText.trim();
+    const messageText = (text ?? inputText).trim();
     if (!messageText) return;
 
-    // Add user message
     const userMessage: Message = {
       id: `user-${Date.now()}`,
       role: 'user',
       text: messageText,
       timestamp: new Date(),
     };
-
-    setMessages(prev => [...prev, userMessage]);
+    setMessages((prev) => [...prev, userMessage]);
     setInputText('');
     setRecordingTime(0);
+    setTurnCount((prev) => prev + 1);
+    setIsAITyping(true);
 
-    // Simulate AI response after delay
-    setTimeout(() => {
-      if (currentPromptIndex < aiPrompts.length - 1) {
-        const nextIndex = currentPromptIndex + 1;
-        const aiMessage: Message = {
-          id: `ai-${Date.now()}`,
-          role: 'ai',
-          text: aiPrompts[nextIndex],
-          timestamp: new Date(),
-        };
-        setMessages(prev => [...prev, aiMessage]);
-        setCurrentPromptIndex(nextIndex);
-      } else {
-        // Conversation complete
-        setTimeout(() => {
-          handleComplete();
-        }, 2000);
-      }
-    }, 1500);
+    const history = [...messages, userMessage].map((m) => ({
+      role: m.role === 'ai' ? 'assistant' : 'user',
+      content: m.text,
+    }));
+
+    apiService.ai.chat({ messages: history, lessonContext })
+      .then((res) => {
+        const raw = res.data as any;
+        const content = raw?.data?.content ?? raw?.content ?? '';
+        const reply = (typeof content === 'string' && content.trim()) ? content.trim() : "I'm here to help. Could you say that again?";
+        const aiMessage: Message = { id: `ai-${Date.now()}`, role: 'ai', text: reply, timestamp: new Date() };
+        setMessages((prev) => [...prev, aiMessage]);
+        setTurnCount((prev) => prev + 1);
+        speakText(reply);
+      })
+      .catch((err) => {
+        toast.error(err?.response?.data?.message || 'Không thể kết nối AI. Thử lại sau.');
+        const fallback: Message = { id: `ai-${Date.now()}`, role: 'ai', text: "Sorry, I couldn't reply right now. Please try again.", timestamp: new Date() };
+        setMessages((prev) => [...prev, fallback]);
+        setTurnCount((prev) => prev + 1);
+      })
+      .finally(() => setIsAITyping(false));
   };
 
-  const handleComplete = () => {
-    completeLesson(selectedLessonId || '', 90);
-    addXP(100);
-    setCurrentView('session-detail');
+  const handleComplete = async () => {
+    if (!lessonId) return;
+    try {
+      await apiService.student.completeLesson(lessonId, 100);
+      invalidateProgress?.();
+    } catch { /* ignore */ }
+    toast.success('Hoàn thành hội thoại!');
+    setCurrentView?.('session-detail');
+    navigate(-1);
   };
 
-  const handlePlayAudio = (messageId: string) => {
-    console.log('Playing audio for message:', messageId);
+  const handlePlayAudio = (text: string) => {
+    speakText(text);
   };
 
-  if (!lesson) {
+  if (loading) {
     return (
-      <div className="container mx-auto p-4">
-        <p>Không tìm thấy bài học</p>
+      <div className="flex min-h-screen items-center justify-center">
+        <Loader2 className="h-10 w-10 animate-spin text-purple-500" />
       </div>
     );
   }
 
-  const isConversationComplete = currentPromptIndex >= aiPrompts.length - 1 && 
-                                  messages[messages.length - 1]?.role === 'ai';
+  const targetTurns = 8;
+  const progress = Math.min((turnCount / targetTurns) * 100, 100);
+  const isConversationComplete = turnCount >= targetTurns;
+  const displayLesson = lesson ?? { id: lessonId, title: 'Luyện hội thoại AI', description: 'Hãy nói chuyện tự nhiên bằng tiếng Anh' };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-pink-50 to-blue-50 dark:from-gray-900 dark:via-gray-900 dark:to-gray-900">
@@ -160,7 +218,7 @@ export function AIConversation() {
         <div className="mb-6 flex items-center justify-between">
           <Button
             variant="ghost"
-            onClick={() => setCurrentView('session-detail')}
+            onClick={() => navigate(-1)}
             className="gap-2"
           >
             <ChevronLeft className="h-4 w-4" />
@@ -179,8 +237,8 @@ export function AIConversation() {
         >
           {/* Title */}
           <div className="mb-6">
-            <h1 className="mb-2 text-3xl font-bold">{lesson.title}</h1>
-            <p className="text-gray-600 dark:text-gray-400">{lesson.description}</p>
+            <h1 className="mb-2 text-3xl font-bold">{displayLesson.title}</h1>
+            <p className="text-gray-600 dark:text-gray-400">{displayLesson.description}</p>
           </div>
 
           {/* Chat Container */}
@@ -226,7 +284,7 @@ export function AIConversation() {
                           <Button
                             size="sm"
                             variant="ghost"
-                            onClick={() => handlePlayAudio(message.id)}
+                            onClick={() => handlePlayAudio(message.text)}
                             className="mt-2 h-8 gap-1 text-xs"
                           >
                             <Volume2 className="h-3 w-3" />
@@ -246,7 +304,7 @@ export function AIConversation() {
               </AnimatePresence>
 
               {/* Typing Indicator */}
-              {messages[messages.length - 1]?.role === 'user' && !isConversationComplete && (
+              {isAITyping && (
                 <motion.div
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
@@ -291,6 +349,7 @@ export function AIConversation() {
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
                     onClick={isRecording ? handleStopRecording : handleStartRecording}
+                    disabled={isAITyping}
                     className={`flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full transition-all ${
                       isRecording
                         ? 'bg-red-500 shadow-lg shadow-red-500/50 animate-pulse'
@@ -326,11 +385,12 @@ export function AIConversation() {
                         onChange={(e) => setInputText(e.target.value)}
                         onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
                         placeholder="Nhập câu trả lời..."
+                        disabled={isAITyping}
                         className="flex-1 rounded-lg border px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600"
                       />
                       <Button
                         onClick={() => handleSendMessage()}
-                        disabled={!inputText.trim()}
+                        disabled={!inputText.trim() || isAITyping}
                         className="h-12 w-12 p-0 bg-gradient-to-br from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700"
                       >
                         <Send className="h-5 w-5" />

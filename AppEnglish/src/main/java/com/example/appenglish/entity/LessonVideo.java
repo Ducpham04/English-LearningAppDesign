@@ -26,7 +26,10 @@ public class LessonVideo {
     private Lesson lesson;
 
     @Column(name = "video_url")
-    private String videoUrl; // Link M3U8/MP4 (MinIO/S3)
+    private String videoUrl; // Link S3/MP4 audio từ YouTube download
+
+    @Column(name = "youtube_url")
+    private String youtubeUrl; // URL YouTube gốc để embed player
 
     // --- JSONB TRANSCRIPT ---
     // Cấu trúc: [{"start": 0, "end": 2, "text": "Hello"}, ...]

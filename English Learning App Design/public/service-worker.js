@@ -1,136 +1,74 @@
-const CACHE_NAME = 'english-ai-v1';
+const CACHE_NAME = 'english-ai-v2';
+
+// Chỉ cache các file tĩnh thực sự tồn tại
 const urlsToCache = [
   '/',
   '/index.html',
   '/manifest.json',
-  '/styles/index.css',
-  '/styles/theme.css',
 ];
 
-// Install event - cache assets
+// Các path KHÔNG được cache (API calls, auth)
+const NO_CACHE_PREFIXES = ['/api/', '/v1/'];
+
+function shouldSkipCache(url) {
+  try {
+    const pathname = new URL(url).pathname;
+    return NO_CACHE_PREFIXES.some((prefix) => pathname.startsWith(prefix));
+  } catch {
+    return false;
+  }
+}
+
+// Install event
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME)
-      .then((cache) => {
-        console.log('Opened cache');
-        return cache.addAll(urlsToCache);
-      })
-      .catch((error) => {
-        console.error('Cache installation failed:', error);
-      })
+      .then((cache) => cache.addAll(urlsToCache))
+      .catch((error) => console.warn('Cache install warning:', error))
   );
   self.skipWaiting();
 });
 
-// Fetch event - serve from cache, fallback to network
+// Fetch event - không cache API calls
 self.addEventListener('fetch', (event) => {
+  // Bỏ qua non-GET và API calls
+  if (event.request.method !== 'GET' || shouldSkipCache(event.request.url)) {
+    return;
+  }
+
   event.respondWith(
-    caches.match(event.request)
-      .then((response) => {
-        // Cache hit - return response
-        if (response) {
+    caches.match(event.request).then((cached) => {
+      if (cached) return cached;
+
+      return fetch(event.request).then((response) => {
+        if (!response || response.status !== 200 || response.type !== 'basic') {
           return response;
         }
-
-        return fetch(event.request).then((response) => {
-          // Check if valid response
-          if (!response || response.status !== 200 || response.type !== 'basic') {
-            return response;
-          }
-
-          // Clone the response
-          const responseToCache = response.clone();
-
-          caches.open(CACHE_NAME)
-            .then((cache) => {
-              cache.put(event.request, responseToCache);
-            });
-
-          return response;
-        }).catch((error) => {
-          console.error('Fetch failed:', error);
-          // Return offline page if available
-          return caches.match('/offline.html');
+        const responseToCache = response.clone();
+        caches.open(CACHE_NAME).then((cache) => {
+          cache.put(event.request, responseToCache);
         });
-      })
-  );
-});
-
-// Activate event - clean up old caches
-self.addEventListener('activate', (event) => {
-  const cacheWhitelist = [CACHE_NAME];
-  
-  event.waitUntil(
-    caches.keys().then((cacheNames) => {
-      return Promise.all(
-        cacheNames.map((cacheName) => {
-          if (cacheWhitelist.indexOf(cacheName) === -1) {
-            return caches.delete(cacheName);
-          }
-        })
-      );
+        return response;
+      }).catch(() => caches.match('/index.html'));
     })
   );
-  
-  return self.clients.claim();
 });
 
-// Background sync for offline submissions
-self.addEventListener('sync', (event) => {
-  if (event.tag === 'sync-submissions') {
-    event.waitUntil(syncSubmissions());
-  }
-});
-
-async function syncSubmissions() {
-  // Get pending submissions from IndexedDB
-  // Send to server
-  // Clear from local storage
-  console.log('Syncing submissions...');
-}
-
-// Push notifications
-self.addEventListener('push', (event) => {
-  const options = {
-    body: event.data ? event.data.text() : 'New notification',
-    icon: '/icons/icon-192x192.png',
-    badge: '/icons/icon-72x72.png',
-    vibrate: [100, 50, 100],
-    data: {
-      dateOfArrival: Date.now(),
-      primaryKey: 1
-    },
-    actions: [
-      {
-        action: 'explore',
-        title: 'View',
-        icon: '/icons/checkmark.png'
-      },
-      {
-        action: 'close',
-        title: 'Close',
-        icon: '/icons/xmark.png'
-      }
-    ]
-  };
-
+// Activate event - xóa cache cũ
+self.addEventListener('activate', (event) => {
   event.waitUntil(
-    self.registration.showNotification('English AI Learning', options)
+    caches.keys().then((names) =>
+      Promise.all(
+        names
+          .filter((name) => name !== CACHE_NAME)
+          .map((name) => caches.delete(name))
+      )
+    )
   );
+  self.clients.claim();
 });
 
-// Notification click
-self.addEventListener('notificationclick', (event) => {
-  event.notification.close();
-
-  if (event.action === 'explore') {
-    event.waitUntil(
-      clients.openWindow('/')
-    );
-  }
-});
-
-// Message event - for two-way communication with app
+// Message event
 self.addEventListener('message', (event) => {
   if (event.data && event.data.type === 'SKIP_WAITING') {
     self.skipWaiting();

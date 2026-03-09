@@ -6,9 +6,13 @@ import { motion } from 'motion/react';
 
 export function GamificationBar() {
   const { user } = useAppStore();
+  const level = user?.level ?? 1;
+  const xp = user?.xp ?? 0;
+  const streak = user?.streak ?? 0;
+  const totalLessonsCompleted = user?.totalLessonsCompleted ?? 0;
 
-  const xpToNextLevel = (user.level + 1) * 250;
-  const xpProgress = (user.xp % 250) / 250 * 100;
+  const xpToNextLevel = (level + 1) * 250;
+  const xpProgress = (xp % 250) / 250 * 100;
 
   return (
     <Card className="p-5 rounded-3xl border-2 border-green-100 dark:border-green-900 shadow-sm">
@@ -19,11 +23,11 @@ export function GamificationBar() {
           whileHover={{ scale: 1.05 }}
         >
           <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-green-400 to-green-600 text-white font-bold text-xl shadow-lg">
-            {user.level}
+            {level}
           </div>
           <div>
             <p className="text-xs text-gray-500 dark:text-gray-400 font-medium">Cấp độ</p>
-            <p className="font-bold text-lg text-green-600 dark:text-green-400">Level {user.level}</p>
+            <p className="font-bold text-lg text-green-600 dark:text-green-400">Level {level}</p>
           </div>
         </motion.div>
 
@@ -32,7 +36,7 @@ export function GamificationBar() {
           <div className="mb-2 flex items-center justify-between text-sm">
             <span className="flex items-center gap-1.5 text-gray-600 dark:text-gray-300 font-medium">
               <Star className="h-4 w-4 text-yellow-500" />
-              {user.xp} XP
+              {xp} XP
             </span>
             <span className="text-gray-500 dark:text-gray-400">{xpToNextLevel} XP</span>
           </div>
@@ -45,19 +49,18 @@ export function GamificationBar() {
           whileHover={{ scale: 1.05 }}
         >
           <div className={`flex h-14 w-14 items-center justify-center rounded-2xl ${
-            user.streak > 0 
-              ? 'bg-gradient-to-br from-orange-400 to-orange-600' 
+            streak > 0
+              ? 'bg-gradient-to-br from-orange-400 to-orange-600'
               : 'bg-gray-200 dark:bg-gray-700'
           } shadow-md`}>
-            <Flame className={`h-7 w-7 ${user.streak > 0 ? 'text-white' : 'text-gray-400'}`} />
+            <Flame className={`h-7 w-7 ${streak > 0 ? 'text-white' : 'text-gray-400'}`} />
           </div>
           <div>
             <p className="text-xs text-gray-500 dark:text-gray-400 font-medium">Chuỗi</p>
-            <p className="font-bold text-lg text-orange-600 dark:text-orange-400">{user.streak} ngày</p>
+            <p className="font-bold text-lg text-orange-600 dark:text-orange-400">{streak} ngày</p>
           </div>
         </motion.div>
 
-        {/* Lessons Completed */}
         <motion.div
           className="flex items-center gap-3"
           whileHover={{ scale: 1.05 }}
@@ -67,7 +70,7 @@ export function GamificationBar() {
           </div>
           <div>
             <p className="text-xs text-gray-500 dark:text-gray-400 font-medium">Hoàn thành</p>
-            <p className="font-bold text-lg text-green-600 dark:text-green-400">{user.totalLessonsCompleted} bài</p>
+            <p className="font-bold text-lg text-green-600 dark:text-green-400">{totalLessonsCompleted} bài</p>
           </div>
         </motion.div>
       </div>

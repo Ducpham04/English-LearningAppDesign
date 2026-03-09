@@ -24,6 +24,12 @@ public class Lesson extends BaseEntity {
 
     private String title;
 
+    @Column(columnDefinition = "TEXT")
+    private String description;
+
+    @Column(name = "duration_minutes")
+    private Integer durationMinutes;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "course_id")
     private Curriculum course;

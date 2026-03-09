@@ -1,123 +1,139 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import { Button } from '@/app/components/ui/button';
 import { Card } from '@/app/components/ui/card';
 import { Progress } from '@/app/components/ui/progress';
 import { Badge } from '@/app/components/ui/badge';
-import { Mic, Volume2, RotateCcw, CheckCircle2, XCircle, ArrowLeft, ArrowRight, Trophy } from 'lucide-react';
+import { Mic, Volume2, RotateCcw, CheckCircle2, Square, ArrowLeft, ArrowRight, Trophy, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
+import apiService from '@/services/apiService';
+import { useAppStore } from '@/store/appStore';
 
-interface Word {
+interface PhraseItem {
   id: number;
   word: string;
   phonetic: string;
-  audioUrl: string;
   difficulty: 'easy' | 'medium' | 'hard';
+}
+
+const FALLBACK_PHRASES: PhraseItem[] = [
+  { id: 1, word: 'Restaurant', phonetic: '/ˈrestərɑːnt/', difficulty: 'medium' },
+  { id: 2, word: 'Pronunciation', phonetic: '/prəˌnʌnsiˈeɪʃn/', difficulty: 'hard' },
+  { id: 3, word: 'Beautiful', phonetic: '/ˈbjuːtɪfl/', difficulty: 'easy' },
+];
+
+function overallScore(d: { pronunciationScore?: number; accuracyScore?: number; fluencyScore?: number; prosodyScore?: number; completenessScore?: number } | null): number {
+  if (!d) return 0;
+  const p = d.pronunciationScore ?? 0;
+  const a = d.accuracyScore ?? 0;
+  const f = d.fluencyScore ?? 0;
+  const pr = d.prosodyScore ?? 0;
+  const c = d.completenessScore ?? 0;
+  const arr = [p, a, f, pr, c].filter((x) => x != null && !Number.isNaN(x));
+  return arr.length ? Math.round(arr.reduce((s, x) => s + x, 0) / arr.length) : 0;
 }
 
 export function PronunciationLesson() {
   const navigate = useNavigate();
   const { lessonId } = useParams();
-  
+
+  const [phrases, setPhrases] = useState<PhraseItem[]>(FALLBACK_PHRASES);
+  const [phrasesLoading, setPhrasesLoading] = useState(!!lessonId);
   const [currentWordIndex, setCurrentWordIndex] = useState(0);
   const [isRecording, setIsRecording] = useState(false);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [scores, setScores] = useState<number[]>([]);
   const [attempts, setAttempts] = useState(0);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
+  const streamRef = useRef<MediaStream | null>(null);
 
-  const words: Word[] = [
-    {
-      id: 1,
-      word: 'Restaurant',
-      phonetic: '/ˈrestərɑːnt/',
-      audioUrl: '/audio/restaurant.mp3',
-      difficulty: 'medium',
-    },
-    {
-      id: 2,
-      word: 'Pronunciation',
-      phonetic: '/prəˌnʌnsiˈeɪʃn/',
-      audioUrl: '/audio/pronunciation.mp3',
-      difficulty: 'hard',
-    },
-    {
-      id: 3,
-      word: 'Beautiful',
-      phonetic: '/ˈbjuːtɪfl/',
-      audioUrl: '/audio/beautiful.mp3',
-      difficulty: 'easy',
-    },
-  ];
+  const currentPhrase = phrases[currentWordIndex];
+  const progress = phrases.length > 0 ? ((currentWordIndex + 1) / phrases.length) * 100 : 0;
 
-  const currentWord = words[currentWordIndex];
-  const progress = ((currentWordIndex + 1) / words.length) * 100;
-
-  // Cleanup audio on unmount or when changing words
   useEffect(() => {
-    return () => {
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current.src = '';
-        audioRef.current = null;
-      }
-    };
-  }, [currentWordIndex]);
+    if (!lessonId) { setPhrasesLoading(false); return; }
+    setPhrasesLoading(true);
+    apiService.transcribe.getTranscript(Number(lessonId))
+      .then((res) => {
+        const data = res.data?.data;
+        if (data && Array.isArray(data) && data.length > 0) {
+          const items: PhraseItem[] = data.map((s: any, i: number) => ({
+            id: i + 1,
+            word: typeof s.text === 'string' ? s.text.trim() : String(s.text || '').trim(),
+            phonetic: s.ipa || '',
+            difficulty: 'medium' as const,
+          })).filter((p) => p.word.length > 0);
+          if (items.length > 0) setPhrases(items);
+        }
+      })
+      .catch(() => setPhrases(FALLBACK_PHRASES))
+      .finally(() => setPhrasesLoading(false));
+  }, [lessonId]);
 
-  const playAudio = () => {
-    // Clean up previous audio instance if exists
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current.src = '';
-      audioRef.current = null;
-    }
+  const playAudio = useCallback(() => {
+    if (!currentPhrase) return;
+    const u = new SpeechSynthesisUtterance(currentPhrase.word);
+    u.lang = 'en-US';
+    u.rate = 0.8;
+    window.speechSynthesis.speak(u);
+  }, [currentPhrase]);
 
-    const audio = new Audio(currentWord.audioUrl);
-    audioRef.current = audio;
-    
-    const playPromise = audio.play();
-    
-    if (playPromise !== undefined) {
-      playPromise
-        .then(() => {
-          // Audio played successfully
-        })
-        .catch((error) => {
-          console.log('Audio playback failed, using speech synthesis fallback:', error);
-          // Fallback: use speech synthesis
-          const utterance = new SpeechSynthesisUtterance(currentWord.word);
-          utterance.lang = 'en-US';
-          utterance.rate = 0.8;
-          window.speechSynthesis.speak(utterance);
-        });
-    }
-  };
-
-  const startRecording = async () => {
+  const startRecording = useCallback(async () => {
+    if (!currentPhrase || !lessonId) return;
     setIsRecording(true);
-    setAttempts(attempts + 1);
-
-    // Simulate recording for 2 seconds
-    setTimeout(() => {
+    setAttempts((a) => a + 1);
+    chunksRef.current = [];
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      streamRef.current = stream;
+      const mr = new MediaRecorder(stream);
+      mediaRecorderRef.current = mr;
+      mr.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data); };
+      mr.onstop = async () => {
+        stream.getTracks().forEach((t) => t.stop());
+        setIsRecording(false);
+        if (chunksRef.current.length === 0) {
+          toast.error('Không có bản ghi âm. Hãy nói rồi nhấn Dừng.');
+          return;
+        }
+        setIsAnalyzing(true);
+        const blob = new Blob(chunksRef.current, { type: mr.mimeType || 'audio/wav' });
+        try {
+          const res = await apiService.pronunciation.getScore(Number(lessonId), currentWordIndex, blob);
+          const d = res.data?.data;
+          if (d) {
+            const score = overallScore(d);
+            setScores((prev) => {
+              const next = [...prev];
+              next[currentWordIndex] = Math.max(score, next[currentWordIndex] ?? 0);
+              return next;
+            });
+            if (score >= 85) toast.success(`Xuất sắc! ${score}/100 🎉`);
+            else if (score >= 70) toast.success(`Tốt! ${score}/100.`);
+            else toast.info(`${score}/100. Nghe mẫu và thử lại.`);
+          } else toast.error('Không nhận được kết quả chấm điểm.');
+        } catch (err: any) {
+          toast.error(err?.response?.data?.message || 'Chấm phát âm thất bại. Thử lại.');
+        } finally {
+          setIsAnalyzing(false);
+        }
+      };
+      mr.start(200);
+    } catch {
+      toast.error('Không thể truy cập micro.');
       setIsRecording(false);
-      
-      // Mock AI scoring (70-100)
-      const score = Math.floor(Math.random() * 30) + 70;
-      const newScores = [...scores];
-      newScores[currentWordIndex] = Math.max(score, newScores[currentWordIndex] || 0);
-      setScores(newScores);
+    }
+  }, [lessonId, currentPhrase, currentWordIndex]);
 
-      if (score >= 85) {
-        toast.success(`Excellent! Score: ${score}/100 🎉`);
-      } else if (score >= 70) {
-        toast.success(`Good! Score: ${score}/100. Try again for better score!`);
-      } else {
-        toast.error(`Score: ${score}/100. Listen and try again!`);
-      }
-    }, 2000);
-  };
+  const stopRecording = useCallback(() => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      mediaRecorderRef.current.stop();
+    }
+  }, []);
 
   const handleNext = () => {
-    if (currentWordIndex < words.length - 1) {
+    if (currentWordIndex < phrases.length - 1) {
       setCurrentWordIndex(currentWordIndex + 1);
       setAttempts(0);
     }
@@ -130,11 +146,20 @@ export function PronunciationLesson() {
     }
   };
 
-  const handleComplete = () => {
-    const avgScore = scores.reduce((a, b) => a + b, 0) / scores.length;
-    const xp = Math.floor(avgScore / 2);
-    toast.success(`🎉 Lesson Completed! +${xp} XP`);
-    navigate('/student/learning');
+  const handleComplete = async () => {
+    const allPassed = phrases.length > 0 && phrases.every((_, i) => (scores[i] ?? 0) >= 70);
+    if (!lessonId || !allPassed) {
+      toast.error('Hãy luyện phát âm và đạt ≥70 điểm cho mỗi từ/câu trước khi hoàn thành.');
+      return;
+    }
+    const validScores = phrases.map((_, i) => scores[i]).filter((s): s is number => s != null);
+    const avgScore = validScores.length ? validScores.reduce((a, b) => a + b, 0) / validScores.length : 0;
+    try {
+      await apiService.student.completeLesson(lessonId, Math.round(avgScore));
+      useAppStore.getState().invalidateProgress();
+    } catch { /* ignore */ }
+    toast.success(`🎉 Hoàn thành bài học! +${Math.round(avgScore / 2)} XP`);
+    navigate(-1);
   };
 
   const getDifficultyColor = (difficulty: string) => {
@@ -152,6 +177,19 @@ export function PronunciationLesson() {
     return 'text-red-600 dark:text-red-400';
   };
 
+  const canComplete = phrases.length > 0 && phrases.every((_, i) => (scores[i] ?? 0) >= 70);
+
+  if (phrasesLoading || !currentPhrase) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-50 to-pink-50 dark:from-gray-900 dark:to-gray-800">
+        <div className="text-center">
+          <Loader2 className="w-12 h-12 animate-spin text-purple-600 mx-auto mb-4" />
+          <p className="text-gray-600 dark:text-gray-400">Đang tải bài học...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 to-pink-50 dark:from-gray-900 dark:to-gray-800 p-6">
       <div className="max-w-3xl mx-auto space-y-6">
@@ -159,7 +197,7 @@ export function PronunciationLesson() {
         <div className="flex items-center justify-between">
           <Button
             variant="ghost"
-            onClick={() => navigate('/student/learning')}
+            onClick={() => navigate(-1)}
             className="gap-2"
           >
             <ArrowLeft className="w-4 h-4" />
@@ -175,7 +213,7 @@ export function PronunciationLesson() {
         <div className="space-y-2">
           <div className="flex justify-between text-sm text-gray-600 dark:text-gray-400">
             <span>Progress</span>
-            <span>{currentWordIndex + 1} / {words.length}</span>
+            <span>{currentWordIndex + 1} / {phrases.length}</span>
           </div>
           <Progress value={progress} className="h-3" />
         </div>
@@ -184,17 +222,17 @@ export function PronunciationLesson() {
         <Card className="p-8">
           <div className="text-center space-y-6">
             {/* Difficulty Badge */}
-            <Badge className={getDifficultyColor(currentWord.difficulty)}>
-              {currentWord.difficulty.toUpperCase()}
+            <Badge className={getDifficultyColor(currentPhrase.difficulty)}>
+              {currentPhrase.difficulty.toUpperCase()}
             </Badge>
 
             {/* Word Display */}
             <div className="space-y-4">
               <h1 className="text-6xl font-bold text-gray-900 dark:text-white">
-                {currentWord.word}
+                {currentPhrase.word}
               </h1>
               <p className="text-2xl text-gray-600 dark:text-gray-400">
-                {currentWord.phonetic}
+                {currentPhrase.phonetic}
               </p>
             </div>
 
@@ -211,12 +249,20 @@ export function PronunciationLesson() {
 
             {/* Recording Section */}
             <div className="py-8">
-              {isRecording ? (
+              {isAnalyzing ? (
+                <div className="flex flex-col items-center gap-4">
+                  <Loader2 className="w-16 h-16 text-purple-600 animate-spin" />
+                  <p className="text-lg font-semibold text-gray-600 dark:text-gray-400">Đang phân tích phát âm...</p>
+                </div>
+              ) : isRecording ? (
                 <div className="flex flex-col items-center gap-4">
                   <div className="w-32 h-32 rounded-full bg-red-500 animate-pulse flex items-center justify-center">
                     <Mic className="w-16 h-16 text-white" />
                   </div>
-                  <p className="text-lg font-semibold text-red-600">Recording...</p>
+                  <p className="text-lg font-semibold text-red-600">Đang thu âm...</p>
+                  <Button onClick={stopRecording} variant="outline" className="gap-2 border-red-300 text-red-700">
+                    <Square className="w-4 h-4" /> Dừng
+                  </Button>
                 </div>
               ) : (
                 <Button
@@ -228,7 +274,7 @@ export function PronunciationLesson() {
                 </Button>
               )}
               <p className="text-sm text-gray-600 dark:text-gray-400 mt-4">
-                Click the microphone to practice
+                Nhấn micro để thu âm, nói xong nhấn Dừng
               </p>
             </div>
 
@@ -271,22 +317,22 @@ export function PronunciationLesson() {
             Previous
           </Button>
 
-          {currentWordIndex === words.length - 1 ? (
+          {currentWordIndex === phrases.length - 1 ? (
             <Button
               onClick={handleComplete}
               className="bg-green-600 hover:bg-green-700 text-white gap-2"
-              disabled={scores.filter(s => s >= 70).length < words.length}
+              disabled={!canComplete}
             >
               <CheckCircle2 className="w-5 h-5" />
-              Complete Lesson
+              Hoàn thành
             </Button>
           ) : (
             <Button
               onClick={handleNext}
-              disabled={!scores[currentWordIndex] || scores[currentWordIndex] < 70}
+              disabled={scores[currentWordIndex] == null || scores[currentWordIndex] < 70}
               className="gap-2"
             >
-              Next
+              Tiếp theo
               <ArrowRight className="w-4 h-4" />
             </Button>
           )}
@@ -296,24 +342,24 @@ export function PronunciationLesson() {
         <Card className="p-6">
           <h3 className="font-semibold mb-4">Your Progress</h3>
           <div className="grid grid-cols-3 gap-4">
-            {words.map((word, idx) => (
+            {phrases.map((phrase, idx) => (
               <div
-                key={word.id}
+                key={phrase.id}
                 className={`p-4 rounded-lg border-2 ${
                   idx === currentWordIndex
                     ? 'border-purple-500 bg-purple-50 dark:bg-purple-900/20'
-                    : scores[idx]
+                    : scores[idx] != null
                     ? 'border-green-500 bg-green-50 dark:bg-green-900/20'
                     : 'border-gray-200 dark:border-gray-700'
                 }`}
               >
-                <p className="text-sm font-semibold mb-1">{word.word}</p>
-                {scores[idx] ? (
+                <p className="text-sm font-semibold mb-1 truncate">{phrase.word}</p>
+                {scores[idx] != null ? (
                   <p className={`text-2xl font-bold ${getScoreColor(scores[idx])}`}>
                     {scores[idx]}
                   </p>
                 ) : (
-                  <p className="text-sm text-gray-400">Not attempted</p>
+                  <p className="text-sm text-gray-400">Chưa thử</p>
                 )}
               </div>
             ))}

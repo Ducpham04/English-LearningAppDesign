@@ -3,270 +3,319 @@ import { useNavigate, useParams } from 'react-router';
 import { Button } from '@/app/components/ui/button';
 import { Card } from '@/app/components/ui/card';
 import { Badge } from '@/app/components/ui/badge';
-import { Mic, Send, Volume2, ArrowLeft, CheckCircle2, Bot, User } from 'lucide-react';
+import { Mic, MicOff, Volume2, ArrowLeft, CheckCircle2, Bot, User, Send, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { Avatar, AvatarFallback, AvatarImage } from '@/app/components/ui/avatar';
+import { Avatar, AvatarFallback } from '@/app/components/ui/avatar';
+import { Input } from '@/app/components/ui/input';
+import apiService from '@/services/apiService';
+import { useAppStore } from '@/store/appStore';
 
 interface Message {
   id: number;
   sender: 'ai' | 'user';
   text: string;
   timestamp: Date;
-  audioUrl?: string;
+}
+
+// Fallback greeting khi API lỗi hoặc chưa load
+function buildGreeting(title: string): string {
+  const t = title.toLowerCase();
+  if (t.includes('ăn') || t.includes('nhà hàng') || t.includes('food') || t.includes('restaurant'))
+    return "Xin chào! Chào mừng bạn đến với nhà hàng của chúng tôi. Bạn muốn đặt bàn không?";
+  if (t.includes('khách sạn') || t.includes('hotel'))
+    return "Good evening! Welcome to our hotel. How may I assist you today?";
+  if (t.includes('mua sắm') || t.includes('shopping'))
+    return "Hello! Welcome to our store. Are you looking for anything specific today?";
+  if (t.includes('du lịch') || t.includes('travel') || t.includes('airport'))
+    return "Hello! Welcome. How can I help you with your travel plans today?";
+  if (t.includes('bệnh viện') || t.includes('doctor') || t.includes('health'))
+    return "Good morning! How can I help you today? Do you have an appointment?";
+  return `Hello! Let's practice a conversation about "${title}". How can I help you?`;
 }
 
 export function AIConversationLesson() {
   const navigate = useNavigate();
   const { lessonId } = useParams();
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const [lesson, setLesson] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
   const [messages, setMessages] = useState<Message[]>([]);
+  const [inputText, setInputText] = useState('');
   const [isRecording, setIsRecording] = useState(false);
   const [isAISpeaking, setIsAISpeaking] = useState(false);
+  const [isAITyping, setIsAITyping] = useState(false);
   const [turnCount, setTurnCount] = useState(0);
-
-  const scenario = {
-    id: lessonId,
-    title: 'Booking a Hotel Room',
-    description: 'Practice a conversation about making a hotel reservation',
-    targetTurns: 10,
-    xp: 75,
-  };
+  const [recognition, setRecognition] = useState<SpeechRecognition | null>(null);
 
   useEffect(() => {
-    // Initial AI greeting
-    const greeting: Message = {
-      id: 1,
-      sender: 'ai',
-      text: "Hello! Welcome to Grand Hotel. How may I help you today?",
-      timestamp: new Date(),
-    };
-    setMessages([greeting]);
-    speakText(greeting.text);
-  }, []);
+    if (!lessonId) return;
+    setLoading(true);
+    apiService.lesson.getById(Number(lessonId))
+      .then((res) => {
+        const data = res.data?.data ?? res.data;
+        setLesson(data);
+        const title = data?.title ?? 'Luyện hội thoại';
+        const desc = data?.description ?? '';
+        const lessonContext = [title, desc].filter(Boolean).join('\n');
+        return apiService.ai.chat({
+          messages: [{ role: 'user', content: `Start with a short greeting for this English conversation practice. Lesson: ${title}. ${desc ? `Description: ${desc}` : ''}` }],
+          lessonContext,
+        }).then((chatRes) => {
+          const content = (chatRes.data as any)?.data?.content ?? (chatRes.data as any)?.content;
+          const greeting = (typeof content === 'string' && content.trim()) ? content.trim() : buildGreeting(title);
+          const msg: Message = { id: 1, sender: 'ai', text: greeting, timestamp: new Date() };
+          setMessages([msg]);
+          speakText(greeting);
+        }).catch(() => {
+          const greeting = buildGreeting(title);
+          setMessages([{ id: 1, sender: 'ai', text: greeting, timestamp: new Date() }]);
+          speakText(greeting);
+        });
+      })
+      .catch(() => {
+        const defaultGreeting = "Hello! Let's practice English conversation. How can I help you?";
+        setMessages([{ id: 1, sender: 'ai', text: defaultGreeting, timestamp: new Date() }]);
+        speakText(defaultGreeting);
+      })
+      .finally(() => setLoading(false));
+  }, [lessonId]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
+  // Setup Web Speech API
+  useEffect(() => {
+    if ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window) {
+      const SpeechRec = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+      const rec = new SpeechRec();
+      rec.lang = 'en-US';
+      rec.continuous = false;
+      rec.interimResults = false;
+      rec.onresult = (e: any) => {
+        const text = e.results[0][0].transcript;
+        setIsRecording(false);
+        handleSendMessage(text);
+      };
+      rec.onerror = () => { setIsRecording(false); toast.error('Không nhận được giọng nói'); };
+      rec.onend = () => setIsRecording(false);
+      setRecognition(rec);
+    }
+  }, []);
+
   const speakText = (text: string) => {
+    if (!window.speechSynthesis) return;
+    window.speechSynthesis.cancel();
     setIsAISpeaking(true);
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = 'en-US';
-    utterance.rate = 0.9;
+    utterance.rate = 0.85;
+    utterance.pitch = 1;
     utterance.onend = () => setIsAISpeaking(false);
+    utterance.onerror = () => setIsAISpeaking(false);
     window.speechSynthesis.speak(utterance);
   };
 
-  const getAIResponse = (userMessage: string): string => {
-    const lowerMessage = userMessage.toLowerCase();
-    
-    if (lowerMessage.includes('book') || lowerMessage.includes('reservation')) {
-      return "Of course! I'd be happy to help you with a reservation. For which dates are you looking to stay?";
-    } else if (lowerMessage.includes('date') || /\d/.test(userMessage)) {
-      return "Great! And how many guests will be staying?";
-    } else if (lowerMessage.includes('guest') || lowerMessage.includes('people')) {
-      return "Perfect! Would you prefer a single room, double room, or a suite?";
-    } else if (lowerMessage.includes('room') || lowerMessage.includes('single') || lowerMessage.includes('double')) {
-      return "Excellent choice! Would you like breakfast included with your stay?";
-    } else if (lowerMessage.includes('yes') || lowerMessage.includes('breakfast')) {
-      return "Wonderful! May I have your name for the reservation, please?";
-    } else if (lowerMessage.includes('name') || lowerMessage.includes('my name')) {
-      return "Thank you! And may I have a contact number where we can reach you?";
-    } else if (/\d{3}/.test(userMessage)) {
-      return "Perfect! I have your reservation confirmed. You'll receive a confirmation email shortly. Is there anything else I can help you with?";
-    } else if (lowerMessage.includes('no') || lowerMessage.includes('that')) {
-      return "Thank you for choosing Grand Hotel! We look forward to your stay. Have a great day!";
-    }
-    
-    return "I see. Could you please tell me more about what you're looking for?";
-  };
-
-  const startRecording = () => {
-    setIsRecording(true);
-    
-    // Simulate recording for 2 seconds
-    setTimeout(() => {
+  const toggleRecording = () => {
+    if (!recognition) { toast.error('Trình duyệt không hỗ trợ nhận diện giọng nói'); return; }
+    if (isRecording) {
+      recognition.stop();
       setIsRecording(false);
-      
-      // Mock speech recognition
-      const responses = [
-        "I'd like to book a room for next weekend.",
-        "For two guests, please.",
-        "A double room would be perfect.",
-        "Yes, breakfast included would be great.",
-        "My name is John Smith.",
-        "You can reach me at 555-1234.",
-        "No, that's everything. Thank you!",
-      ];
-      
-      const userText = responses[Math.min(turnCount, responses.length - 1)];
-      handleSendMessage(userText);
-    }, 2000);
+    } else {
+      recognition.start();
+      setIsRecording(true);
+    }
   };
 
   const handleSendMessage = (text: string) => {
-    const userMessage: Message = {
-      id: messages.length + 1,
-      sender: 'user',
-      text,
-      timestamp: new Date(),
-    };
+    if (!text.trim()) return;
+    const userMsg: Message = { id: Date.now(), sender: 'user', text: text.trim(), timestamp: new Date() };
+    setMessages((prev) => [...prev, userMsg]);
+    setInputText('');
+    setTurnCount((prev) => prev + 1);
+    setIsAITyping(true);
 
-    setMessages([...messages, userMessage]);
-    setTurnCount(turnCount + 1);
+    const title = lesson?.title ?? '';
+    const desc = lesson?.description ?? '';
+    const lessonContext = [title, desc].filter(Boolean).join('\n');
+    const history = [...messages, userMsg].map((m) => ({
+      role: m.sender === 'ai' ? 'assistant' : 'user',
+      content: m.text,
+    }));
 
-    // Get AI response
-    setTimeout(() => {
-      const aiResponseText = getAIResponse(text);
-      const aiMessage: Message = {
-        id: messages.length + 2,
-        sender: 'ai',
-        text: aiResponseText,
-        timestamp: new Date(),
-      };
-      
-      setMessages(prev => [...prev, aiMessage]);
-      speakText(aiResponseText);
-      setTurnCount(prev => prev + 1);
-    }, 1000);
+    apiService.ai.chat({ messages: history, lessonContext })
+      .then((res) => {
+        const raw = res.data as any;
+        const content = raw?.data?.content ?? raw?.content ?? '';
+        const response = (typeof content === 'string' && content.trim()) ? content.trim() : "I'm here to help. Could you say that again?";
+        const aiMsg: Message = { id: Date.now() + 1, sender: 'ai', text: response, timestamp: new Date() };
+        setMessages((prev) => [...prev, aiMsg]);
+        setTurnCount((prev) => prev + 1);
+        speakText(response);
+      })
+      .catch((err) => {
+        toast.error(err?.response?.data?.message || 'Không thể kết nối AI. Thử lại sau.');
+        const fallback: Message = { id: Date.now() + 1, sender: 'ai', text: "Sorry, I couldn't reply right now. Please try again.", timestamp: new Date() };
+        setMessages((prev) => [...prev, fallback]);
+        setTurnCount((prev) => prev + 1);
+      })
+      .finally(() => setIsAITyping(false));
   };
 
-  const handleComplete = () => {
-    toast.success(`🎉 Conversation Completed! +${scenario.xp} XP`);
-    navigate('/student/learning');
+  const handleComplete = async () => {
+    try {
+      await apiService.student.completeLesson(lessonId!, 100);
+      useAppStore.getState().invalidateProgress();
+    } catch { /* ignore */ }
+    toast.success('Tuyệt vời! Hoàn thành luyện hội thoại!');
+    navigate(-1);
   };
 
-  const progress = (turnCount / scenario.targetTurns) * 100;
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <Loader2 className="h-10 w-10 animate-spin text-purple-500" />
+      </div>
+    );
+  }
+
+  const targetTurns = 8;
+  const progress = Math.min((turnCount / targetTurns) * 100, 100);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-gray-900 dark:to-gray-800 p-6">
-      <div className="max-w-4xl mx-auto space-y-6">
+    <div className="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50 dark:from-gray-900 dark:to-gray-800">
+      <div className="max-w-3xl mx-auto p-4 lg:p-6 flex flex-col h-screen">
+
         {/* Header */}
-        <div className="flex items-center justify-between">
-          <Button
-            variant="ghost"
-            onClick={() => navigate('/student/learning')}
-            className="gap-2"
-          >
+        <div className="flex items-center justify-between mb-3 flex-shrink-0">
+          <Button variant="ghost" onClick={() => navigate(-1)} className="gap-2">
             <ArrowLeft className="w-4 h-4" />
-            Back
+            Quay lại
           </Button>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
             <div className="text-right">
-              <p className="text-sm text-gray-600 dark:text-gray-400">
-                Progress: {turnCount}/{scenario.targetTurns} turns
-              </p>
-              <div className="w-32 h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-green-600 transition-all duration-300"
-                  style={{ width: `${progress}%` }}
-                />
+              <p className="text-xs text-gray-500">{turnCount} lượt</p>
+              <div className="w-28 h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                <div className="h-full bg-purple-500 transition-all" style={{ width: `${progress}%` }} />
               </div>
             </div>
+            <Badge variant="secondary">QUIZ / AI</Badge>
           </div>
         </div>
 
-        {/* Scenario Info */}
-        <Card className="p-6">
-          <div className="flex items-start gap-4">
-            <div className="w-12 h-12 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center">
-              <Bot className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+        {/* Scenario Card */}
+        <Card className="p-4 mb-3 flex-shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-purple-100 dark:bg-purple-900 flex items-center justify-center flex-shrink-0">
+              <Bot className="w-5 h-5 text-purple-600" />
             </div>
-            <div className="flex-1">
-              <h2 className="text-2xl font-bold mb-2">{scenario.title}</h2>
-              <p className="text-gray-600 dark:text-gray-400">{scenario.description}</p>
+            <div>
+              <h2 className="font-bold">{lesson?.title ?? 'Luyện hội thoại AI'}</h2>
+              <p className="text-xs text-gray-500">{lesson?.description ?? 'Hãy nói chuyện tự nhiên bằng tiếng Anh'}</p>
             </div>
-            <Badge variant="secondary" className="text-sm">
-              {scenario.xp} XP
-            </Badge>
-          </div>
-        </Card>
-
-        {/* Chat Messages */}
-        <Card className="p-6 h-[500px] flex flex-col">
-          <div className="flex-1 overflow-y-auto space-y-4 mb-4">
-            {messages.map((message) => (
-              <div
-                key={message.id}
-                className={`flex gap-3 ${message.sender === 'user' ? 'flex-row-reverse' : ''}`}
-              >
-                <Avatar className="w-10 h-10">
-                  {message.sender === 'ai' ? (
-                    <>
-                      <AvatarFallback className="bg-blue-100 dark:bg-blue-900">
-                        <Bot className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-                      </AvatarFallback>
-                    </>
-                  ) : (
-                    <>
-                      <AvatarFallback className="bg-green-100 dark:bg-green-900">
-                        <User className="w-5 h-5 text-green-600 dark:text-green-400" />
-                      </AvatarFallback>
-                    </>
-                  )}
-                </Avatar>
-                
-                <div className={`flex flex-col ${message.sender === 'user' ? 'items-end' : ''}`}>
-                  <div
-                    className={`max-w-md rounded-2xl px-4 py-3 ${
-                      message.sender === 'ai'
-                        ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100'
-                        : 'bg-green-600 text-white'
-                    }`}
-                  >
-                    <p>{message.text}</p>
-                  </div>
-                  {message.sender === 'ai' && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => speakText(message.text)}
-                      className="mt-1 h-6 px-2 text-xs gap-1"
-                    >
-                      <Volume2 className="w-3 h-3" />
-                      Listen
-                    </Button>
-                  )}
-                </div>
+            {isAISpeaking && (
+              <div className="ml-auto flex items-center gap-1 text-xs text-purple-500 animate-pulse">
+                <Volume2 className="w-3 h-3" />
+                <span>AI đang nói...</span>
               </div>
-            ))}
-            <div ref={messagesEndRef} />
-          </div>
-
-          {/* Input Area */}
-          <div className="flex gap-2 pt-4 border-t">
-            <Button
-              onClick={startRecording}
-              disabled={isRecording || isAISpeaking}
-              className={`${
-                isRecording
-                  ? 'bg-red-600 hover:bg-red-700'
-                  : 'bg-blue-600 hover:bg-blue-700'
-              } gap-2`}
-            >
-              <Mic className="w-5 h-5" />
-              {isRecording ? 'Recording...' : 'Speak'}
-            </Button>
-            
-            {turnCount >= scenario.targetTurns && (
-              <Button
-                onClick={handleComplete}
-                className="bg-green-600 hover:bg-green-700 text-white gap-2 ml-auto"
-              >
-                <CheckCircle2 className="w-5 h-5" />
-                Complete Lesson (+{scenario.xp} XP)
-              </Button>
             )}
           </div>
         </Card>
 
-        {/* Tips */}
-        <Card className="p-4 bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800">
-          <p className="text-sm text-blue-800 dark:text-blue-300">
-            💡 <strong>Tip:</strong> Take your time and speak clearly. The AI will wait for you to finish before responding.
-          </p>
+        {/* Messages */}
+        <Card className="flex-1 flex flex-col overflow-hidden">
+          <div className="flex-1 overflow-y-auto p-4 space-y-3">
+            {messages.map((message) => (
+              <div key={message.id} className={`flex gap-3 ${message.sender === 'user' ? 'flex-row-reverse' : ''}`}>
+                <Avatar className="w-8 h-8 flex-shrink-0">
+                  <AvatarFallback className={message.sender === 'ai' ? 'bg-purple-100' : 'bg-green-100'}>
+                    {message.sender === 'ai'
+                      ? <Bot className="w-4 h-4 text-purple-600" />
+                      : <User className="w-4 h-4 text-green-600" />}
+                  </AvatarFallback>
+                </Avatar>
+                <div className={`flex flex-col gap-1 max-w-[75%] ${message.sender === 'user' ? 'items-end' : ''}`}>
+                  <div className={`rounded-2xl px-4 py-2.5 text-sm ${
+                    message.sender === 'ai'
+                      ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded-tl-sm'
+                      : 'bg-purple-600 text-white rounded-tr-sm'
+                  }`}>
+                    {message.text}
+                  </div>
+                  {message.sender === 'ai' && (
+                    <button onClick={() => speakText(message.text)} className="flex items-center gap-1 text-xs text-gray-400 hover:text-purple-500 transition-colors">
+                      <Volume2 className="w-3 h-3" />
+                      Nghe lại
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+            {isAITyping && (
+              <div className="flex gap-3">
+                <Avatar className="w-8 h-8 flex-shrink-0">
+                  <AvatarFallback className="bg-purple-100">
+                    <Bot className="w-4 h-4 text-purple-600" />
+                  </AvatarFallback>
+                </Avatar>
+                <div className="bg-gray-100 dark:bg-gray-800 rounded-2xl rounded-tl-sm px-4 py-3 flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                  <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                  <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                </div>
+              </div>
+            )}
+            <div ref={messagesEndRef} />
+          </div>
+
+          {/* Input */}
+          <div className="p-3 border-t flex gap-2 flex-shrink-0">
+            <Button
+              size="icon"
+              variant={isRecording ? 'destructive' : 'outline'}
+              onClick={toggleRecording}
+              disabled={isAISpeaking || isAITyping}
+              className={`flex-shrink-0 ${isRecording ? 'animate-pulse' : ''}`}
+              title={isRecording ? 'Nhấn để dừng' : 'Nhấn để nói'}
+            >
+              {isRecording ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+            </Button>
+            <Input
+              ref={inputRef}
+              value={inputText}
+              onChange={(e) => setInputText(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(inputText); } }}
+              placeholder="Gõ câu trả lời hoặc nhấn mic để nói..."
+              disabled={isAITyping}
+              className="flex-1"
+            />
+            <Button
+              size="icon"
+              onClick={() => handleSendMessage(inputText)}
+              disabled={!inputText.trim() || isAITyping}
+              className="flex-shrink-0 bg-purple-600 hover:bg-purple-700"
+            >
+              <Send className="w-4 h-4" />
+            </Button>
+          </div>
         </Card>
+
+        {/* Complete Button */}
+        {turnCount >= targetTurns && (
+          <div className="mt-3 flex-shrink-0">
+            <Button onClick={handleComplete} className="w-full bg-green-600 hover:bg-green-700 text-white gap-2">
+              <CheckCircle2 className="w-5 h-5" />
+              Hoàn thành hội thoại
+            </Button>
+          </div>
+        )}
+
+        {/* Tip */}
+        <p className="text-center text-xs text-gray-400 mt-2 flex-shrink-0">
+          💡 Nhấn mic để nói bằng giọng thật, hoặc gõ câu trả lời của bạn
+        </p>
       </div>
     </div>
   );

@@ -9,6 +9,12 @@ import { Mail, Lock, AlertCircle, Loader2 } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
 import type { UserRole } from '@/types/auth';
 
+const getRoleDashboard = (role?: string) => {
+  if (role === 'teacher') return '/teacher';
+  if (role === 'admin') return '/admin';
+  return '/';
+};
+
 export function Login() {
   const navigate = useNavigate();
   const { login, isLoading } = useAuthStore();
@@ -34,15 +40,9 @@ export function Login() {
 
     try {
       await login({ email, password });
-      // Navigate based on role
-      const role = selectedRole || (email.includes('teacher') ? 'teacher' : email.includes('admin') ? 'admin' : 'student');
-      if (role === 'teacher') {
-        navigate('/teacher');
-      } else if (role === 'admin') {
-        navigate('/admin');
-      } else {
-        navigate('/');
-      }
+      // Đọc role thực từ store (đã được set bởi authStore.login từ BE response)
+      const { user } = useAuthStore.getState();
+      navigate(getRoleDashboard(user?.role));
     } catch (err: any) {
       setError(err.message || 'Login failed. Please check your credentials.');
     }
