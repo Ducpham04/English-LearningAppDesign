@@ -2,7 +2,6 @@ package com.example.appenglish.modules.lesson.service;
 
 import com.example.appenglish.entity.Lesson;
 import com.example.appenglish.entity.LessonVideo;
-import com.example.appenglish.entity.Session;
 import com.example.appenglish.enums.LessonType;
 import com.example.appenglish.common.exception.ApiException;
 import com.example.appenglish.modules.lesson.dto.LessonCreateRequest;

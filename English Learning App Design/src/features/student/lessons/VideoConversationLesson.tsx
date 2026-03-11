@@ -57,7 +57,7 @@ function TogglePill({
       className={`px-3 py-1 rounded-full text-xs font-semibold border transition-all select-none ${
         active
           ? `${activeColor} border-transparent shadow-sm`
-          : 'bg-white dark:bg-gray-800 text-gray-500 border-gray-200 dark:border-gray-700 hover:border-gray-400'
+          : 'bg-card text-muted-foreground border-border hover:border-muted-foreground/50 hover:text-foreground'
       }`}
     >
       {label}
@@ -319,60 +319,60 @@ export function VideoConversationLesson() {
   }, []);
 
   if (loading) return (
-    <div className="flex min-h-screen items-center justify-center">
-      <Loader2 className="h-10 w-10 animate-spin text-blue-500" />
+    <div className="flex min-h-[60vh] items-center justify-center" style={{ backgroundColor: 'var(--page-bg)' }}>
+      <Loader2 className="h-10 w-10 animate-spin text-primary" />
     </div>
   );
 
   const currentLine = activeLineIdx >= 0 ? transcript[activeLineIdx] : null;
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      <div className="max-w-6xl mx-auto p-4 lg:p-6 space-y-4">
+    <div className="min-h-screen w-full" style={{ backgroundColor: 'var(--page-bg)' }}>
+      <div className="max-w-6xl mx-auto p-4 lg:p-6 space-y-6">
 
         {/* ── Header ── */}
-        <div className="flex items-center justify-between">
-          <Button variant="ghost" onClick={() => navigate(-1)} className="gap-2">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <Button variant="ghost" onClick={() => navigate(-1)} className="gap-2 -ml-2 text-muted-foreground hover:text-foreground">
             <ArrowLeft className="w-4 h-4" /> Quay lại
           </Button>
           <div className="flex items-center gap-2">
-            <Badge variant="secondary">VIDEO</Badge>
+            <Badge variant="secondary" className="font-medium">VIDEO</Badge>
             {lesson?.durationMinutes && <Badge variant="outline">{lesson.durationMinutes} phút</Badge>}
           </div>
         </div>
 
         <div>
-          <h1 className="text-xl font-bold">{lesson?.title ?? 'Bài học Video'}</h1>
-          {lesson?.description && <p className="text-sm text-gray-500 mt-0.5">{lesson.description}</p>}
+          <h1 className="text-xl font-bold text-foreground">{lesson?.title ?? 'Bài học Video'}</h1>
+          {lesson?.description && <p className="text-sm text-muted-foreground mt-0.5">{lesson.description}</p>}
         </div>
 
         {/* ── Display Toggles ── */}
         {transcript.length > 0 && (
-          <div className="flex flex-wrap items-center gap-2 p-3 bg-white dark:bg-gray-800 rounded-xl border shadow-sm">
-            <span className="text-xs font-semibold text-gray-500 mr-1">Hiển thị:</span>
-            <TogglePill active={showOverlaySub} onClick={() => setShowOverlaySub(v => !v)} label="📺 Subtitle video" activeColor="bg-gray-900 text-white dark:bg-white dark:text-gray-900" />
+          <div className="flex flex-wrap items-center gap-2 p-4 rounded-2xl border bg-card shadow-sm">
+            <span className="text-xs font-semibold text-muted-foreground mr-1">Hiển thị:</span>
+            <TogglePill active={showOverlaySub} onClick={() => setShowOverlaySub(v => !v)} label="📺 Subtitle video" activeColor="bg-primary text-primary-foreground" />
             <TogglePill active={showScript} onClick={() => setShowScript(v => !v)} label="📄 Script" activeColor="bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300" />
             <TogglePill active={showVI} onClick={() => setShowVI(v => !v)} label="🇻🇳 Dịch tiếng Việt" activeColor="bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300" />
-            <TogglePill active={showIPA} onClick={() => setShowIPA(v => !v)} label="/IPA/ câu" activeColor="bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300" />
+            <TogglePill active={showIPA} onClick={() => setShowIPA(v => !v)} label="/IPA/ câu" activeColor="bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300" />
             <TogglePill active={showWordIPA} onClick={() => setShowWordIPA(v => !v)} label="🔤 IPA từng từ" activeColor="bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300" />
           </div>
         )}
 
         {/* ── Chế độ thoại theo: thanh chọn Ẩn/Hiện video ── */}
         {mode === 'shadowing' && transcript.length > 0 && (
-          <div className="flex items-center gap-3 p-3 bg-indigo-50 dark:bg-indigo-900/20 rounded-xl border border-indigo-200 dark:border-indigo-800">
-            <Mic className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
-            <span className="font-medium text-indigo-900 dark:text-indigo-100">Chế độ thoại theo</span>
+          <div className="flex flex-wrap items-center gap-3 p-4 rounded-2xl border border-primary/20 bg-primary/5">
+            <Mic className="w-5 h-5 text-primary flex-shrink-0" />
+            <span className="font-medium text-foreground">Chế độ thoại theo</span>
             <Button
               variant="outline"
               size="sm"
               onClick={() => setShowVideoInShadowing((v) => !v)}
-              className="gap-2 border-indigo-300 dark:border-indigo-700"
+              className="gap-2"
             >
               {showVideoInShadowing ? <VideoOff className="w-4 h-4" /> : <Video className="w-4 h-4" />}
               {showVideoInShadowing ? 'Ẩn video' : 'Hiện video'}
             </Button>
-            <span className="text-xs text-indigo-600 dark:text-indigo-400 ml-auto">
+            <span className="text-xs text-muted-foreground ml-auto">
               {Object.keys(sentenceScores).length}/{transcript.length} câu đã chấm
             </span>
           </div>
@@ -384,7 +384,7 @@ export function VideoConversationLesson() {
           {/* Video — ẩn trong shadowing nếu user chọn ẩn video */}
           {(mode !== 'shadowing' || showVideoInShadowing) && (
           <div className={showScript && transcript.length > 0 ? 'lg:col-span-3' : ''}>
-            <Card className="overflow-hidden shadow-lg">
+            <Card className="overflow-hidden rounded-2xl border shadow-lg bg-card">
               <div className="bg-black relative" style={{ aspectRatio: '16/9' }}>
 
                 {ytVideoId ? (
@@ -471,15 +471,15 @@ export function VideoConversationLesson() {
 
               {/* YouTube toolbar */}
               {ytVideoId && (
-                <div className="bg-gray-900 px-4 py-2 flex items-center gap-2 text-xs">
-                  <span className="text-gray-400">Controls:</span>
-                  <Button size="icon" variant="ghost" onClick={togglePlay} className="text-white hover:bg-white/20 h-6 w-6">
+                <div className="bg-muted/80 px-4 py-2 flex items-center gap-2 text-xs border-t">
+                  <span className="text-muted-foreground">Controls:</span>
+                  <Button size="icon" variant="ghost" onClick={togglePlay} className="h-6 w-6">
                     {isPlaying ? <Pause className="w-3 h-3" /> : <Play className="w-3 h-3" />}
                   </Button>
-                  <Button size="icon" variant="ghost" onClick={toggleMute} className="text-white hover:bg-white/20 h-6 w-6">
+                  <Button size="icon" variant="ghost" onClick={toggleMute} className="h-6 w-6">
                     {isMuted ? <VolumeX className="w-3 h-3" /> : <Volume2 className="w-3 h-3" />}
                   </Button>
-                  <span className="text-gray-500 ml-auto">{formatTime(currentMs)}</span>
+                  <span className="text-muted-foreground ml-auto tabular-nums">{formatTime(currentMs)}</span>
                 </div>
               )}
             </Card>
@@ -489,14 +489,14 @@ export function VideoConversationLesson() {
           {/* ── Script Panel ── */}
           {showScript && transcript.length > 0 && (
             <div className="lg:col-span-2">
-              <Card className="flex flex-col h-full">
-                <div className="p-3 border-b flex items-center gap-2 flex-shrink-0">
-                  <AlignLeft className="w-4 h-4 text-blue-500" />
+              <Card className="flex flex-col h-full rounded-2xl border bg-card shadow-sm overflow-hidden">
+                <div className="p-3 border-b bg-muted/30 flex items-center gap-2 flex-shrink-0">
+                  <AlignLeft className="w-4 h-4 text-primary" />
                   <h3 className="font-semibold text-sm">Script</h3>
-                  <span className="text-xs text-gray-400 ml-auto">{transcript.length} câu</span>
+                  <span className="text-xs text-muted-foreground ml-auto">{transcript.length} câu</span>
                 </div>
 
-                <div ref={scriptRef} className="flex-1 overflow-y-auto" style={{ maxHeight: '480px' }}>
+                <div ref={scriptRef} className="flex-1 overflow-y-auto divide-y divide-border" style={{ maxHeight: '480px' }}>
                   {transcript.map((line, idx) => {
                     const isActive = idx === activeLineIdx;
                     const pairs = (showWordIPA && line.ipa)
@@ -510,19 +510,19 @@ export function VideoConversationLesson() {
                         key={idx}
                         ref={isActive ? activeLineRef : undefined}
                         onClick={mode !== 'shadowing' ? () => seekToLine(line) : undefined}
-                        className={`px-3 py-2.5 border-b border-gray-50 dark:border-gray-800 group transition-colors ${
+                        className={`px-3 py-2.5 group transition-colors ${
                           mode === 'shadowing' ? '' : 'cursor-pointer'
                         } ${
                           isActive && mode !== 'shadowing'
-                            ? 'bg-blue-50 dark:bg-blue-900/30 border-l-2 border-l-blue-500'
+                            ? 'bg-primary/10 border-l-2 border-l-primary'
                             : mode === 'shadowing' && score
                               ? getScoreBg(overallFromResponse(score))
-                              : 'hover:bg-gray-50 dark:hover:bg-gray-800/50'
+                              : 'hover:bg-muted/50'
                         }`}
                       >
                         <div className="flex items-start gap-2">
                           {/* Timestamp */}
-                          <span className="text-xs text-gray-400 mt-0.5 flex-shrink-0 w-9 tabular-nums">
+                          <span className="text-xs text-muted-foreground mt-0.5 flex-shrink-0 w-9 tabular-nums">
                             {formatTime(line.start)}
                           </span>
 
@@ -532,7 +532,7 @@ export function VideoConversationLesson() {
                               <div className="flex flex-wrap gap-x-1.5 gap-y-0.5">
                                 {pairs.map((wp, i) => (
                                   <span key={i} className="inline-flex flex-col items-center">
-                                    <span className={`text-sm leading-tight ${isActive && mode !== 'shadowing' ? 'font-semibold text-blue-900 dark:text-blue-100' : 'text-gray-800 dark:text-gray-200'}`}>
+                                    <span className={`text-sm leading-tight ${isActive && mode !== 'shadowing' ? 'font-semibold text-primary' : 'text-foreground'}`}>
                                       {wp.word}
                                     </span>
                                     {wp.ipa && (
@@ -544,7 +544,7 @@ export function VideoConversationLesson() {
                                 ))}
                               </div>
                             ) : (
-                              <p className={`text-sm leading-snug ${isActive && mode !== 'shadowing' ? 'font-semibold text-blue-900 dark:text-blue-100' : 'text-gray-800 dark:text-gray-200'}`}>
+                              <p className={`text-sm leading-snug ${isActive && mode !== 'shadowing' ? 'font-semibold text-primary' : 'text-foreground'}`}>
                                 {line.text}
                               </p>
                             )}
@@ -584,7 +584,7 @@ export function VideoConversationLesson() {
                                     type="button"
                                     size="sm"
                                     variant="outline"
-                                    className="gap-1.5 border-indigo-300 text-indigo-700 hover:bg-indigo-50 dark:border-indigo-700 dark:text-indigo-300 dark:hover:bg-indigo-900/30"
+                                    className="gap-1.5"
                                     onClick={(e) => { e.stopPropagation(); startRecordingForSentence(idx); }}
                                   >
                                     <Mic className="w-3.5 h-3.5" /> Thu âm
@@ -596,7 +596,7 @@ export function VideoConversationLesson() {
                                       <span className={`font-bold ${getScoreColor(overallFromResponse(score))}`}>
                                         {overallFromResponse(score)} điểm
                                       </span>
-                                      <span className="text-gray-600 dark:text-gray-400">·</span>
+                                      <span className="text-muted-foreground">·</span>
                                       <span>Phát âm {(score.pronunciationScore ?? 0).toFixed(0)}%</span>
                                       <span>·</span>
                                       <span>Độ chính xác {(score.accuracyScore ?? 0).toFixed(0)}%</span>
@@ -604,7 +604,7 @@ export function VideoConversationLesson() {
                                       <span>Độ trôi chảy {(score.fluencyScore ?? 0).toFixed(0)}%</span>
                                     </div>
                                     {score.recognizedText && (
-                                      <p className="text-xs text-gray-600 dark:text-gray-400 mt-1 truncate" title={score.recognizedText}>
+                                      <p className="text-xs text-muted-foreground mt-1 truncate" title={score.recognizedText}>
                                         Bạn nói: {score.recognizedText}
                                       </p>
                                     )}
@@ -615,7 +615,7 @@ export function VideoConversationLesson() {
                           </div>
 
                           {mode !== 'shadowing' && (
-                          <ChevronRight className={`w-3 h-3 flex-shrink-0 mt-1 transition-opacity ${isActive ? 'opacity-100 text-blue-500' : 'opacity-0 group-hover:opacity-60 text-gray-400'}`} />
+                          <ChevronRight className={`w-3 h-3 flex-shrink-0 mt-1 transition-opacity ${isActive ? 'opacity-100 text-primary' : 'opacity-0 group-hover:opacity-60 text-muted-foreground'}`} />
                           )}
                         </div>
                       </div>
@@ -629,14 +629,14 @@ export function VideoConversationLesson() {
 
         {/* ── CTA: Sau khi xem, chọn Thoại theo hoặc Bỏ qua ── */}
         {mode === 'watch' && transcript.length > 0 && (
-          <Card className="p-6 bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-indigo-900/20 dark:to-purple-900/20 border-indigo-200 dark:border-indigo-800">
-            <p className="text-base text-gray-700 dark:text-gray-300 mb-4">
+          <Card className="p-6 rounded-2xl border border-primary/20 bg-primary/5">
+            <p className="text-base text-foreground mb-4">
               Bạn đã xem qua nội dung. <strong>Thoại theo</strong> từng câu để được chấm phát âm ngay và cải thiện.
             </p>
             <div className="flex flex-wrap gap-3">
               <Button
                 onClick={() => setMode('shadowing')}
-                className="gap-2 bg-indigo-600 hover:bg-indigo-700 text-white"
+                className="gap-2 bg-primary hover:bg-primary-hover text-primary-foreground shadow-md"
               >
                 <Mic className="w-4 h-4" /> Bắt đầu thoại theo
               </Button>
@@ -649,11 +649,11 @@ export function VideoConversationLesson() {
 
         {/* Processing banner */}
         {transcript.length === 0 && lesson?.s3Status === 'PROCESSING' && (
-          <Card className="p-4 bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 flex items-center gap-3">
-            <Loader2 className="w-5 h-5 animate-spin text-yellow-600 flex-shrink-0" />
+          <Card className="p-4 rounded-2xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 flex items-center gap-3">
+            <Loader2 className="w-5 h-5 animate-spin text-amber-600 flex-shrink-0" />
             <div>
-              <p className="font-medium text-yellow-800 dark:text-yellow-300">Đang phân tích video...</p>
-              <p className="text-xs text-yellow-600 dark:text-yellow-400 mt-0.5">
+              <p className="font-medium text-amber-800 dark:text-amber-300">Đang phân tích video...</p>
+              <p className="text-xs text-amber-600 dark:text-amber-400 mt-0.5">
                 Đang tạo subtitle, dịch tiếng Việt và IPA. Trang tự cập nhật khi xong.
               </p>
             </div>
@@ -661,8 +661,8 @@ export function VideoConversationLesson() {
         )}
 
         {/* Complete */}
-        <div className="flex justify-end">
-          <Button onClick={handleComplete} className="bg-green-600 hover:bg-green-700 text-white gap-2 px-6">
+        <div className="flex justify-end pt-2">
+          <Button onClick={handleComplete} className="bg-green-600 hover:bg-green-700 text-white gap-2 px-6 rounded-xl shadow-md">
             <CheckCircle2 className="w-5 h-5" /> Hoàn thành bài học
           </Button>
         </div>

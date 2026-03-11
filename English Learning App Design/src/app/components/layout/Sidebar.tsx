@@ -2,7 +2,6 @@ import { Link, useLocation } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
 import { Button } from '@/app/components/ui/button';
 import { ScrollArea } from '@/app/components/ui/scroll-area';
-import { Separator } from '@/app/components/ui/separator';
 import {
   Home,
   BookOpen,
@@ -39,10 +38,9 @@ export function Sidebar() {
 
   if (!user) return null;
 
-  // Navigation items based on role
   const studentNavItems: NavItem[] = [
     { title: 'Dashboard', href: '/', icon: Home },
-    { title: 'Chủ đề', href: '/sessions', icon: BookOpen },
+    { title: 'Learning', href: '/sessions', icon: BookOpen },
     { title: 'Vocabulary', href: '/vocabulary', icon: Book },
     { title: 'Tests', href: '/tests', icon: FileText },
     { title: 'Progress', href: '/progress', icon: BarChart3 },
@@ -79,57 +77,63 @@ export function Sidebar() {
     { title: 'System', href: '/admin/settings', icon: Database },
   ];
 
-  const navItems = 
+  const navItems =
     user.role === 'student' ? studentNavItems :
     user.role === 'teacher' ? teacherNavItems :
     adminNavItems;
 
-  const roleColors = {
-    student: 'from-green-400 to-green-600',
-    teacher: 'from-purple-400 to-purple-600',
-    admin: 'from-red-400 to-red-600',
+  const roleGradient = {
+    student: 'from-emerald-500 to-teal-600',
+    teacher: 'from-violet-500 to-purple-600',
+    admin: 'from-rose-500 to-red-600',
   };
 
   return (
-    <div className="w-64 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 flex flex-col">
+    <aside
+      className="w-[252px] flex-shrink-0 flex flex-col border-r border-slate-200/80 dark:border-slate-800/80 shadow-sm"
+      style={{ backgroundColor: 'var(--sidebar-bg, #F8F9FA)' }}
+    >
       {/* Logo */}
-      <div className="p-6">
-        <Link to="/" className="flex items-center gap-3">
-          <div className={`flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br ${roleColors[user.role]} text-white font-bold shadow-lg text-xl`}>
+      <div
+        className="h-[72px] flex items-center px-5 border-b border-slate-200/80 dark:border-slate-800/80"
+        style={{ backgroundColor: 'var(--sidebar-bg, #F8F9FA)' }}
+      >
+        <Link to="/" className="flex items-center gap-3 group">
+          <div className={`flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br ${roleGradient[user.role]} text-white font-bold text-lg shadow-lg shadow-black/10 transition-transform group-hover:scale-105`}>
             E
           </div>
-          <div>
-            <div className="text-xl font-bold text-gray-900 dark:text-white">
-              English AI
-            </div>
-            <div className="text-xs text-gray-500 dark:text-gray-400 capitalize">
-              {user.role}
-            </div>
+          <div className="min-w-0">
+            <div className="text-base font-bold text-slate-900 dark:text-white truncate">English AI</div>
+            <div className="text-xs text-slate-500 dark:text-slate-400 capitalize truncate">{user.role}</div>
           </div>
         </Link>
       </div>
 
-      <Separator />
-
-      {/* Navigation */}
-      <ScrollArea className="flex-1 px-3 py-4">
-        <nav className="space-y-1">
+      {/* Nav */}
+      <ScrollArea
+        className="flex-1 py-4"
+        style={{ backgroundColor: 'var(--sidebar-bg, #F8F9FA)' }}
+      >
+        <nav className="px-3 space-y-1" aria-label="Main">
+          <p className="px-3 mb-2 text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+            Main Menu
+          </p>
           {navItems.map((item) => {
-            const isActive = location.pathname === item.href;
+            const isActive = location.pathname === item.href || (item.href !== '/' && location.pathname.startsWith(item.href));
             return (
-              <Link key={item.href} to={item.href}>
+              <Link key={item.href} to={item.href} className="block mx-1">
                 <Button
-                  variant={isActive ? 'default' : 'ghost'}
-                  className={`w-full justify-start gap-3 ${
+                  variant="ghost"
+                  className={`w-full justify-start gap-3 h-11 px-4 rounded-full font-medium transition-all duration-200 border-l-4 border-transparent ${
                     isActive
-                      ? 'bg-green-500 hover:bg-green-600 text-white'
-                      : 'hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300'
+                      ? 'bg-violet-600 dark:bg-violet-600 text-white hover:bg-violet-700 dark:hover:bg-violet-700 border-l-violet-400 dark:border-l-violet-400 shadow-sm'
+                      : 'text-slate-600 dark:text-slate-400 hover:bg-slate-200/80 dark:hover:bg-slate-800/80 hover:text-slate-900 dark:hover:text-white'
                   }`}
                 >
-                  <item.icon className="h-5 w-5" />
-                  <span>{item.title}</span>
+                  <item.icon className={`h-5 w-5 flex-shrink-0 ${isActive ? 'text-white' : ''}`} />
+                  <span className="truncate text-sm">{item.title}</span>
                   {item.badge && (
-                    <span className="ml-auto text-xs bg-red-500 text-white px-2 py-0.5 rounded-full">
+                    <span className="ml-auto text-[10px] font-semibold bg-rose-500 text-white px-2 py-0.5 rounded-full">
                       {item.badge}
                     </span>
                   )}
@@ -140,20 +144,24 @@ export function Sidebar() {
         </nav>
       </ScrollArea>
 
-      <Separator />
-
       {/* Settings */}
-      <div className="p-3">
-        <Link to={user.role === 'teacher' ? '/teacher/settings' : user.role === 'admin' ? '/admin/settings' : '/settings'}>
+      <div
+        className="p-3 border-t border-slate-200/80 dark:border-slate-800/80"
+        style={{ backgroundColor: 'var(--sidebar-bg, #F8F9FA)' }}
+      >
+        <p className="px-3 mb-2 text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+          System
+        </p>
+        <Link to={user.role === 'teacher' ? '/teacher/settings' : user.role === 'admin' ? '/admin/settings' : '/settings'} className="block mx-1">
           <Button
             variant="ghost"
-            className="w-full justify-start gap-3 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
+            className="w-full justify-start gap-3 h-11 px-4 rounded-full text-slate-600 dark:text-slate-400 hover:bg-slate-200/80 dark:hover:bg-slate-800/80 hover:text-slate-900 dark:hover:text-white text-sm font-medium"
           >
             <Settings className="h-5 w-5" />
             <span>Settings</span>
           </Button>
         </Link>
       </div>
-    </div>
+    </aside>
   );
 }

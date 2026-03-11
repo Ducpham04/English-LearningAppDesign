@@ -2,131 +2,128 @@
 
 :root {
   --font-size: 16px;
-  
-  /* Duolingo-inspired Green Color System */
-  --background: #ffffff;
-  --foreground: #3c3c3c;
-  
+
+  /* Focused, modern light background */
+  --background: #f8fafc;
+  --foreground: #1e293b;
+
   --card: #ffffff;
-  --card-foreground: #3c3c3c;
-  
+  --card-foreground: #1e293b;
+
   --popover: #ffffff;
-  --popover-foreground: #3c3c3c;
-  
-  /* Primary - Green (Duolingo style) */
-  --primary: #58cc02;
+  --popover-foreground: #1e293b;
+
+  /* Primary - Violet (modern EdTech) */
+  --primary: #7c3aed;
   --primary-foreground: #ffffff;
-  --primary-hover: #4bad00;
-  
-  /* Secondary - Soft gray */
-  --secondary: #f7f7f7;
-  --secondary-foreground: #3c3c3c;
-  
-  /* Muted - Very light gray */
-  --muted: #f7f7f7;
-  --muted-foreground: #777777;
-  
-  /* Accent - Light green tint */
-  --accent: #e9f9e0;
-  --accent-foreground: #58cc02;
-  
-  /* Success - Green variations */
-  --success: #58cc02;
+  --primary-hover: #6d28d9;
+
+  /* Secondary - Slate */
+  --secondary: #f1f5f9;
+  --secondary-foreground: #334155;
+
+  /* Muted */
+  --muted: #f1f5f9;
+  --muted-foreground: #64748b;
+
+  /* Accent - Violet tint */
+  --accent: #f5f3ff;
+  --accent-foreground: #7c3aed;
+
+  /* Success */
+  --success: #10b981;
   --success-foreground: #ffffff;
-  
-  /* Warning - Soft yellow */
-  --warning: #ffc800;
-  --warning-foreground: #3c3c3c;
-  
-  /* Destructive - Soft red */
-  --destructive: #ff4b4b;
+
+  /* Warning */
+  --warning: #f59e0b;
+  --warning-foreground: #1e293b;
+
+  /* Destructive */
+  --destructive: #ef4444;
   --destructive-foreground: #ffffff;
-  
+
   /* Borders and inputs */
-  --border: #e5e5e5;
+  --border: #e2e8f0;
   --input: transparent;
-  --input-background: #f7f7f7;
-  --switch-background: #e5e5e5;
-  
+  --input-background: #f1f5f9;
+  --switch-background: #e2e8f0;
+
   --font-weight-medium: 500;
   --font-weight-normal: 400;
-  
-  --ring: #58cc02;
-  
-  /* Rounded corners - larger for friendly feel */
-  --radius: 1rem;
-  
-  /* Chart colors - green variations */
-  --chart-1: #58cc02;
-  --chart-2: #7ed321;
-  --chart-3: #a3e635;
-  --chart-4: #4bad00;
-  --chart-5: #36a100;
-  
+
+  --ring: #7c3aed;
+
+  /* Rounded */
+  --radius: 0.75rem;
+
+  /* Chart */
+  --chart-1: #7c3aed;
+  --chart-2: #10b981;
+  --chart-3: #f59e0b;
+  --chart-4: #6366f1;
+  --chart-5: #ec4899;
+
   /* Sidebar */
   --sidebar: #ffffff;
-  --sidebar-foreground: #3c3c3c;
-  --sidebar-primary: #58cc02;
+  --sidebar-foreground: #334155;
+  --sidebar-primary: #7c3aed;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #f7f7f7;
-  --sidebar-accent-foreground: #3c3c3c;
-  --sidebar-border: #e5e5e5;
-  --sidebar-ring: #58cc02;
+  --sidebar-accent: #f5f3ff;
+  --sidebar-accent-foreground: #5b21b6;
+  --sidebar-border: #e2e8f0;
+  --sidebar-ring: #7c3aed;
 }
 
 .dark {
-  --background: #1f1f1f;
-  --foreground: #f7f7f7;
-  
-  --card: #2b2b2b;
-  --card-foreground: #f7f7f7;
-  
-  --popover: #2b2b2b;
-  --popover-foreground: #f7f7f7;
-  
-  --primary: #58cc02;
+  --background: #0f1115;
+  --foreground: #f1f5f9;
+
+  --card: #1a1d24;
+  --card-foreground: #f1f5f9;
+
+  --popover: #1a1d24;
+  --popover-foreground: #f1f5f9;
+
+  --primary: #8b5cf6;
   --primary-foreground: #ffffff;
-  --primary-hover: #4bad00;
-  
-  --secondary: #3c3c3c;
-  --secondary-foreground: #f7f7f7;
-  
-  --muted: #3c3c3c;
-  --muted-foreground: #999999;
-  
-  --accent: #2d4a1f;
-  --accent-foreground: #7ed321;
-  
-  --success: #58cc02;
+  --primary-hover: #7c3aed;
+
+  --secondary: #1e293b;
+  --secondary-foreground: #e2e8f0;
+
+  --muted: #1e293b;
+  --muted-foreground: #94a3b8;
+
+  --accent: #2e1065;
+  --accent-foreground: #a78bfa;
+
+  --success: #10b981;
   --success-foreground: #ffffff;
-  
-  --warning: #ffc800;
-  --warning-foreground: #1f1f1f;
-  
-  --destructive: #ff4b4b;
+
+  --warning: #f59e0b;
+  --warning-foreground: #0f1115;
+
+  --destructive: #ef4444;
   --destructive-foreground: #ffffff;
-  
-  --border: #3c3c3c;
-  --input: #3c3c3c;
-  --ring: #58cc02;
-  
-  --font-weight-medium: 500;
-  --font-weight-normal: 400;
-  
-  --chart-1: #58cc02;
-  --chart-2: #7ed321;
-  --chart-3: #a3e635;
-  --chart-4: #4bad00;
-  --chart-5: #36a100;
-  
-  --sidebar: #2b2b2b;
-  --sidebar-foreground: #f7f7f7;
-  --sidebar-primary: #58cc02;
+
+  --border: #334155;
+  --input: #334155;
+  --ring: #8b5cf6;
+
+  --chart-1: #8b5cf6;
+  --chart-2: #10b981;
+  --chart-3: #f59e0b;
+  --chart-4: #6366f1;
+  --chart-5: #ec4899;
+
+  --sidebar: #0f1115;
+  --sidebar-foreground: #e2e8f0;
+  --sidebar-primary: #8b5cf6;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #3c3c3c;
-  --sidebar-accent-foreground: #f7f7f7;
-  --sidebar-border: #3c3c3c;
-  --sidebar-ring: #58cc02;
+  --sidebar-accent: #1e293b;
+  --sidebar-accent-foreground: #a78bfa;
+  --sidebar-border: #334155;
+  --sidebar-ring: #8b5cf6;
 }
 
 @theme inline {
@@ -252,4 +249,83 @@
     line-height: 1.5;
     letter-spacing: -0.011em;
   }
+}
+
+/* Page background theme (data-theme-bg) - tuỳ chỉnh màu nền */
+/* Header & Sidebar dùng chung với page-bg để đồng bộ khi đổi theme */
+[data-theme-bg="slate"] {
+  --page-bg: #f8fafc;
+  --header-bg: #f8fafc;
+  --sidebar-bg: #F8F9FA;
+}
+.dark [data-theme-bg="slate"] {
+  --page-bg: #0f1115;
+  --header-bg: #0f1115;
+  --sidebar-bg: #0f1115;
+}
+
+[data-theme-bg="warm"] {
+  --page-bg: #fef7ed;
+  --header-bg: #fef7ed;
+  --sidebar-bg: #fef3e2;
+}
+.dark [data-theme-bg="warm"] {
+  --page-bg: #1c1917;
+  --header-bg: #1c1917;
+  --sidebar-bg: #1c1917;
+}
+
+[data-theme-bg="blue"] {
+  --page-bg: #f0f9ff;
+  --header-bg: #f0f9ff;
+  --sidebar-bg: #e0f2fe;
+}
+.dark [data-theme-bg="blue"] {
+  --page-bg: #0c1929;
+  --header-bg: #0c1929;
+  --sidebar-bg: #0c1929;
+}
+
+[data-theme-bg="green"] {
+  --page-bg: #f0fdf4;
+  --header-bg: #f0fdf4;
+  --sidebar-bg: #dcfce7;
+}
+.dark [data-theme-bg="green"] {
+  --page-bg: #0d1f12;
+  --header-bg: #0d1f12;
+  --sidebar-bg: #0d1f12;
+}
+
+[data-theme-bg="violet"] {
+  --page-bg: #faf5ff;
+  --header-bg: #faf5ff;
+  --sidebar-bg: #f3e8ff;
+}
+.dark [data-theme-bg="violet"] {
+  --page-bg: #1a1625;
+  --header-bg: #1a1625;
+  --sidebar-bg: #1a1625;
+}
+
+[data-theme-bg="rose"] {
+  --page-bg: #fff1f2;
+  --header-bg: #fff1f2;
+  --sidebar-bg: #ffe4e6;
+}
+.dark [data-theme-bg="rose"] {
+  --page-bg: #1f1315;
+  --header-bg: #1f1315;
+  --sidebar-bg: #1f1315;
+}
+
+[data-theme-bg="dark"] {
+  --page-bg: #e2e8f0;
+  --header-bg: #e2e8f0;
+  --sidebar-bg: #cbd5e1;
+}
+.dark [data-theme-bg="dark"] {
+  --page-bg: #0a0a0b;
+  --header-bg: #0a0a0b;
+  --sidebar-bg: #0a0a0b;
 }

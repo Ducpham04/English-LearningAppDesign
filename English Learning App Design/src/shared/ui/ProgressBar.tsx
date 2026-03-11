@@ -7,18 +7,19 @@ interface ProgressBarProps {
 }
 
 export function ProgressBar({ value, className, showLabel = false }: ProgressBarProps) {
-  const percentage = Math.min(100, Math.max(0, value));
+  const raw = Math.min(100, Math.max(0, value));
+  const percentage = Math.round(raw);
 
   return (
     <div className={cn('w-full', className)}>
-      <div className="relative h-2.5 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700">
+      <div className="relative h-1.5 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
         <div
-          className="h-full bg-gradient-to-r from-green-400 to-green-600 transition-all duration-300 ease-out shadow-sm"
+          className="h-full bg-gradient-to-r from-emerald-400 to-teal-500 transition-all duration-300 ease-out"
           style={{ width: `${percentage}%` }}
         />
       </div>
       {showLabel && (
-        <p className="mt-1.5 text-xs font-medium text-green-600 dark:text-green-400">
+        <p className="mt-1 text-xs font-medium text-emerald-600 dark:text-emerald-400">
           {percentage}% hoàn thành
         </p>
       )}

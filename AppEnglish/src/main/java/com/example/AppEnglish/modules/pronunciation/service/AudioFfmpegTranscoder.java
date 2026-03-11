@@ -5,7 +5,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -22,18 +21,9 @@ public class AudioFfmpegTranscoder {
     @Value("${app.ffmpeg.path:ffmpeg}")
     private String ffmpegPath;
 
-    /** On macOS/Linux, ignore Windows .exe paths and use "ffmpeg" from PATH. */
-    private String resolveFfmpegCommand() {
-        if (File.separatorChar != '\\' && ffmpegPath.toLowerCase().endsWith(".exe")) {
-            log.debug("Non-Windows OS: using 'ffmpeg' from PATH instead of configured {}", ffmpegPath);
-            return "ffmpeg";
-        }
-        return ffmpegPath;
-    }
-
     public TranscodeResult transcodeToPcm16kMono(InputStream input) throws IOException, InterruptedException {
         List<String> cmd = new ArrayList<>();
-        cmd.add(resolveFfmpegCommand());
+        cmd.add(ffmpegPath);
         cmd.add("-hide_banner");
         cmd.add("-loglevel");
         cmd.add("error");

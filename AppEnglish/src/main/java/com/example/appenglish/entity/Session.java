@@ -1,18 +1,25 @@
 package com.example.appenglish.entity;
 
 import jakarta.persistence.*;
-import lombok.*;
+import lombok.Getter;
+import lombok.Setter;
+import org.hibernate.annotations.OrderBy;
+
+import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Session (chủ đề/buổi học) nằm trong một khóa học (Curriculum)
+ * và chứa nhiều Lesson.
+ */
 @Entity
 @Table(name = "sessions")
-@Getter @Setter
+@Getter
+@Setter
 public class Session extends BaseEntity {
 
+    @Column(nullable = false)
     private String title;
-
-    @Column(name = "order_index")
-    private Integer orderIndex; // Thứ tự chương (Chương 1, Chương 2)
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "course_id")
@@ -22,7 +29,11 @@ public class Session extends BaseEntity {
     @JoinColumn(name = "topic_id")
     private Topic topic;
 
-    // Một chương có nhiều bài học
-    @OneToMany(mappedBy = "session", cascade = CascadeType.ALL)
-    private List<Lesson> lessons;
+    @Column(name = "order_index")
+    private Integer orderIndex;
+
+    @OneToMany(mappedBy = "session", cascade = CascadeType.ALL, orphanRemoval = true)
+    @jakarta.persistence.OrderBy("orderIndex ASC")
+    private List<Lesson> lessons = new ArrayList<>();
 }
+
