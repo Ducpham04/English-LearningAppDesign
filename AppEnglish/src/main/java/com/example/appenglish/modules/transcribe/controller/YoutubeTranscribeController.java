@@ -16,6 +16,8 @@ import lombok.experimental.FieldDefaults;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Map;
+
 @RestController
 @RequestMapping("/v1/youtube")
 @RequiredArgsConstructor
@@ -42,6 +44,11 @@ public class YoutubeTranscribeController {
         LessonVideo lv = lessonVideoRepository.findById(lessonId)
                 .orElseThrow(() -> new ApiException("Lesson video not found", "LESSON_VIDEO_NOT_FOUND"));
 
-        return ResponseEntity.ok(BaseResponse.ok(lv.getTranscriptJson(), "OK", request.getRequestURI()));
+        Map<String, Object> response = Map.of(
+                "transcript", lv.getTranscriptJson(),
+                "s3Url", lv.getVideoUrl()
+        );
+
+        return ResponseEntity.ok(BaseResponse.ok(response, "OK", request.getRequestURI()));
     }
 }

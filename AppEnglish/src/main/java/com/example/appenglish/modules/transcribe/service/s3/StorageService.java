@@ -22,13 +22,18 @@ public class StorageService {
     @NonFinal
     @Value("${aws.s3.bucket}")
     String bucket;
+
+    @NonFinal
+    @Value("${aws.region}")
+    String region;
+
     S3Client s3Client;
 
     public String uploadFile(Path file, String key) {
         s3Client.putObject(
                 PutObjectRequest.builder().bucket(bucket).key(key).build(),
                 file);
-        return "s3://" + bucket + "/" + key;
+        return buildPublicUrl(key);
     }
 
     public String uploadMultipartFile(MultipartFile file, String key) throws IOException {
@@ -40,6 +45,10 @@ public class StorageService {
                         .build(),
                 RequestBody.fromInputStream(file.getInputStream(), file.getSize())
         );
-        return "s3://" + bucket + "/" + key;
+        return buildPublicUrl(key);
+    }
+
+    private String buildPublicUrl(String key) {
+        return "https://" + bucket + ".s3." + region + ".amazonaws.com/" + key;
     }
 }

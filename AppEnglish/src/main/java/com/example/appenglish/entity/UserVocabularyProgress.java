@@ -43,7 +43,7 @@ public class UserVocabularyProgress {
 @Embeddable
 @Getter @Setter @EqualsAndHashCode
 class UserVocabId implements Serializable {
-    private Long userId;
+    private String userId;
     private Long vocabId;
 }
 
