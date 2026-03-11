@@ -314,11 +314,21 @@ export function SessionOverview() {
               onClick={() => setSelectedTopic(topic)}
               className="group text-left rounded-2xl overflow-hidden bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/80 shadow-sm hover:shadow-xl hover:shadow-violet-500/10 hover:border-violet-200 dark:hover:border-violet-800/50 transition-all duration-300 hover:-translate-y-1"
             >
-              <div className={`relative h-32 sm:h-36 bg-gradient-to-br ${TOPIC_GRADIENTS[idx % TOPIC_GRADIENTS.length]} flex items-center justify-center`}>
+              <div
+                className={`relative h-32 sm:h-36 flex items-center justify-center ${
+                  topic.thumbnailUrl ? 'bg-slate-900' : `bg-gradient-to-br ${TOPIC_GRADIENTS[idx % TOPIC_GRADIENTS.length]}`
+                }`}
+              >
                 {topic.thumbnailUrl && (
-                  <img src={topic.thumbnailUrl} alt="" className="absolute inset-0 w-full h-full object-cover opacity-30" />
+                  <img
+                    src={topic.thumbnailUrl}
+                    alt=""
+                    className="absolute inset-0 w-full h-full object-cover"
+                  />
                 )}
-                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors" />
+                {!topic.thumbnailUrl && (
+                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors" />
+                )}
                 <BookOpen className="relative h-12 w-12 text-white/90 drop-shadow-md" />
                 <span className="absolute top-3 left-3 rounded-lg bg-white/20 backdrop-blur-sm px-2.5 py-1 text-xs font-semibold text-white">
                   #{topic.orderIndex + 1}

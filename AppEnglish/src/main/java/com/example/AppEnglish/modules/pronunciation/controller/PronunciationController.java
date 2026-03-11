@@ -28,13 +28,14 @@ public class PronunciationController {
             Authentication authentication,
             @RequestParam @NotNull Long lessonId,
             @RequestParam @NotNull Integer sentenceIndex,
+            @RequestParam(required = false) String expectedText,
             @RequestPart("file") MultipartFile file
     ) throws Exception {
         String email = authentication.getName();
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new IllegalArgumentException("User not found: " + email));
 
-        PronunciationScoreResponse response = attemptService.scoreAndEnqueueUpload(user, lessonId, sentenceIndex, file);
+        PronunciationScoreResponse response = attemptService.scoreAndEnqueueUpload(user, lessonId, sentenceIndex, expectedText, file);
         return BaseResponse.ok(response, "OK", "/api/pronunciation/score");
     }
 }

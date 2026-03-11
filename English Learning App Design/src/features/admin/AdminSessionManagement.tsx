@@ -10,6 +10,7 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/app/components/ui/select';
+import { AdminPageLayout } from '@/app/components/layout/AdminPageLayout';
 import { BookOpen, Plus, Pencil, Trash2, Layers, Search, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import apiService from '@/services/apiService';
@@ -108,9 +109,10 @@ export function AdminSessionManagement() {
     try {
       await apiService.session.delete(id);
       toast.success('Đã xóa session');
-      setSessions(sessions.filter(s => s.id !== id));
-    } catch {
-      toast.error('Lỗi khi xóa session');
+      fetchData();
+    } catch (err: any) {
+      const msg = err?.response?.data?.message ?? err?.message ?? 'Không thể xóa session';
+      toast.error(msg);
     }
   };
 
@@ -121,117 +123,92 @@ export function AdminSessionManagement() {
   });
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-950 pb-20 md:pb-6">
-      {/* Header */}
-      <div className="bg-gradient-to-br from-violet-500 to-violet-700 text-white p-6 md:p-8">
-        <div className="max-w-7xl mx-auto">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-3">
-              <div className="bg-white/20 p-3 rounded-2xl backdrop-blur-sm">
-                <Layers className="h-8 w-8" />
-              </div>
-              <div>
-                <h1 className="text-3xl font-bold">Session Management</h1>
-                <p className="text-violet-100">Tạo và quản lý các session học tập</p>
-              </div>
-            </div>
-            <Button
-              onClick={openCreate}
-              className="bg-white text-violet-700 hover:bg-violet-50 gap-2 font-semibold"
-            >
-              <Plus className="h-5 w-5" />
-              Tạo Session
-            </Button>
+    <AdminPageLayout
+      title="Buổi học (Sessions)"
+      subtitle="Quản lý các buổi học thuộc từng khóa (course)"
+      icon={Layers}
+      action={
+        <Button onClick={openCreate} className="gap-2">
+          <Plus className="h-5 w-5" />
+          Tạo buổi học
+        </Button>
+      }
+      stats={[
+        { label: 'Tổng buổi học', value: sessions.length },
+        { label: 'Số khóa học (courses)', value: courses.length },
+        { label: 'Kết quả tìm kiếm', value: filtered.length },
+      ]}
+    >
+      {/* Filters */}
+      <Card className="p-4 mb-6 border-border bg-card">
+        <div className="flex flex-col md:flex-row gap-3">
+          <div className="flex-1 relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+            <Input
+              placeholder="Tìm theo tên session..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              className="pl-10 bg-background"
+            />
           </div>
-
-          <div className="grid grid-cols-3 gap-4 mt-4">
-            {[
-              { label: 'Tổng Sessions', value: sessions.length },
-              { label: 'Courses', value: courses.length },
-              { label: 'Sessions hôm nay', value: sessions.filter(() => true).length },
-            ].map((stat) => (
-              <Card key={stat.label} className="bg-white/10 backdrop-blur-sm border-white/20 p-4 text-white">
-                <div className="text-2xl font-bold">{stat.value}</div>
-                <div className="text-sm text-violet-100">{stat.label}</div>
-              </Card>
-            ))}
-          </div>
+          <Select value={filterCourse} onValueChange={setFilterCourse}>
+            <SelectTrigger className="w-[200px]">
+              <SelectValue placeholder="Tất cả courses" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Tất cả courses</SelectItem>
+              {courses.map(c => (
+                <SelectItem key={c.id} value={String(c.id)}>{c.title}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
-      </div>
+      </Card>
 
-      {/* Content */}
-      <div className="max-w-7xl mx-auto p-4 md:p-6">
-        {/* Filters */}
-        <Card className="p-4 mb-6">
-          <div className="flex flex-col md:flex-row gap-3">
-            <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
-              <Input
-                placeholder="Tìm theo tên session..."
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-                className="pl-10"
-              />
-            </div>
-            <Select value={filterCourse} onValueChange={setFilterCourse}>
-              <SelectTrigger className="w-[200px]">
-                <SelectValue placeholder="Tất cả courses" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Tất cả courses</SelectItem>
-                {courses.map(c => (
-                  <SelectItem key={c.id} value={String(c.id)}>{c.title}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+      {/* Session List */}
+      {loading ? (
+        <div className="flex items-center justify-center py-20">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      ) : filtered.length === 0 ? (
+        <Card className="p-12 text-center border-border bg-card">
+          <Layers className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+          <p className="text-muted-foreground font-medium">
+            {sessions.length === 0 ? 'Chưa có session nào. Tạo session đầu tiên!' : 'Không tìm thấy session phù hợp.'}
+          </p>
+          {sessions.length === 0 && (
+            <Button onClick={openCreate} className="mt-4 gap-2">
+              <Plus className="h-4 w-4" /> Tạo Session ngay
+            </Button>
+          )}
         </Card>
-
-        {/* Session List */}
-        {loading ? (
-          <div className="flex items-center justify-center py-20">
-            <Loader2 className="h-8 w-8 animate-spin text-violet-500" />
-          </div>
-        ) : filtered.length === 0 ? (
-          <Card className="p-12 text-center">
-            <Layers className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-            <p className="text-gray-500 font-medium">
-              {sessions.length === 0 ? 'Chưa có session nào. Tạo session đầu tiên!' : 'Không tìm thấy session phù hợp.'}
-            </p>
-            {sessions.length === 0 && (
-              <Button onClick={openCreate} className="mt-4 bg-violet-600 hover:bg-violet-700 text-white gap-2">
-                <Plus className="h-4 w-4" /> Tạo Session ngay
-              </Button>
-            )}
-          </Card>
-        ) : (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {filtered.map(session => (
-              <Card key={session.id} className="p-5 hover:shadow-lg transition-all duration-300 group">
-                <div className="flex items-start justify-between mb-3">
-                  <div className="bg-violet-100 dark:bg-violet-900/30 p-2 rounded-xl">
-                    <BookOpen className="h-6 w-6 text-violet-600 dark:text-violet-400" />
-                  </div>
-                  <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <Button size="sm" variant="ghost" onClick={() => openEdit(session)}>
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                    <Button size="sm" variant="ghost" className="text-red-500" onClick={() => handleDelete(session.id)}>
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
+      ) : (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {filtered.map(session => (
+            <Card key={session.id} className="p-5 hover:shadow-md transition-all duration-200 group border-border bg-card text-card-foreground">
+              <div className="flex items-start justify-between mb-3">
+                <div className="p-2 rounded-xl bg-primary/10">
+                  <BookOpen className="h-6 w-6 text-primary" />
                 </div>
-                <h3 className="font-semibold text-gray-900 dark:text-white mb-1 line-clamp-2">{session.title}</h3>
-                <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">{session.courseTitle || 'Chưa có course'}</p>
-                <div className="flex items-center gap-2">
-                  <Badge variant="outline" className="text-xs">Thứ tự: {session.orderIndex}</Badge>
-                  <Badge variant="outline" className="text-xs">{session.lessonCount} bài học</Badge>
+                <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <Button size="sm" variant="ghost" onClick={() => openEdit(session)}>
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                  <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" onClick={() => handleDelete(session.id)}>
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
                 </div>
-              </Card>
-            ))}
-          </div>
-        )}
-      </div>
+              </div>
+              <h3 className="font-semibold text-foreground mb-1 line-clamp-2">{session.title}</h3>
+              <p className="text-sm text-muted-foreground mb-3">{session.courseTitle || 'Chưa có course'}</p>
+              <div className="flex items-center gap-2">
+                <Badge variant="outline" className="text-xs">Thứ tự: {session.orderIndex}</Badge>
+                <Badge variant="outline" className="text-xs">{session.lessonCount} bài học</Badge>
+              </div>
+            </Card>
+          ))}
+        </div>
+      )}
 
       {/* Create/Edit Modal */}
       <Dialog open={modalOpen} onOpenChange={setModalOpen}>
@@ -284,7 +261,7 @@ export function AdminSessionManagement() {
 
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setModalOpen(false)}>Hủy</Button>
-              <Button type="submit" disabled={saving} className="bg-violet-600 hover:bg-violet-700 text-white gap-2">
+              <Button type="submit" disabled={saving} className="gap-2">
                 {saving && <Loader2 className="h-4 w-4 animate-spin" />}
                 {editingSession ? 'Cập nhật' : 'Tạo Session'}
               </Button>
@@ -292,6 +269,6 @@ export function AdminSessionManagement() {
           </form>
         </DialogContent>
       </Dialog>
-    </div>
+    </AdminPageLayout>
   );
 }

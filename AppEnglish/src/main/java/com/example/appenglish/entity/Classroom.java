@@ -1,5 +1,6 @@
 package com.example.appenglish.entity;
 
+import com.example.appenglish.enums.ClassStatus;
 import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDate;
@@ -14,10 +15,13 @@ public class Classroom extends BaseEntity {
     @JoinColumn(name = "teacher_id")
     private User teacher;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "course_id")
+    private Curriculum course;
+
     private LocalDate startDate;
     private LocalDate endDate;
 
     @Enumerated(EnumType.STRING)
     private ClassStatus status;
 }
-enum ClassStatus { UPCOMING, ACTIVE, FINISHED }

@@ -44,12 +44,14 @@ import { AIConversationLesson } from '@/features/student/lessons/AIConversationL
 import { FlashcardLesson } from '@/features/student/lessons/FlashcardLesson';
 import { LessonRouter } from '@/features/lesson/LessonRouter';
 import { TestTaking } from '@/features/test/TestTaking';
+import { StudentClassDetail } from '@/features/student/StudentClassDetail';
 
 // Teacher
 import { TeacherDashboard } from '@/features/teacher/TeacherDashboard';
 import { TeacherSettings } from '@/features/settings/TeacherSettings';
 import { StudentsManagement } from '@/features/teacher/StudentsManagement';
 import { ClassesManagement } from '@/features/teacher/ClassesManagement';
+import { ClassDetail } from '@/features/teacher/ClassDetail';
 import { ContentLibrary } from '@/features/teacher/ContentLibrary';
 import { CreateLesson } from '@/features/teacher/CreateLesson';
 import { CreateTest } from '@/features/teacher/CreateTest';
@@ -133,6 +135,7 @@ export default function App() {
               <Route path="/lessons/flashcard-lesson/:lessonId" element={<FlashcardLesson />} />
               <Route path="/lessons/:lessonId" element={<LessonRouter />} />
               <Route path="/tests/:testId" element={<TestTaking />} />
+              <Route path="/classes/:classId" element={<StudentClassDetail />} />
             </Route>
           </Route>
 
@@ -142,6 +145,7 @@ export default function App() {
               <Route path="/teacher" element={<TeacherDashboard />} />
               <Route path="/teacher/students" element={<StudentsManagement />} />
               <Route path="/teacher/classes" element={<ClassesManagement />} />
+              <Route path="/teacher/classes/:classId" element={<ClassDetail />} />
               <Route path="/teacher/lessons" element={<ContentLibrary />} />
               <Route path="/teacher/analytics" element={<TeacherAnalytics />} />
               <Route path="/teacher/settings" element={<TeacherSettings />} />

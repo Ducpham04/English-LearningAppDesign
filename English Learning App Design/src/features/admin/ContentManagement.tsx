@@ -371,17 +371,17 @@ export function ContentManagement() {
   const reported = staticContents.filter(c => c.reports > 0).length;
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-950 pb-20 md:pb-6">
+    <div className="min-h-screen bg-[var(--page-bg)] pb-20 md:pb-6">
       {/* Header */}
-      <div className="bg-gradient-to-br from-indigo-500 to-indigo-700 text-white p-6 md:p-8">
+      <div className="bg-gradient-to-br from-slate-800 to-slate-900 text-white p-6 md:p-8">
         <div className="max-w-7xl mx-auto">
           <div className="flex items-center gap-3 mb-6">
             <div className="bg-white/20 p-3 rounded-2xl backdrop-blur-sm">
               <BookOpen className="h-8 w-8" />
             </div>
             <div>
-              <h1 className="text-3xl font-bold">Content Hub</h1>
-              <p className="text-indigo-100">Quản lý nội dung, phát âm, video và phân tích AI</p>
+              <h1 className="text-3xl font-bold">Nội dung & Bài học</h1>
+              <p className="text-slate-200 text-sm">Quản lý loại nội dung, chấm phát âm, video và phân tích AI</p>
             </div>
           </div>
 

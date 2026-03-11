@@ -26,7 +26,7 @@ public class ClassStudent {
 
 @Embeddable
 @Getter @Setter @EqualsAndHashCode
-class ClassStudentId implements Serializable {
+public class ClassStudentId implements Serializable {
     private Long classId;
-    private Long studentId;
+    private String studentId; // matches User.id (UUID)
 }

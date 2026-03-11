@@ -2,11 +2,14 @@ package com.example.appenglish.modules.session.service;
 
 import com.example.appenglish.entity.Curriculum;
 import com.example.appenglish.entity.Session;
+import com.example.appenglish.common.exception.ApiException;
+import com.example.appenglish.common.exception.ConstraintMessageHelper;
 import com.example.appenglish.modules.session.dto.SessionCreateRequest;
 import com.example.appenglish.modules.session.dto.SessionDto;
 import com.example.appenglish.repository.CurriculumRepository;
 import com.example.appenglish.repository.SessionRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -61,7 +64,12 @@ public class SessionService {
     }
 
     public void delete(Long id) {
-        sessionRepository.deleteById(id);
+        try {
+            sessionRepository.deleteById(id);
+        } catch (DataIntegrityViolationException e) {
+            String detail = ConstraintMessageHelper.buildDeleteConstraintMessage(e, "session");
+            throw new ApiException(detail, "CONSTRAINT_VIOLATION");
+        }
     }
 
     private SessionDto toDto(Session s) {

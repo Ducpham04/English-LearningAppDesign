@@ -84,11 +84,14 @@ const apiService = {
 
   // --- PRONUNCIATION MODULE ---
   pronunciation: {
-    getScore: (lessonId: number, sentenceIndex: number, audioBlob: Blob) => {
+    getScore: (lessonId: number, sentenceIndex: number, audioBlob: Blob, expectedText?: string) => {
       const formData = new FormData();
       formData.append('file', audioBlob, 'recording.wav');
       formData.append('lessonId', lessonId.toString());
       formData.append('sentenceIndex', sentenceIndex.toString());
+      if (expectedText && expectedText.trim()) {
+        formData.append('expectedText', expectedText.trim());
+      }
       
       return axiosInstance.post<BaseResponse<PronunciationScoreResponse>>(
         '/pronunciation/score', 
@@ -113,7 +116,13 @@ const apiService = {
       formData.append('file', file);
       formData.append('lessonId', lessonId.toString());
       formData.append('languageCode', languageCode);
-      return axiosInstance.post<BaseResponse<string>>('/v1/upload/transcribe', formData);
+      return axiosInstance.post<BaseResponse<string>>(
+        '/v1/upload/transcribe',
+        formData,
+        {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        }
+      );
     },
   },
 
@@ -136,6 +145,30 @@ const apiService = {
     
     delete: (id: number) => 
       axiosInstance.delete<BaseResponse<any>>(`/v1/classrooms/${id}`),
+  },
+
+  // --- TEACHER CLASSES (v1/teacher/classes) ---
+  teacherClasses: {
+    getAll: () =>
+      axiosInstance.get<BaseResponse<any[]>>('/v1/teacher/classes'),
+    create: (data: { name: string; courseId?: number; startDate?: string; endDate?: string; status?: string }) =>
+      axiosInstance.post<BaseResponse<any>>('/v1/teacher/classes', data),
+    getById: (classId: number) =>
+      axiosInstance.get<BaseResponse<any>>(`/v1/teacher/classes/${classId}`),
+    getStudents: (classId: number) =>
+      axiosInstance.get<BaseResponse<any[]>>(`/v1/teacher/classes/${classId}/students`),
+    addStudent: (classId: number, studentId: string) =>
+      axiosInstance.post<BaseResponse<any>>(`/v1/teacher/classes/${classId}/students`, { studentId }),
+    removeStudent: (classId: number, studentId: string) =>
+      axiosInstance.delete<BaseResponse<void>>(`/v1/teacher/classes/${classId}/students/${studentId}`),
+    getAssignments: (classId: number) =>
+      axiosInstance.get<BaseResponse<any[]>>(`/v1/teacher/classes/${classId}/assignments`),
+    createAssignment: (classId: number, data: { lessonId: number; title?: string; description?: string; dueAt?: string; maxScore?: number; isRequired?: boolean; orderIndex?: number }) =>
+      axiosInstance.post<BaseResponse<any>>(`/v1/teacher/classes/${classId}/assignments`, data),
+    updateAssignment: (classId: number, assignmentId: number, data: { title?: string; description?: string; dueAt?: string; maxScore?: number; isRequired?: boolean; orderIndex?: number }) =>
+      axiosInstance.put<BaseResponse<any>>(`/v1/teacher/classes/${classId}/assignments/${assignmentId}`, data),
+    deleteAssignment: (classId: number, assignmentId: number) =>
+      axiosInstance.delete<BaseResponse<void>>(`/v1/teacher/classes/${classId}/assignments/${assignmentId}`),
   },
 
   // --- CURRICULUM (COURSE) MODULE ---
@@ -368,6 +401,14 @@ const apiService = {
     /** Sessions mà học sinh đã/đang tham gia (có ít nhất 1 bài hoàn thành). Cho Dashboard "Đang học". */
     getParticipatedSessions: () =>
       axiosInstance.get<BaseResponse<any[]>>('/v1/student/progress/participated-sessions'),
+
+    /** Lớp mà học sinh đã ghi danh. */
+    getClasses: () =>
+      axiosInstance.get<BaseResponse<any[]>>('/v1/student/classes'),
+
+    /** Bài tập giao trong lớp (chỉ lớp đã ghi danh). */
+    getClassAssignments: (classId: number) =>
+      axiosInstance.get<BaseResponse<any[]>>(`/v1/student/classes/${classId}/assignments`),
   },
 };
 

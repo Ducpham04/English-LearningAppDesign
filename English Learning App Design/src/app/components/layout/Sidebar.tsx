@@ -63,16 +63,19 @@ export function Sidebar() {
 
   const adminNavItems: NavItem[] = [
     { title: 'Dashboard', href: '/admin', icon: Home },
-    { title: 'User Management', href: '/admin/users', icon: Users },
-    { title: 'Content Hub', href: '/admin/content', icon: BookOpen },
-    { title: 'Chủ đề học', href: '/admin/topics', icon: Target },
-    { title: 'Sessions', href: '/admin/sessions', icon: Layers },
-    { title: 'Lộ trình học', href: '/admin/curriculum', icon: ListOrdered },
+    // Cấu trúc học: Course → Topic → Session → Lesson/Content
+    { title: 'Lộ trình học (Courses)', href: '/admin/curriculum', icon: ListOrdered },
+    { title: 'Chủ đề học (Topics)', href: '/admin/topics', icon: Target },
+    { title: 'Buổi học (Sessions)', href: '/admin/sessions', icon: Layers },
+    { title: 'Nội dung & Bài học', href: '/admin/content', icon: BookOpen },
+    // Đánh giá & lớp học
     { title: 'Bài test', href: '/admin/tests', icon: FileText },
-    { title: 'Classes', href: '/admin/classes', icon: GraduationCap },
+    { title: 'Lớp học', href: '/admin/classes', icon: GraduationCap },
+    // Người dùng & hệ thống
+    { title: 'Người dùng', href: '/admin/users', icon: Users },
+    { title: 'Analytics', href: '/admin/analytics', icon: BarChart3 },
     { title: 'AI Usage', href: '/admin/ai-usage', icon: Sparkles },
     { title: 'Face ID', href: '/admin/face-id', icon: Shield },
-    { title: 'Analytics', href: '/admin/analytics', icon: BarChart3 },
     { title: 'Notifications', href: '/admin/notifications', icon: Bell },
     { title: 'System', href: '/admin/settings', icon: Database },
   ];
@@ -119,18 +122,24 @@ export function Sidebar() {
             Main Menu
           </p>
           {navItems.map((item) => {
-            const isActive = location.pathname === item.href || (item.href !== '/' && location.pathname.startsWith(item.href));
+            const isActive =
+              location.pathname === item.href ||
+              (item.href !== '/' && location.pathname.startsWith(item.href));
             return (
               <Link key={item.href} to={item.href} className="block mx-1">
                 <Button
                   variant="ghost"
-                  className={`w-full justify-start gap-3 h-11 px-4 rounded-full font-medium transition-all duration-200 border-l-4 border-transparent ${
+                  className={`w-full justify-start gap-3 h-11 px-4 rounded-full font-medium transition-all duration-200 border-l-4 ${
                     isActive
-                      ? 'bg-violet-600 dark:bg-violet-600 text-white hover:bg-violet-700 dark:hover:bg-violet-700 border-l-violet-400 dark:border-l-violet-400 shadow-sm'
-                      : 'text-slate-600 dark:text-slate-400 hover:bg-slate-200/80 dark:hover:bg-slate-800/80 hover:text-slate-900 dark:hover:text-white'
+                      ? 'bg-primary/10 text-primary border-l-primary shadow-sm hover:bg-primary/15'
+                      : 'border-l-transparent text-slate-600 dark:text-slate-400 hover:bg-slate-200/80 dark:hover:bg-slate-800/80 hover:text-slate-900 dark:hover:text-white'
                   }`}
                 >
-                  <item.icon className={`h-5 w-5 flex-shrink-0 ${isActive ? 'text-white' : ''}`} />
+                  <item.icon
+                    className={`h-5 w-5 flex-shrink-0 ${
+                      isActive ? 'text-primary' : ''
+                    }`}
+                  />
                   <span className="truncate text-sm">{item.title}</span>
                   {item.badge && (
                     <span className="ml-auto text-[10px] font-semibold bg-rose-500 text-white px-2 py-0.5 rounded-full">

@@ -10,6 +10,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/app/components/ui/dialog';
+import { AdminPageLayout } from '@/app/components/layout/AdminPageLayout';
 import {
   Select,
   SelectContent,
@@ -280,7 +281,8 @@ export default function AdminTopicManagement() {
       setSessionLessons((prev) => ({ ...prev, [sessionId]: (prev[sessionId] ?? []).filter((l) => l.id !== lessonId) }));
       loadTopics();
     } catch (err: any) {
-      toast.error('Không thể xóa', { description: err?.message });
+      const msg = err?.response?.data?.message ?? err?.message ?? 'Không thể xóa bài học';
+      toast.error(msg);
     }
   };
 
@@ -398,7 +400,8 @@ export default function AdminTopicManagement() {
       setSessionLessons((prev) => { const n = { ...prev }; delete n[sessionId]; return n; });
       loadTopics();
     } catch (err: any) {
-      toast.error('Không thể xóa session', { description: err?.message });
+      const msg = err?.response?.data?.message ?? err?.message ?? 'Không thể xóa session';
+      toast.error(msg);
     }
   };
 
@@ -466,7 +469,8 @@ export default function AdminTopicManagement() {
       toast.success('Đã xóa chủ đề');
       loadTopics();
     } catch (err: any) {
-      toast.error('Không thể xóa', { description: err?.message });
+      const msg = err?.response?.data?.message ?? err?.message ?? 'Không thể xóa chủ đề';
+      toast.error(msg);
     }
   };
 
@@ -507,70 +511,49 @@ export default function AdminTopicManagement() {
   };
 
   return (
-    <div className="p-6 space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <BookOpen className="h-6 w-6 text-blue-600" />
-            Quản lý Chủ đề học
-          </h1>
-          <p className="text-gray-500 text-sm mt-1">
-            Tạo chủ đề và các bài session để học viên luyện tập
-          </p>
-        </div>
-        <Button onClick={openCreateTopic} className="flex items-center gap-2">
+    <AdminPageLayout
+      title="Chủ đề học (Topics)"
+      subtitle="Tạo chủ đề và các buổi học (sessions) bên trong mỗi khóa học"
+      icon={BookOpen}
+      action={
+        <Button onClick={openCreateTopic} className="gap-2">
           <Plus className="h-4 w-4" />
           Tạo chủ đề mới
         </Button>
-      </div>
-
-      {/* Stats */}
-      <div className="grid grid-cols-3 gap-4">
-        <div className="bg-white dark:bg-gray-800 rounded-xl p-4 border">
-          <p className="text-sm text-gray-500">Tổng chủ đề</p>
-          <p className="text-2xl font-bold text-blue-600">{topics.length}</p>
-        </div>
-        <div className="bg-white dark:bg-gray-800 rounded-xl p-4 border">
-          <p className="text-sm text-gray-500">Đang hoạt động</p>
-          <p className="text-2xl font-bold text-green-600">{topics.filter((t) => t.isActive).length}</p>
-        </div>
-        <div className="bg-white dark:bg-gray-800 rounded-xl p-4 border">
-          <p className="text-sm text-gray-500">Tổng session</p>
-          <p className="text-2xl font-bold text-purple-600">
-            {topics.reduce((sum, t) => sum + (t.sessionCount ?? 0), 0)}
-          </p>
-        </div>
-      </div>
-
-      {/* Search */}
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+      }
+      stats={[
+        { label: 'Tổng chủ đề', value: topics.length },
+        { label: 'Đang hoạt động', value: topics.filter((t) => t.isActive).length },
+        { label: 'Tổng session', value: topics.reduce((sum, t) => sum + (t.sessionCount ?? 0), 0) },
+      ]}
+    >
+      <div className="relative mb-6">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
           placeholder="Tìm kiếm chủ đề..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="pl-9"
+          className="pl-9 bg-background"
         />
       </div>
 
       {/* Topic List */}
       {loading ? (
-        <div className="text-center py-12 text-gray-400">Đang tải...</div>
+        <div className="text-center py-12 text-muted-foreground">Đang tải...</div>
       ) : filteredTopics.length === 0 ? (
         <div className="text-center py-16">
-          <BookOpen className="mx-auto h-12 w-12 text-gray-300 mb-3" />
-          <p className="text-gray-500">Chưa có chủ đề nào. Tạo chủ đề đầu tiên!</p>
+          <BookOpen className="mx-auto h-12 w-12 text-muted-foreground mb-3" />
+          <p className="text-muted-foreground">Chưa có chủ đề nào. Tạo chủ đề đầu tiên!</p>
         </div>
       ) : (
         <div className="space-y-3">
           {filteredTopics.map((topic) => (
-            <div key={topic.id} className="bg-white dark:bg-gray-800 rounded-xl border shadow-sm overflow-hidden">
+            <div key={topic.id} className="bg-card rounded-xl border border-border overflow-hidden">
               {/* Topic Row */}
               <div className="flex items-center gap-3 p-4">
                 <button
                   onClick={() => toggleExpand(topic.id)}
-                  className="flex-shrink-0 text-gray-400 hover:text-gray-600"
+                  className="flex-shrink-0 text-muted-foreground hover:text-foreground"
                 >
                   {expandedTopics.has(topic.id) ? (
                     <ChevronDown className="h-5 w-5" />
@@ -579,16 +562,15 @@ export default function AdminTopicManagement() {
                   )}
                 </button>
 
-                {/* Color indicator */}
-                <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold text-sm">
+                <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-primary/20 flex items-center justify-center text-primary font-bold text-sm">
                   {topic.orderIndex}
                 </div>
 
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-semibold text-gray-900 dark:text-white">{topic.name}</span>
+                    <span className="font-semibold text-foreground">{topic.name}</span>
                     {topic.difficultyLevel && (
-                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${DIFFICULTY_COLORS[topic.difficultyLevel] ?? 'bg-gray-100 text-gray-600'}`}>
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${DIFFICULTY_COLORS[topic.difficultyLevel] ?? 'bg-muted text-muted-foreground'}`}>
                         {DIFFICULTY_LABELS[topic.difficultyLevel] ?? topic.difficultyLevel}
                       </span>
                     )}
@@ -597,9 +579,9 @@ export default function AdminTopicManagement() {
                     )}
                   </div>
                   {topic.description && (
-                    <p className="text-sm text-gray-500 truncate mt-0.5">{topic.description}</p>
+                    <p className="text-sm text-muted-foreground truncate mt-0.5">{topic.description}</p>
                   )}
-                  <div className="flex items-center gap-4 mt-1 text-xs text-gray-400">
+                  <div className="flex items-center gap-4 mt-1 text-xs text-muted-foreground">
                     <span className="flex items-center gap-1">
                       <Layers className="h-3 w-3" />
                       {topic.sessionCount} session
@@ -655,30 +637,30 @@ export default function AdminTopicManagement() {
 
               {/* Sessions (expanded) */}
               {expandedTopics.has(topic.id) && (
-                <div className="border-t bg-gray-50 dark:bg-gray-900/50 px-4 py-3 space-y-2">
+                <div className="border-t border-border bg-muted/30 px-4 py-3 space-y-2">
                   {(topic.sessions ?? []).length === 0 ? (
-                    <p className="text-sm text-gray-400 italic py-2">
+                    <p className="text-sm text-muted-foreground italic py-2">
                       Chưa có session.{' '}
-                      <button onClick={() => openAddSession(topic)} className="text-blue-500 hover:underline">
+                      <button onClick={() => openAddSession(topic)} className="text-primary hover:underline">
                         Thêm session đầu tiên
                       </button>
                     </p>
                   ) : (
                     (topic.sessions ?? []).map((s, idx) => (
-                      <div key={s.id} className="bg-white dark:bg-gray-800 rounded-lg border overflow-hidden">
+                      <div key={s.id} className="bg-card rounded-lg border border-border overflow-hidden">
                         {/* Session row */}
                         <div className="flex items-center gap-2 px-3 py-2">
-                          <button onClick={() => toggleSession(s.id)} className="text-gray-400 hover:text-gray-600 flex-shrink-0">
+                          <button onClick={() => toggleSession(s.id)} className="text-muted-foreground hover:text-foreground flex-shrink-0">
                             {expandedSessions.has(s.id) ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                           </button>
-                          <div className="w-5 h-5 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-xs font-bold flex-shrink-0">
+                          <div className="w-5 h-5 rounded-full bg-primary/20 text-primary flex items-center justify-center text-xs font-bold flex-shrink-0">
                             {idx + 1}
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium">{s.title}</p>
-                            <p className="text-xs text-gray-400">{s.lessonCount} bài học</p>
+                            <p className="text-sm font-medium text-foreground">{s.title}</p>
+                            <p className="text-xs text-muted-foreground">{s.lessonCount} bài học</p>
                           </div>
-                          <Button variant="ghost" size="sm" onClick={() => openAddLesson(s)} className="text-xs text-blue-600 gap-1 h-7 flex-shrink-0">
+                          <Button variant="ghost" size="sm" onClick={() => openAddLesson(s)} className="text-xs text-primary gap-1 h-7 flex-shrink-0">
                             <Plus className="h-3 w-3" /> Bài học
                           </Button>
                           <Button variant="ghost" size="icon" className="h-6 w-6 flex-shrink-0" onClick={() => openEditSession(s)} title="Sửa session">
@@ -1113,6 +1095,6 @@ export default function AdminTopicManagement() {
           </div>
         </DialogContent>
       </Dialog>
-    </div>
+    </AdminPageLayout>
   );
 }

@@ -100,7 +100,12 @@ export function PronunciationLesson() {
         setIsAnalyzing(true);
         const blob = new Blob(chunksRef.current, { type: mr.mimeType || 'audio/wav' });
         try {
-          const res = await apiService.pronunciation.getScore(Number(lessonId), currentWordIndex, blob);
+          const res = await apiService.pronunciation.getScore(
+            Number(lessonId),
+            currentWordIndex,
+            blob,
+            currentPhrase.word
+          );
           const d = res.data?.data;
           if (d) {
             const score = overallScore(d);

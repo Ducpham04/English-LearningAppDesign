@@ -2,11 +2,14 @@ package com.example.appenglish.modules.curriculum.service;
 
 import com.example.appenglish.entity.Curriculum;
 import com.example.appenglish.entity.User;
+import com.example.appenglish.common.exception.ApiException;
+import com.example.appenglish.common.exception.ConstraintMessageHelper;
 import com.example.appenglish.modules.curriculum.dto.CurriculumCreateRequest;
 import com.example.appenglish.modules.curriculum.dto.CurriculumDto;
 import com.example.appenglish.repository.CurriculumRepository;
 import com.example.appenglish.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -50,7 +53,12 @@ public class CurriculumService {
     }
 
     public void delete(Long id) {
-        curriculumRepository.deleteById(id);
+        try {
+            curriculumRepository.deleteById(id);
+        } catch (DataIntegrityViolationException e) {
+            String detail = ConstraintMessageHelper.buildDeleteConstraintMessage(e, "khóa học");
+            throw new ApiException(detail, "CONSTRAINT_VIOLATION");
+        }
     }
 
     private CurriculumDto toDto(Curriculum c) {

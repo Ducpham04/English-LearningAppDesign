@@ -12,7 +12,23 @@ import java.util.List;
 public class StudentDashboardDto {
     private UserDataDto user;
     private List<CurriculumDto> courses;
+    private List<EnrolledClassDto> enrolledClasses;
     private DashboardStatsDto stats;
+
+    @Data
+    @Builder
+    public static class EnrolledClassDto {
+        private Long id;
+        private String name;
+        private String teacherName;
+        private Long courseId;
+        private String courseTitle;
+        private String startDate;
+        private String endDate;
+        private String status;
+        private Integer studentCount;
+        private Integer assignmentCount;
+    }
 
     @Data
     @Builder

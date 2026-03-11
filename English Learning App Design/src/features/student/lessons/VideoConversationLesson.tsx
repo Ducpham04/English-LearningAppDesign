@@ -4,8 +4,22 @@ import { Button } from '@/app/components/ui/button';
 import { Card } from '@/app/components/ui/card';
 import { Badge } from '@/app/components/ui/badge';
 import {
-  Play, Pause, RotateCcw, Volume2, VolumeX, CheckCircle2, ArrowLeft,
-  AlignLeft, Loader2, ChevronRight, Mic, Video, VideoOff,
+  Play,
+  Pause,
+  RotateCcw,
+  Volume2,
+  VolumeX,
+  CheckCircle2,
+  ArrowLeft,
+  AlignLeft,
+  Loader2,
+  ChevronDown,
+  ChevronRight,
+  Mic,
+  Video,
+  VideoOff,
+  BookOpen,
+  BookmarkPlus,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import apiService from '@/services/apiService';
@@ -20,6 +34,12 @@ interface TranscriptLine {
   text: string;
   viText?: string;
   ipa?: string;    // IPA toàn câu, từng từ cách nhau bởi khoảng trắng
+}
+
+interface WordInfo {
+  text: string;
+  ipa?: string;
+  meaning?: string;
 }
 
 // Ghép từng từ với IPA tương ứng.
@@ -47,18 +67,22 @@ function extractYoutubeId(url: string): string | null {
   return m ? m[1] : null;
 }
 
-// ─── Toggle Pill ───────────────────────────────────────────────────────────────
+// ─── Toggle Pill: một màu chủ đạo (Indigo #4F46E5) khi active ─────────────────
+const ACTIVE_COLOR = '#4F46E5';
+
 function TogglePill({
-  active, onClick, label, activeColor,
-}: { active: boolean; onClick: () => void; label: string; activeColor: string }) {
+  active, onClick, label,
+}: { active: boolean; onClick: () => void; label: string }) {
   return (
     <button
+      type="button"
       onClick={onClick}
-      className={`px-3 py-1 rounded-full text-xs font-semibold border transition-all select-none ${
+      className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all select-none ${
         active
-          ? `${activeColor} border-transparent shadow-sm`
-          : 'bg-card text-muted-foreground border-border hover:border-muted-foreground/50 hover:text-foreground'
+          ? 'border-transparent text-white shadow-sm'
+          : 'bg-transparent text-muted-foreground border-border hover:border-[#4F46E5]/40 hover:text-foreground'
       }`}
+      style={active ? { backgroundColor: ACTIVE_COLOR } : undefined}
     >
       {label}
     </button>
@@ -115,12 +139,19 @@ export function VideoConversationLesson() {
   const [showVI, setShowVI] = useState(true);
   const [showIPA, setShowIPA] = useState(false);      // sentence IPA: tắt mặc định (tránh trùng với word IPA)
   const [showWordIPA, setShowWordIPA] = useState(true); // word IPA: bật mặc định
-  const [showOverlaySub, setShowOverlaySub] = useState(true);
+  const [playbackRate, setPlaybackRate] = useState(1);
+
+  // Tra cứu từ vựng / cấu trúc
+  const [selectedWord, setSelectedWord] = useState<WordInfo | null>(null);
+  const [wordLoading, setWordLoading] = useState(false);
+  const [grammarExplainIdx, setGrammarExplainIdx] = useState<number | null>(null);
+  const [grammarExplainText, setGrammarExplainText] = useState<string>('');
 
   // Thoại theo (shadowing): xem xong → chọn thoại lại từng câu + chấm phát âm
   const [mode, setMode] = useState<'watch' | 'shadowing'>('watch');
   const [showVideoInShadowing, setShowVideoInShadowing] = useState(true);
   const [sentenceScores, setSentenceScores] = useState<Record<number, PronunciationScoreResponse>>({});
+  const [autoCompleted, setAutoCompleted] = useState(false);
   const [recordingForSentenceIndex, setRecordingForSentenceIndex] = useState<number | null>(null);
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
@@ -131,6 +162,8 @@ export function VideoConversationLesson() {
 
   const isYoutube = !!(lesson?.youtubeUrl && extractYoutubeId(lesson.youtubeUrl));
   const ytVideoId = isYoutube ? extractYoutubeId(lesson?.youtubeUrl) : null;
+  // Chỉ dùng videoUrl để phát native khi KHÔNG phải URI S3 nội bộ (s3://...)
+  const hasNativeVideo = !!(lesson?.videoUrl && !String(lesson.videoUrl).startsWith('s3://'));
 
   // ── Load lesson ──────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -253,6 +286,16 @@ export function VideoConversationLesson() {
     setIsMuted(!isMuted);
   };
 
+  // Tốc độ phát: 0.75x, 1x, 1.25x
+  const setPlaybackRateVideo = useCallback((rate: number) => {
+    setPlaybackRate(rate);
+    if (ytVideoId && ytPlayerRef.current?.setPlaybackRate) {
+      ytPlayerRef.current.setPlaybackRate(rate);
+    } else if (videoRef.current) {
+      videoRef.current.playbackRate = rate;
+    }
+  }, [ytVideoId]);
+
   const handleComplete = async () => {
     try {
       await apiService.student.completeLesson(lessonId!, 100);
@@ -261,6 +304,74 @@ export function VideoConversationLesson() {
     toast.success('Hoàn thành bài học!');
     navigate(-1);
   };
+
+  // ── Tra từ vựng: click vào từ để xem nghĩa + IPA ─────────────────────────────
+  const handleWordClick = useCallback(
+    async (rawWord: string, ipaFromSentence?: string, viHint?: string) => {
+      const clean = rawWord.replace(/^[^a-zA-Z0-9']+|[^a-zA-Z0-9']+$/g, '');
+      if (!clean) return;
+      setSelectedWord({ text: clean, ipa: ipaFromSentence, meaning: viHint });
+      setWordLoading(true);
+      try {
+        const res = await apiService.vocabulary.search(clean.toLowerCase());
+        const list = res.data?.data ?? [];
+        if (Array.isArray(list) && list.length > 0) {
+          const first = list[0];
+          const firstMeaning =
+            Array.isArray(first.meanings) && first.meanings.length > 0
+              ? first.meanings[0].def || first.meanings[0].definition
+              : undefined;
+          setSelectedWord((prev) =>
+            prev && prev.text.toLowerCase() === clean.toLowerCase()
+              ? {
+                  ...prev,
+                  ipa: prev.ipa || first.ipa || first.phonetic,
+                  meaning: firstMeaning || prev.meaning,
+                }
+              : prev
+          );
+        }
+      } catch {
+        // fallback: giữ meaning từ viHint nếu có
+      } finally {
+        setWordLoading(false);
+      }
+    },
+    []
+  );
+
+  // ── Phân tích ngữ pháp câu: Accordion — click mở/đóng ───────────────────────
+  const handleGrammarExplain = useCallback(
+    async (idx: number, text: string) => {
+      if (!text.trim()) return;
+      // Toggle: đang mở cùng câu thì đóng
+      if (grammarExplainIdx === idx) {
+        setGrammarExplainIdx(null);
+        return;
+      }
+      setGrammarExplainIdx(idx);
+      setGrammarExplainText('Đang phân tích cấu trúc ngữ pháp câu này...');
+      try {
+        const res = await apiService.ai.chat({
+          messages: [
+            {
+              role: 'user',
+              content:
+                'Phân tích ngữ pháp câu tiếng Anh sau, giải thích ngắn gọn bằng tiếng Việt, tập trung vào thì, cấu trúc câu, và cụm từ quan trọng:\n\n"' +
+                text +
+                '"',
+            },
+          ],
+          lessonContext: lesson?.title || 'Video conversation',
+        });
+        const content = res.data?.data?.content || res.data?.data || '';
+        setGrammarExplainText(content || 'Không nhận được phân tích từ hệ thống.');
+      } catch {
+        setGrammarExplainText('Có lỗi khi gọi phân tích ngữ pháp. Thử lại sau.');
+      }
+    },
+    [lesson?.title, grammarExplainIdx]
+  );
 
   // ── Thoại theo: thu âm từng câu và gọi API chấm phát âm ────────────────────
   const startRecordingForSentence = useCallback(async (sentenceIndex: number) => {
@@ -290,9 +401,24 @@ export function VideoConversationLesson() {
           const res = await apiService.pronunciation.getScore(Number(lessonId), sentenceIndex, blob);
           const data = res.data?.data;
           if (data) {
-            setSentenceScores((prev) => ({ ...prev, [sentenceIndex]: data }));
-            const overall = overallFromResponse(data);
-            toast.success(`Câu ${sentenceIndex + 1}: ${overall} điểm`);
+            setSentenceScores((prev) => {
+              const next = { ...prev, [sentenceIndex]: data };
+              const scores = Object.values(next);
+              const avg =
+                scores.length > 0
+                  ? Math.round(
+                      scores.reduce((sum, s) => sum + overallFromResponse(s), 0) / scores.length
+                    )
+                  : 0;
+              const thisOverall = overallFromResponse(data);
+              toast.success(`Câu ${sentenceIndex + 1}: ${thisOverall} điểm`);
+              if (!autoCompleted && avg >= 80) {
+                setAutoCompleted(true);
+                toast.success(`Điểm trung bình ${avg}%. Hệ thống tự động hoàn thành bài học!`);
+                handleComplete();
+              }
+              return next;
+            });
           } else {
             toast.error('Không nhận được kết quả chấm điểm');
           }
@@ -330,10 +456,15 @@ export function VideoConversationLesson() {
     <div className="min-h-screen w-full" style={{ backgroundColor: 'var(--page-bg)' }}>
       <div className="max-w-6xl mx-auto p-4 lg:p-6 space-y-6">
 
-        {/* ── Header ── */}
+        {/* ── Header: nút Quay lại tinh tế + khoảng cách rõ ràng ── */}
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <Button variant="ghost" onClick={() => navigate(-1)} className="gap-2 -ml-2 text-muted-foreground hover:text-foreground">
-            <ArrowLeft className="w-4 h-4" /> Quay lại
+          <Button
+            variant="ghost"
+            onClick={() => navigate(-1)}
+            className="gap-2 -ml-2 text-muted-foreground hover:text-foreground hover:bg-muted/50"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Quay lại
           </Button>
           <div className="flex items-center gap-2">
             <Badge variant="secondary" className="font-medium">VIDEO</Badge>
@@ -341,20 +472,20 @@ export function VideoConversationLesson() {
           </div>
         </div>
 
-        <div>
+        <div className="mb-6">
           <h1 className="text-xl font-bold text-foreground">{lesson?.title ?? 'Bài học Video'}</h1>
-          {lesson?.description && <p className="text-sm text-muted-foreground mt-0.5">{lesson.description}</p>}
+          {lesson?.description && <p className="text-sm text-muted-foreground mt-1">{lesson.description}</p>}
         </div>
 
-        {/* ── Display Toggles ── */}
+        {/* ── Toolbar: nền #F8F9FB, một màu active Indigo ── */}
         {transcript.length > 0 && (
-          <div className="flex flex-wrap items-center gap-2 p-4 rounded-2xl border bg-card shadow-sm">
-            <span className="text-xs font-semibold text-muted-foreground mr-1">Hiển thị:</span>
-            <TogglePill active={showOverlaySub} onClick={() => setShowOverlaySub(v => !v)} label="📺 Subtitle video" activeColor="bg-primary text-primary-foreground" />
-            <TogglePill active={showScript} onClick={() => setShowScript(v => !v)} label="📄 Script" activeColor="bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300" />
-            <TogglePill active={showVI} onClick={() => setShowVI(v => !v)} label="🇻🇳 Dịch tiếng Việt" activeColor="bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300" />
-            <TogglePill active={showIPA} onClick={() => setShowIPA(v => !v)} label="/IPA/ câu" activeColor="bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300" />
-            <TogglePill active={showWordIPA} onClick={() => setShowWordIPA(v => !v)} label="🔤 IPA từng từ" activeColor="bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300" />
+          <div className="flex flex-wrap items-center gap-2 p-4 rounded-xl border border-border/80 bg-[#F8F9FB] dark:bg-gray-900/50">
+            <span className="text-xs font-medium text-muted-foreground mr-1">Hiển thị:</span>
+            <TogglePill active={showOverlaySub} onClick={() => setShowOverlaySub(v => !v)} label="Subtitle video" />
+            <TogglePill active={showScript} onClick={() => setShowScript(v => !v)} label="Script" />
+            <TogglePill active={showVI} onClick={() => setShowVI(v => !v)} label="Dịch tiếng Việt" />
+            <TogglePill active={showIPA} onClick={() => setShowIPA(v => !v)} label="IPA câu" />
+            <TogglePill active={showWordIPA} onClick={() => setShowWordIPA(v => !v)} label="IPA từng từ" />
           </div>
         )}
 
@@ -389,7 +520,7 @@ export function VideoConversationLesson() {
 
                 {ytVideoId ? (
                   <div id="yt-player" className="w-full h-full" />
-                ) : lesson?.videoUrl ? (
+                ) : hasNativeVideo ? (
                   <video
                     ref={videoRef}
                     className="w-full h-full object-contain"
@@ -416,10 +547,18 @@ export function VideoConversationLesson() {
                       {showWordIPA && currentLine.ipa ? (
                         <div className="flex flex-wrap justify-center gap-x-2 gap-y-0.5">
                           {buildWordIpaPairs(currentLine.text, currentLine.ipa).map((wp, i) => (
-                            <span key={i} className="inline-flex flex-col items-center">
+                            <button
+                              key={i}
+                              type="button"
+                              className="inline-flex flex-col items-center px-0.5 focus:outline-none focus-visible:outline-none pointer-events-auto"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleWordClick(wp.word, wp.ipa, currentLine.viText);
+                              }}
+                            >
                               <span className="text-white text-base font-medium leading-tight">{wp.word}</span>
                               {wp.ipa && <span className="text-green-300 text-xs leading-tight">{wp.ipa}</span>}
-                            </span>
+                            </button>
                           ))}
                         </div>
                       ) : (
@@ -462,24 +601,52 @@ export function VideoConversationLesson() {
                         <Button size="icon" variant="ghost" onClick={toggleMute} className="text-white hover:bg-white/20 h-7 w-7">
                           {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
                         </Button>
-                        <span className="text-white text-xs">{formatTime(currentMs)} / {formatTime(duration)}</span>
+                        <span className="text-white text-xs tabular-nums">{formatTime(currentMs)} / {formatTime(duration)}</span>
+                        {/* Tốc độ phát */}
+                        <div className="flex items-center gap-0.5 ml-1">
+                          {[0.75, 1, 1.25].map((r) => (
+                            <button
+                              key={r}
+                              type="button"
+                              onClick={() => setPlaybackRateVideo(r)}
+                              className={`min-w-[2rem] py-0.5 px-1.5 rounded text-[11px] font-medium transition-colors ${
+                                playbackRate === r ? 'bg-white text-black' : 'text-white/80 hover:bg-white/20'
+                              }`}
+                            >
+                              {r}x
+                            </button>
+                          ))}
+                        </div>
                       </div>
                     </div>
                   </div>
                 )}
               </div>
 
-              {/* YouTube toolbar */}
+              {/* YouTube toolbar: play, mute, tốc độ */}
               {ytVideoId && (
-                <div className="bg-muted/80 px-4 py-2 flex items-center gap-2 text-xs border-t">
-                  <span className="text-muted-foreground">Controls:</span>
+                <div className="px-4 py-2 flex items-center gap-2 text-xs border-t bg-muted/80">
                   <Button size="icon" variant="ghost" onClick={togglePlay} className="h-6 w-6">
                     {isPlaying ? <Pause className="w-3 h-3" /> : <Play className="w-3 h-3" />}
                   </Button>
                   <Button size="icon" variant="ghost" onClick={toggleMute} className="h-6 w-6">
                     {isMuted ? <VolumeX className="w-3 h-3" /> : <Volume2 className="w-3 h-3" />}
                   </Button>
-                  <span className="text-muted-foreground ml-auto tabular-nums">{formatTime(currentMs)}</span>
+                  <span className="text-muted-foreground tabular-nums">{formatTime(currentMs)}</span>
+                  <div className="flex items-center gap-0.5 ml-2">
+                    {[0.75, 1, 1.25].map((r) => (
+                      <button
+                        key={r}
+                        type="button"
+                        onClick={() => setPlaybackRateVideo(r)}
+                        className={`min-w-[2rem] py-0.5 px-1 rounded text-[11px] font-medium ${
+                          playbackRate === r ? 'bg-[#4F46E5] text-white' : 'text-muted-foreground hover:bg-muted'
+                        }`}
+                      >
+                        {r}x
+                      </button>
+                    ))}
+                  </div>
                 </div>
               )}
             </Card>
@@ -514,10 +681,10 @@ export function VideoConversationLesson() {
                           mode === 'shadowing' ? '' : 'cursor-pointer'
                         } ${
                           isActive && mode !== 'shadowing'
-                            ? 'bg-primary/10 border-l-2 border-l-primary'
+                            ? 'border-l-2 border-l-[#4F46E5] bg-[#EEF2FF] dark:bg-indigo-950/40'
                             : mode === 'shadowing' && score
                               ? getScoreBg(overallFromResponse(score))
-                              : 'hover:bg-muted/50'
+                              : 'hover:bg-muted/40'
                         }`}
                       >
                         <div className="flex items-start gap-2">
@@ -531,7 +698,15 @@ export function VideoConversationLesson() {
                             {pairs ? (
                               <div className="flex flex-wrap gap-x-1.5 gap-y-0.5">
                                 {pairs.map((wp, i) => (
-                                  <span key={i} className="inline-flex flex-col items-center">
+                                  <button
+                                    key={i}
+                                    type="button"
+                                    className="inline-flex flex-col items-center px-0.5 text-left focus:outline-none focus-visible:outline-none"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleWordClick(wp.word, wp.ipa, line.viText);
+                                    }}
+                                  >
                                     <span className={`text-sm leading-tight ${isActive && mode !== 'shadowing' ? 'font-semibold text-primary' : 'text-foreground'}`}>
                                       {wp.word}
                                     </span>
@@ -540,7 +715,7 @@ export function VideoConversationLesson() {
                                         {wp.ipa}
                                       </span>
                                     )}
-                                  </span>
+                                  </button>
                                 ))}
                               </div>
                             ) : (
@@ -562,6 +737,31 @@ export function VideoConversationLesson() {
                                 {line.viText}
                               </p>
                             )}
+
+                            {/* Ngữ pháp: Accordion — chỉ hiện nội dung khi mở ── */}
+                            <div className="mt-1">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleGrammarExplain(idx, line.text);
+                                }}
+                                className="inline-flex items-center gap-1.5 h-7 px-2 rounded-md text-[11px] font-medium text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+                              >
+                                <BookOpen className="w-3 h-3" />
+                                Ngữ pháp
+                                {grammarExplainIdx === idx ? (
+                                  <ChevronDown className="w-3 h-3" />
+                                ) : (
+                                  <ChevronRight className="w-3 h-3" />
+                                )}
+                              </button>
+                              {grammarExplainIdx === idx && grammarExplainText && (
+                                <div className="mt-1.5 rounded-lg px-3 py-2 text-[11px] text-foreground/90 whitespace-pre-line border border-amber-200/80 dark:border-amber-800/60 bg-[#FFFBEB] dark:bg-amber-950/30">
+                                  {grammarExplainText}
+                                </div>
+                              )}
+                            </div>
 
                             {/* Thoại theo: nút Thu âm + điểm phát âm cụ thể */}
                             {mode === 'shadowing' && (
@@ -622,6 +822,50 @@ export function VideoConversationLesson() {
                     );
                   })}
                 </div>
+
+                {/* Word info panel + Lưu từ vựng */}
+                {selectedWord && (
+                  <div className="border-t px-3 py-2.5 text-xs flex items-start gap-3 bg-[#F8F9FB] dark:bg-gray-900/50">
+                    <div className="mt-0.5 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full text-[10px] font-semibold" style={{ backgroundColor: '#EEF2FF', color: ACTIVE_COLOR }}>
+                      {selectedWord.text.charAt(0).toUpperCase()}
+                    </div>
+                    <div className="flex-1 min-w-0 space-y-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-semibold text-foreground">{selectedWord.text}</span>
+                        {selectedWord.ipa && (
+                          <span className="font-mono text-[11px] text-muted-foreground">
+                            /{selectedWord.ipa}/
+                          </span>
+                        )}
+                      </div>
+                      {wordLoading ? (
+                        <p className="text-[11px] text-muted-foreground flex items-center gap-1">
+                          <Loader2 className="w-3 h-3 animate-spin" />
+                          Đang tra cứu từ vựng...
+                        </p>
+                      ) : (
+                        selectedWord.meaning && (
+                          <p className="text-[11px] text-muted-foreground">
+                            Nghĩa: <span className="text-foreground">{selectedWord.meaning}</span>
+                          </p>
+                        )
+                      )}
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-7 gap-1.5 text-[11px] mt-1"
+                        onClick={() => {
+                          toast.success(`Đã lưu "${selectedWord.text}" vào bộ sưu tập từ vựng.`);
+                          // TODO: gọi API lưu UserVocabularyProgress khi backend hỗ trợ
+                        }}
+                      >
+                        <BookmarkPlus className="w-3 h-3" />
+                        Lưu từ vựng
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </Card>
             </div>
           )}

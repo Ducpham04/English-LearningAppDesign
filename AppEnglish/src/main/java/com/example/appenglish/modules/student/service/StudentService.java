@@ -7,9 +7,13 @@ import com.example.appenglish.entity.UserSessionProgress;
 import com.example.appenglish.modules.auth.service.UserConverterService;
 import com.example.appenglish.modules.curriculum.dto.CurriculumDto;
 import com.example.appenglish.modules.curriculum.service.CurriculumService;
+import com.example.appenglish.modules.lesson.service.LessonService;
 import com.example.appenglish.modules.student.dto.SessionProgressDto;
 import com.example.appenglish.modules.student.dto.StudentDashboardDto;
 import com.example.appenglish.modules.userDetail.dto.UserDataDto;
+import com.example.appenglish.repository.ClassLessonAssignmentRepository;
+import com.example.appenglish.repository.ClassroomRepository;
+import com.example.appenglish.repository.ClassStudentRepository;
 import com.example.appenglish.repository.LessonRepository;
 import com.example.appenglish.repository.SessionRepository;
 import com.example.appenglish.repository.UserLessonProgressRepository;
@@ -22,6 +26,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -36,11 +41,16 @@ public class StudentService {
     private final UserSessionProgressRepository userSessionProgressRepository;
     private final LessonRepository lessonRepository;
     private final SessionRepository sessionRepository;
+    private final ClassStudentRepository classStudentRepository;
+    private final ClassroomRepository classroomRepository;
+    private final ClassLessonAssignmentRepository classLessonAssignmentRepository;
+    private final LessonService lessonService;
 
     public StudentDashboardDto getDashboard() {
         User user = getCurrentUser();
         UserDataDto userDto = userConverterService.convertUserToDataDto(user);
         List<CurriculumDto> courses = curriculumService.getAll();
+        List<StudentDashboardDto.EnrolledClassDto> enrolledClasses = getEnrolledClassesList(user.getId());
 
         int xp = user.getXp() != null ? user.getXp() : 0;
         int level = user.getLevel() != null ? user.getLevel() : 1;
@@ -49,6 +59,7 @@ public class StudentService {
         return StudentDashboardDto.builder()
                 .user(userDto)
                 .courses(courses)
+                .enrolledClasses(enrolledClasses)
                 .stats(StudentDashboardDto.DashboardStatsDto.builder()
                         .totalXP(xp)
                         .currentLevel(level)
@@ -60,6 +71,57 @@ public class StudentService {
                         .badgesEarned(0)
                         .build())
                 .build();
+    }
+
+    /** Lớp mà học sinh đã ghi danh (cho dashboard và GET /student/classes). */
+    public List<StudentDashboardDto.EnrolledClassDto> getEnrolledClasses() {
+        User user = getCurrentUser();
+        return getEnrolledClassesList(user.getId());
+    }
+
+    private List<StudentDashboardDto.EnrolledClassDto> getEnrolledClassesList(String studentId) {
+        List<StudentDashboardDto.EnrolledClassDto> out = new ArrayList<>();
+        for (var cs : classStudentRepository.findByStudent_Id(studentId)) {
+            var c = cs.getClassroom();
+            if (c == null) continue;
+            int assignmentCount = classLessonAssignmentRepository.findByClassroom_IdOrderByOrderIndexAscIdAsc(c.getId()).size();
+            int studentCount = classStudentRepository.findByClassroom_Id(c.getId()).size();
+            out.add(StudentDashboardDto.EnrolledClassDto.builder()
+                    .id(c.getId())
+                    .name(c.getName())
+                    .teacherName(c.getTeacher() != null ? c.getTeacher().getFullName() : null)
+                    .courseId(c.getCourse() != null ? c.getCourse().getId() : null)
+                    .courseTitle(c.getCourse() != null ? c.getCourse().getTitle() : null)
+                    .startDate(c.getStartDate() != null ? c.getStartDate().toString() : null)
+                    .endDate(c.getEndDate() != null ? c.getEndDate().toString() : null)
+                    .status(c.getStatus() != null ? c.getStatus().name() : null)
+                    .studentCount(studentCount)
+                    .assignmentCount(assignmentCount)
+                    .build());
+        }
+        return out;
+    }
+
+    /** Bài tập giao trong lớp (chỉ cho lớp mà học sinh đã ghi danh). */
+    public List<com.example.appenglish.modules.teacher.dto.AssignmentDto> getClassAssignments(Long classId) {
+        User user = getCurrentUser();
+        if (!classStudentRepository.existsByClassroom_IdAndStudent_Id(classId, user.getId())) {
+            throw new RuntimeException("Not enrolled in this class");
+        }
+        return classLessonAssignmentRepository.findByClassroom_IdOrderByOrderIndexAscIdAsc(classId).stream()
+                .map(a -> com.example.appenglish.modules.teacher.dto.AssignmentDto.builder()
+                        .id(a.getId())
+                        .classId(a.getClassroom().getId())
+                        .lessonId(a.getLesson().getId())
+                        .title(a.getTitle())
+                        .description(a.getDescription())
+                        .dueAt(a.getDueAt())
+                        .maxScore(a.getMaxScore())
+                        .isRequired(a.getIsRequired() != null ? a.getIsRequired() : false)
+                        .orderIndex(a.getOrderIndex())
+                        .lesson(lessonService.getById(a.getLesson().getId()))
+                        .build())
+                .collect(Collectors.toList());
     }
 
     public List<CurriculumDto> getCourses() {

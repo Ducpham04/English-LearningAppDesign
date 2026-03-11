@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card } from '@/app/components/ui/card';
 import { Button } from '@/app/components/ui/button';
 import { Input } from '@/app/components/ui/input';
@@ -40,6 +40,7 @@ import {
   DialogTrigger,
 } from '@/app/components/ui/dialog';
 import { Label } from '@/app/components/ui/label';
+import apiService from '@/services/apiService';
 
 interface User {
   id: string;
@@ -58,58 +59,60 @@ export function UserManagement() {
   const [roleFilter, setRoleFilter] = useState<'all' | User['role']>('all');
   const [statusFilter, setStatusFilter] = useState<'all' | User['status']>('all');
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [users, setUsers] = useState<User[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
-  const users: User[] = [
-    {
-      id: '1',
-      name: 'Nguyễn Văn A',
-      email: 'nguyenvana@email.com',
-      role: 'student',
-      status: 'active',
-      registeredAt: '2025-09-01',
-      lastActive: '2026-01-16',
-      level: 8,
-    },
-    {
-      id: '2',
-      name: 'Trần Thị B',
-      email: 'tranthib@email.com',
-      role: 'teacher',
-      status: 'active',
-      registeredAt: '2025-08-15',
-      lastActive: '2026-01-16',
-      classes: ['Class 10A', 'Class 10B'],
-    },
-    {
-      id: '3',
-      name: 'Lê Văn C',
-      email: 'levanc@email.com',
-      role: 'student',
-      status: 'suspended',
-      registeredAt: '2025-10-05',
-      lastActive: '2026-01-10',
-      level: 4,
-    },
-    {
-      id: '4',
-      name: 'Phạm Thị D',
-      email: 'phamthid@email.com',
-      role: 'admin',
-      status: 'active',
-      registeredAt: '2025-07-01',
-      lastActive: '2026-01-16',
-    },
-    {
-      id: '5',
-      name: 'Hoàng Văn E',
-      email: 'hoangvane@email.com',
-      role: 'student',
-      status: 'inactive',
-      registeredAt: '2025-11-20',
-      lastActive: '2025-12-30',
-      level: 5,
-    },
-  ];
+  useEffect(() => {
+    const loadUsers = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const res = await apiService.user.getAllUsers();
+        const raw = res.data?.data ?? res.data ?? [];
+        const mapped: User[] = raw.map((u: any) => {
+          const roleRaw = (u.role?.name ?? u.role ?? 'STUDENT').toString().toUpperCase();
+          let role: User['role'];
+          if (roleRaw === 'TEACHER') role = 'teacher';
+          else if (roleRaw === 'ADMIN') role = 'admin';
+          else role = 'student';
+
+          const status: User['status'] = 'active';
+
+          return {
+            id: String(u.id),
+            name: u.fullName ?? u.name ?? u.email ?? 'User',
+            email: u.email ?? '',
+            role,
+            status,
+            registeredAt: u.createdAt ?? new Date().toISOString(),
+            lastActive:
+              u.lastLoginAt ??
+              u.updatedAt ??
+              u.createdAt ??
+              new Date().toISOString(),
+            level: u.level,
+            classes: Array.isArray(u.classes)
+              ? u.classes.map((c: any) => c.name ?? String(c))
+              : [],
+          };
+        });
+        setUsers(mapped);
+      } catch (e: any) {
+        const msg =
+          e?.response?.data?.message ??
+          e?.message ??
+          'Không tải được danh sách người dùng';
+        setError(msg);
+        setUsers([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadUsers();
+  }, []);
 
   const filteredUsers = users.filter((user) => {
     const matchesSearch =
@@ -128,6 +131,25 @@ export function UserManagement() {
     active: users.filter((u) => u.status === 'active').length,
   };
 
+  const hasSelection = selectedIds.size > 0;
+
+  const toggleSelectAll = () => {
+    if (hasSelection) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filteredUsers.map((u) => u.id)));
+    }
+  };
+
+  const toggleSelectOne = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
   const roleColors = {
     student: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
     teacher: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400',
@@ -141,9 +163,9 @@ export function UserManagement() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-950 pb-20 md:pb-6">
+    <div className="min-h-screen bg-[var(--page-bg)] pb-20 md:pb-6">
       {/* Header */}
-      <div className="bg-gradient-to-br from-red-400 to-red-600 text-white p-6 md:p-8">
+      <div className="bg-gradient-to-br from-slate-800 to-slate-900 text-white p-6 md:p-8">
         <div className="max-w-7xl mx-auto">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-3">
@@ -152,12 +174,12 @@ export function UserManagement() {
               </div>
               <div>
                 <h1 className="text-3xl font-bold">User Management</h1>
-                <p className="text-red-50">Manage all platform users</p>
+                <p className="text-slate-200 text-sm">Quản lý toàn bộ người dùng trên hệ thống</p>
               </div>
             </div>
             <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
               <DialogTrigger asChild>
-                <Button className="bg-white text-red-600 hover:bg-red-50 gap-2">
+                <Button className="bg-white text-slate-800 hover:bg-slate-100 gap-2">
                   <UserPlus className="h-5 w-5" />
                   Add User
                 </Button>
@@ -206,48 +228,48 @@ export function UserManagement() {
 
           {/* Stats */}
           <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-            <Card className="bg-white/10 backdrop-blur-sm border-white/20 p-4">
+            <Card className="bg-white/5 backdrop-blur-sm border-white/10 p-4">
               <div className="flex items-center gap-3">
                 <Users className="h-8 w-8 text-white" />
                 <div>
                   <div className="text-2xl font-bold">{stats.total}</div>
-                  <div className="text-sm text-red-50">Total Users</div>
+                  <div className="text-sm text-slate-200">Tổng user</div>
                 </div>
               </div>
             </Card>
-            <Card className="bg-white/10 backdrop-blur-sm border-white/20 p-4">
+            <Card className="bg-white/5 backdrop-blur-sm border-white/10 p-4">
               <div className="flex items-center gap-3">
-                <UserCog className="h-8 w-8 text-green-400" />
+                <UserCog className="h-8 w-8 text-emerald-300" />
                 <div>
                   <div className="text-2xl font-bold">{stats.students}</div>
-                  <div className="text-sm text-red-50">Students</div>
+                  <div className="text-sm text-slate-200">Học viên</div>
                 </div>
               </div>
             </Card>
-            <Card className="bg-white/10 backdrop-blur-sm border-white/20 p-4">
+            <Card className="bg-white/5 backdrop-blur-sm border-white/10 p-4">
               <div className="flex items-center gap-3">
-                <UserCog className="h-8 w-8 text-purple-400" />
+                <UserCog className="h-8 w-8 text-indigo-300" />
                 <div>
                   <div className="text-2xl font-bold">{stats.teachers}</div>
-                  <div className="text-sm text-red-50">Teachers</div>
+                  <div className="text-sm text-slate-200">Giáo viên</div>
                 </div>
               </div>
             </Card>
-            <Card className="bg-white/10 backdrop-blur-sm border-white/20 p-4">
+            <Card className="bg-white/5 backdrop-blur-sm border-white/10 p-4">
               <div className="flex items-center gap-3">
-                <Shield className="h-8 w-8 text-yellow-400" />
+                <Shield className="h-8 w-8 text-amber-300" />
                 <div>
                   <div className="text-2xl font-bold">{stats.admins}</div>
-                  <div className="text-sm text-red-50">Admins</div>
+                  <div className="text-sm text-slate-200">Admin</div>
                 </div>
               </div>
             </Card>
-            <Card className="bg-white/10 backdrop-blur-sm border-white/20 p-4">
+            <Card className="bg-white/5 backdrop-blur-sm border-white/10 p-4">
               <div className="flex items-center gap-3">
-                <TrendingUp className="h-8 w-8 text-blue-400" />
+                <TrendingUp className="h-8 w-8 text-cyan-300" />
                 <div>
                   <div className="text-2xl font-bold">{stats.active}</div>
-                  <div className="text-sm text-red-50">Active</div>
+                  <div className="text-sm text-slate-200">Đang hoạt động</div>
                 </div>
               </div>
             </Card>
@@ -257,6 +279,30 @@ export function UserManagement() {
 
       {/* Content */}
       <div className="max-w-7xl mx-auto p-4 md:p-6">
+        {error && (
+          <Card className="mb-4 border-red-200 bg-red-50 text-red-700">
+            <div className="p-3 text-sm">{error}</div>
+          </Card>
+        )}
+        {/* Bulk actions */}
+        {hasSelection && (
+          <Card className="mb-4 p-3 flex items-center justify-between border-primary/30 bg-primary/5">
+            <span className="text-sm text-foreground">
+              Đã chọn <strong>{selectedIds.size}</strong> user
+            </span>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" className="gap-1 text-slate-700">
+                <Ban className="h-3 w-3" />
+                Ẩn đã chọn
+              </Button>
+              <Button variant="outline" size="sm" className="gap-1 text-destructive">
+                <Trash2 className="h-3 w-3" />
+                Xóa đã chọn
+              </Button>
+            </div>
+          </Card>
+        )}
+
         {/* Filters */}
         <Card className="p-4 mb-6">
           <div className="flex flex-col md:flex-row gap-4">
@@ -300,6 +346,14 @@ export function UserManagement() {
             <table className="w-full">
               <thead className="bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
                 <tr>
+                  <th className="px-4 py-3">
+                    <input
+                      type="checkbox"
+                      checked={hasSelection && selectedIds.size === filteredUsers.length}
+                      onChange={toggleSelectAll}
+                      className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                    />
+                  </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                     User
                   </th>
@@ -322,7 +376,20 @@ export function UserManagement() {
               </thead>
               <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-800">
                 {filteredUsers.map((user) => (
-                  <tr key={user.id} className="hover:bg-gray-50 dark:hover:bg-gray-800">
+                  <tr
+                    key={user.id}
+                    className={`hover:bg-gray-50 dark:hover:bg-gray-800 ${
+                      selectedIds.has(user.id) ? 'bg-primary/5' : ''
+                    }`}
+                  >
+                    <td className="px-4 py-4">
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(user.id)}
+                        onChange={() => toggleSelectOne(user.id)}
+                        className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                      />
+                    </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
                         <div className={`h-10 w-10 rounded-xl flex items-center justify-center text-white font-bold ${

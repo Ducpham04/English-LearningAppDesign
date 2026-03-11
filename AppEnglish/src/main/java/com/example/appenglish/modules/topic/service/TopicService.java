@@ -2,12 +2,15 @@ package com.example.appenglish.modules.topic.service;
 
 import com.example.appenglish.entity.Session;
 import com.example.appenglish.entity.Topic;
+import com.example.appenglish.common.exception.ApiException;
+import com.example.appenglish.common.exception.ConstraintMessageHelper;
 import com.example.appenglish.modules.session.dto.SessionCreateRequest;
 import com.example.appenglish.modules.topic.dto.TopicCreateRequest;
 import com.example.appenglish.modules.topic.dto.TopicDto;
 import com.example.appenglish.repository.SessionRepository;
 import com.example.appenglish.repository.TopicRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -74,7 +77,12 @@ public class TopicService {
     }
 
     public void delete(Long id) {
-        topicRepository.deleteById(id);
+        try {
+            topicRepository.deleteById(id);
+        } catch (DataIntegrityViolationException e) {
+            String detail = ConstraintMessageHelper.buildDeleteConstraintMessage(e, "chủ đề (topic)");
+            throw new ApiException(detail, "CONSTRAINT_VIOLATION");
+        }
     }
 
     /** Tạo session trong topic */

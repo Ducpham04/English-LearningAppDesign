@@ -10,12 +10,12 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/app/components/ui/dialog';
+import { AdminPageLayout } from '@/app/components/layout/AdminPageLayout';
 import {
   BookOpen,
   Plus,
   ChevronDown,
   ChevronRight,
-  Edit,
   Trash2,
   ListOrdered,
   Loader2,
@@ -180,7 +180,8 @@ export function AdminCurriculumManagement() {
       toast.success('Đã xóa lộ trình');
       loadCurriculums();
     } catch (e: any) {
-      toast.error(e?.response?.data?.message || 'Xóa thất bại');
+      const msg = e?.response?.data?.message ?? e?.message ?? 'Xóa thất bại';
+      toast.error(msg);
     }
   };
 
@@ -191,47 +192,38 @@ export function AdminCurriculumManagement() {
       toast.success('Đã xóa buổi học');
       loadSessionsForCourse(courseId);
     } catch (e: any) {
-      toast.error(e?.response?.data?.message || 'Xóa thất bại');
+      const msg = e?.response?.data?.message ?? e?.message ?? 'Xóa thất bại';
+      toast.error(msg);
     }
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-950 pb-20 md:pb-6">
-      <div className="bg-gradient-to-br from-teal-500 to-cyan-600 text-white p-6 md:p-8">
-        <div className="max-w-5xl mx-auto">
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-3">
-              <div className="bg-white/20 p-3 rounded-2xl backdrop-blur-sm">
-                <ListOrdered className="h-8 w-8" />
-              </div>
-              <div>
-                <h1 className="text-3xl font-bold">Lộ trình học</h1>
-                <p className="text-teal-50">Quản lý khóa học và buổi học</p>
-              </div>
-            </div>
-            <Button
-              onClick={openAddCurriculum}
-              className="bg-white text-teal-600 hover:bg-teal-50 gap-2"
-            >
-              <Plus className="h-5 w-5" />
-              Thêm lộ trình
-            </Button>
-          </div>
-        </div>
-      </div>
-
-      <div className="max-w-5xl mx-auto p-4 md:p-6">
+    <>
+    <AdminPageLayout
+      title="Lộ trình học (Courses)"
+      subtitle="Quản lý các khóa học và buổi học bên trong"
+      icon={ListOrdered}
+      action={
+        <Button onClick={openAddCurriculum} className="gap-2">
+          <Plus className="h-5 w-5" />
+          Thêm lộ trình
+        </Button>
+      }
+      stats={[
+        { label: 'Lộ trình', value: curriculums.length },
+      ]}
+    >
         {loading ? (
           <div className="flex items-center justify-center py-12">
-            <Loader2 className="h-10 w-10 animate-spin text-teal-500" />
+            <Loader2 className="h-10 w-10 animate-spin text-primary" />
           </div>
         ) : (
           <div className="space-y-4">
             {curriculums.length === 0 ? (
-              <Card className="p-12 text-center">
-                <BookOpen className="h-12 w-12 mx-auto text-gray-400 mb-4" />
-                <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">Chưa có lộ trình nào</h3>
-                <p className="text-gray-600 dark:text-gray-400 mb-6">Thêm lộ trình học để học viên có thể đăng ký và học.</p>
+              <Card className="p-12 text-center border-border bg-card">
+                <BookOpen className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                <h3 className="text-xl font-bold text-foreground mb-2">Chưa có lộ trình nào</h3>
+                <p className="text-muted-foreground mb-6">Thêm lộ trình học để học viên có thể đăng ký và học.</p>
                 <Button onClick={openAddCurriculum} className="gap-2">
                   <Plus className="h-5 w-5" />
                   Thêm lộ trình đầu tiên
@@ -242,20 +234,20 @@ export function AdminCurriculumManagement() {
                 const sessions = sessionsByCourse[course.id] ?? [];
                 const isExpanded = expandedCourseId === course.id;
                 return (
-                  <Card key={course.id} className="overflow-hidden">
+                  <Card key={course.id} className="overflow-hidden border-border bg-card text-card-foreground">
                     <div
-                      className="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/50"
+                      className="flex items-center justify-between p-4 cursor-pointer hover:bg-muted/50"
                       onClick={() => setExpandedCourseId(isExpanded ? null : course.id)}
                     >
                       <div className="flex items-center gap-3">
                         {isExpanded ? (
-                          <ChevronDown className="h-5 w-5 text-teal-600" />
+                          <ChevronDown className="h-5 w-5 text-primary" />
                         ) : (
-                          <ChevronRight className="h-5 w-5 text-teal-600" />
+                          <ChevronRight className="h-5 w-5 text-primary" />
                         )}
                         <div>
-                          <h3 className="font-bold text-lg text-gray-900 dark:text-white">{course.title}</h3>
-                          <p className="text-sm text-gray-500 dark:text-gray-400">
+                          <h3 className="font-bold text-lg text-foreground">{course.title}</h3>
+                          <p className="text-sm text-muted-foreground">
                             {course.teacherName ? `GV: ${course.teacherName}` : 'Chưa gán giáo viên'}
                             {course.price != null && course.price > 0 && ` · ${course.price} đ`}
                           </p>
@@ -274,7 +266,7 @@ export function AdminCurriculumManagement() {
                         <Button
                           size="sm"
                           variant="ghost"
-                          className="text-red-600 hover:text-red-700"
+                          className="text-destructive hover:text-destructive"
                           onClick={() => handleDeleteCurriculum(course.id)}
                         >
                           <Trash2 className="h-4 w-4" />
@@ -282,9 +274,9 @@ export function AdminCurriculumManagement() {
                       </div>
                     </div>
                     {isExpanded && (
-                      <div className="border-t bg-gray-50 dark:bg-gray-900/50 px-4 py-3">
+                      <div className="border-t border-border bg-muted/30 px-4 py-3">
                         {sessions.length === 0 ? (
-                          <p className="text-sm text-gray-500 py-2">Chưa có buổi học. Nhấn &quot;Buổi học&quot; để thêm.</p>
+                          <p className="text-sm text-muted-foreground py-2">Chưa có buổi học. Nhấn &quot;Buổi học&quot; để thêm.</p>
                         ) : (
                           <ul className="space-y-2">
                             {sessions
@@ -292,15 +284,15 @@ export function AdminCurriculumManagement() {
                               .map((s) => (
                                 <li
                                   key={s.id}
-                                  className="flex items-center justify-between py-2 px-3 rounded-lg bg-white dark:bg-gray-800"
+                                  className="flex items-center justify-between py-2 px-3 rounded-lg bg-card border border-border"
                                 >
-                                  <span className="font-medium text-gray-900 dark:text-white">{s.title}</span>
+                                  <span className="font-medium text-foreground">{s.title}</span>
                                   <div className="flex items-center gap-2">
-                                    <span className="text-xs text-gray-500">{s.lessonCount ?? 0} bài</span>
+                                    <span className="text-xs text-muted-foreground">{s.lessonCount ?? 0} bài</span>
                                     <Button
                                       size="sm"
                                       variant="ghost"
-                                      className="text-red-600 h-8 w-8 p-0"
+                                      className="text-destructive h-8 w-8 p-0"
                                       onClick={() => handleDeleteSession(course.id, s.id)}
                                     >
                                       <Trash2 className="h-4 w-4" />
@@ -318,7 +310,7 @@ export function AdminCurriculumManagement() {
             )}
           </div>
         )}
-      </div>
+      </AdminPageLayout>
 
       {/* Modal: Thêm lộ trình */}
       <Dialog open={modalOpen === 'curriculum'} onOpenChange={(open) => !open && setModalOpen(null)}>
@@ -430,6 +422,6 @@ export function AdminCurriculumManagement() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </>
   );
 }

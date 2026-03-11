@@ -95,11 +95,13 @@
     - Dashboard, SessionOverview/Detail, LessonRouter, PronunciationLesson, VideoConversationLesson, AIConversationLesson, Tests.
     - Bài học hoàn thành gọi `student.completeLesson` + `invalidateProgress`.
   - Teacher/Admin:
-    - `AdminTopicManagement` – quản lý Topic/Curriculum/Session/Lesson/Test.
-    - Dùng `transcribe.youtube` và `transcribe.upload` để generate transcript cho video bài học.
+    - `AdminDashboard` – thống kê từ `/v1/admin/stats`, thao tác nhanh tới User/Topic/Session/Curriculum, theme đồng bộ với app.
+    - `AdminTopicManagement` – quản lý Topic/Curriculum/Session/Lesson/Test; accordion theo topic → session → lesson; dùng `transcribe.youtube` và `transcribe.upload` để generate transcript cho video bài học.
+    - `AdminSessionManagement` + `AdminCurriculumManagement` – layout admin thống nhất, load dữ liệu thật từ `/v1/sessions` và `/v1/curriculums`, refetch sau khi tạo/xóa.
+    - `UserManagement` – danh sách user từ `/v1/auth/users`, lọc theo role/status, UI bảng nâng cấp.
   - AI & Pronunciation:
     - `PronunciationLesson.tsx` – ghi âm thật, gửi audio blob lên `/api/pronunciation/score`, hiển thị điểm + feedback, complete lesson khi đạt ngưỡng.
-    - `VideoConversationLesson.tsx` – mode xem video & thoại theo, chấm từng câu.
+    - `VideoConversationLesson.tsx` – mode xem video & thoại theo, chấm từng câu; ưu tiên `youtubeUrl` hoặc `https` `videoUrl`, bỏ qua URI nội bộ dạng `s3://...` để tránh lỗi `ERR_UNKNOWN_URL_SCHEME`.
     - `AIConversationLesson.tsx` + `AIConversation.tsx` – hội thoại với AI, dùng `apiService.ai.chat`.
 
 ### 4. Upload Video & Transcript Flow (Updated)
@@ -120,6 +122,7 @@
      - Lỗi đọc file → 400 `UPLOAD_IO_ERROR`.
      - Lỗi Kafka/hàng đợi → 503 `QUEUE_UNAVAILABLE`.
      - Lỗi khác → 500 `UPLOAD_ERROR`.
+   - FE đã được fix `Content-Type: multipart/form-data` khi gọi `transcribe.upload` để tránh lỗi “No endpoint found for this URL and method” do sai Content-Type.
 
 3. **Worker / Consumer** (không nằm trong repo này) xử lý S3 URI, tạo transcript JSON gắn vào `LessonVideo`.
 

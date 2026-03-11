@@ -6,6 +6,7 @@ import com.example.appenglish.modules.student.dto.SessionProgressDto;
 import com.example.appenglish.modules.student.dto.StudentDashboardDto;
 import com.example.appenglish.modules.student.service.StudentService;
 import com.example.appenglish.modules.userDetail.dto.UserDataDto;
+import com.example.appenglish.modules.teacher.dto.AssignmentDto;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -77,6 +78,29 @@ public class StudentController {
             return ResponseEntity.ok(BaseResponse.ok(studentService.getParticipatedSessions(), "OK", req.getRequestURI()));
         } catch (Exception e) {
             return ResponseEntity.status(401).body(BaseResponse.error(e.getMessage(), "UNAUTHORIZED", req.getRequestURI()));
+        }
+    }
+
+    @GetMapping("/classes")
+    public ResponseEntity<BaseResponse<List<StudentDashboardDto.EnrolledClassDto>>> getMyClasses(HttpServletRequest req) {
+        try {
+            return ResponseEntity.ok(BaseResponse.ok(studentService.getEnrolledClasses(), "OK", req.getRequestURI()));
+        } catch (Exception e) {
+            return ResponseEntity.status(401).body(BaseResponse.error(e.getMessage(), "UNAUTHORIZED", req.getRequestURI()));
+        }
+    }
+
+    @GetMapping("/classes/{classId}/assignments")
+    public ResponseEntity<BaseResponse<List<AssignmentDto>>> getClassAssignments(
+            @PathVariable Long classId,
+            HttpServletRequest req) {
+        try {
+            return ResponseEntity.ok(BaseResponse.ok(studentService.getClassAssignments(classId), "OK", req.getRequestURI()));
+        } catch (RuntimeException e) {
+            if (e.getMessage().contains("Not enrolled")) {
+                return ResponseEntity.status(403).body(BaseResponse.error(e.getMessage(), "FORBIDDEN", req.getRequestURI()));
+            }
+            return ResponseEntity.status(404).body(BaseResponse.error(e.getMessage(), "NOT_FOUND", req.getRequestURI()));
         }
     }
 }

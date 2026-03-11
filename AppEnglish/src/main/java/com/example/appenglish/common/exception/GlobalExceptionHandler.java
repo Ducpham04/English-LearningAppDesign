@@ -83,10 +83,9 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(org.springframework.dao.DataIntegrityViolationException.class)
     public ResponseEntity<BaseResponse<Void>> handleDataIntegrity(org.springframework.dao.DataIntegrityViolationException ex, HttpServletRequest request) {
         log.warn("Data integrity violation: {}", ex.getMessage());
-        String message = ex.getMostSpecificCause() != null ? ex.getMostSpecificCause().getMessage() : ex.getMessage();
-        if (message != null && message.length() > 200) message = "Không thể thực hiện vì còn dữ liệu liên quan.";
+        String message = ConstraintMessageHelper.buildDeleteConstraintMessage(ex, "mục này");
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(BaseResponse.error(message != null ? message : "Constraint violation", "CONSTRAINT_VIOLATION", request.getRequestURI()));
+                .body(BaseResponse.error(message, "CONSTRAINT_VIOLATION", request.getRequestURI()));
     }
 
     // 6. Xử lý lỗi chung (Luôn để cuối cùng)

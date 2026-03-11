@@ -55,12 +55,20 @@ public class PronunciationAttemptService {
     public PronunciationScoreResponse scoreAndEnqueueUpload(User user,
                                                            Long lessonId,
                                                            Integer sentenceIndex,
+                                                           String expectedTextOverride,
                                                            MultipartFile audioFile) throws Exception {
 
-        LessonVideo lessonVideo = lessonVideoRepository.findById(lessonId)
-                .orElseThrow(() -> new IllegalArgumentException("LessonVideo not found: " + lessonId));
+        // Vẫn cần LessonVideo để liên kết attempt -> lesson và lưu transcript context.
+        // Với bài Pronunciation (từ/cụm từ), FE có thể gửi expectedTextOverride để chấm trực tiếp.
+        LessonVideo lessonVideo = lessonVideoRepository.findByLessonIdForUpdate(lessonId)
+                .orElseThrow(() -> new IllegalArgumentException("LessonVideo not found for lessonId: " + lessonId));
 
-        String expectedText = transcriptSentenceResolver.resolveExpectedText(lessonVideo, sentenceIndex);
+        String expectedText;
+        if (expectedTextOverride != null && !expectedTextOverride.trim().isBlank()) {
+            expectedText = expectedTextOverride.trim();
+        } else {
+            expectedText = transcriptSentenceResolver.resolveExpectedText(lessonVideo, sentenceIndex);
+        }
 
         PronunciationAttempt attempt = new PronunciationAttempt();
         attempt.setUser(user);

@@ -3,9 +3,9 @@
 :root {
   --font-size: 16px;
 
-  /* Focused, modern light background */
-  --background: #f8fafc;
-  --foreground: #1e293b;
+  /* Focused, modern light background (admin-friendly) */
+  --background: #f4f6f8;
+  --foreground: #212121;
 
   --card: #ffffff;
   --card-foreground: #1e293b;
@@ -13,10 +13,10 @@
   --popover: #ffffff;
   --popover-foreground: #1e293b;
 
-  /* Primary - Violet (modern EdTech) */
-  --primary: #7c3aed;
+  /* Primary - professional blue */
+  --primary: #3f51b5;
   --primary-foreground: #ffffff;
-  --primary-hover: #6d28d9;
+  --primary-hover: #303f9f;
 
   /* Secondary - Slate */
   --secondary: #f1f5f9;
@@ -31,7 +31,7 @@
   --accent-foreground: #7c3aed;
 
   /* Success */
-  --success: #10b981;
+  --success: #388e3c;
   --success-foreground: #ffffff;
 
   /* Warning */
@@ -39,7 +39,7 @@
   --warning-foreground: #1e293b;
 
   /* Destructive */
-  --destructive: #ef4444;
+  --destructive: #ef5350;
   --destructive-foreground: #ffffff;
 
   /* Borders and inputs */
@@ -51,7 +51,7 @@
   --font-weight-medium: 500;
   --font-weight-normal: 400;
 
-  --ring: #7c3aed;
+  --ring: #3f51b5;
 
   /* Rounded */
   --radius: 0.75rem;
@@ -65,13 +65,13 @@
 
   /* Sidebar */
   --sidebar: #ffffff;
-  --sidebar-foreground: #334155;
-  --sidebar-primary: #7c3aed;
+  --sidebar-foreground: #424242;
+  --sidebar-primary: #3f51b5;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #f5f3ff;
-  --sidebar-accent-foreground: #5b21b6;
-  --sidebar-border: #e2e8f0;
-  --sidebar-ring: #7c3aed;
+  --sidebar-accent: #e8eaf6;
+  --sidebar-accent-foreground: #303f9f;
+  --sidebar-border: #d0d7de;
+  --sidebar-ring: #3f51b5;
 }
 
 .dark {

@@ -4,6 +4,7 @@ import com.example.appenglish.entity.Lesson;
 import com.example.appenglish.entity.LessonVideo;
 import com.example.appenglish.enums.LessonType;
 import com.example.appenglish.common.exception.ApiException;
+import com.example.appenglish.common.exception.ConstraintMessageHelper;
 import com.example.appenglish.modules.lesson.dto.LessonCreateRequest;
 import com.example.appenglish.modules.lesson.dto.LessonDto;
 import com.example.appenglish.modules.lesson.dto.LessonVideoRequest;
@@ -92,7 +93,8 @@ public class LessonService {
             lessonRepository.deleteById(id);
         } catch (DataIntegrityViolationException e) {
             log.warn("Cannot delete lesson {}: {}", id, e.getMessage());
-            throw new ApiException("Không thể xóa bài học vì còn dữ liệu liên quan (video, transcript, v.v.). Hãy xóa hoặc cập nhật trước.", "CONSTRAINT_VIOLATION");
+            String detail = ConstraintMessageHelper.buildDeleteConstraintMessage(e, "bài học");
+            throw new ApiException(detail, "CONSTRAINT_VIOLATION");
         }
     }
 

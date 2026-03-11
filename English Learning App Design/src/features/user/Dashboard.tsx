@@ -348,7 +348,10 @@ export function Dashboard() {
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: 0.18 + index * 0.04 }}
                       >
-                        <Card className="group cursor-pointer overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-700/80 bg-white dark:bg-slate-800/80 hover:shadow-md transition-all">
+                        <Card
+                          className="group cursor-pointer overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-700/80 bg-white dark:bg-slate-800/80 hover:shadow-md transition-all"
+                          onClick={() => navigate(`/classes/${item.id}`)}
+                        >
                           <div
                             className={`h-1 bg-gradient-to-r ${(classItem as any).color || 'from-emerald-500 to-teal-500'}`}
                           />
