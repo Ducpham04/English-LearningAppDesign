@@ -153,19 +153,7 @@ public class AuthController {
 
         log.info("Register request received: email={}, role={}", req.getEmail(), req.getRole());
 
-        boolean isSuccess = userDetailsServiceImpl.register(req);
-
-        if (!isSuccess) {
-            log.warn("Register failed for email={}, role={}", req.getEmail(), req.getRole());
-            return ResponseEntity.status(HttpStatus.CONFLICT)
-                    .body(
-                            BaseResponse.error(
-                                    "Email đã tồn tại, vui lòng dùng email khác!",
-                                    "DUPLICATE_EMAIL",
-                                    httpReq.getRequestURI()
-                            )
-                    );
-        }
+        userDetailsServiceImpl.register(req);
 
         log.info("Register success for email={}, role={}", req.getEmail(), req.getRole());
         return ResponseEntity.status(HttpStatus.CREATED)

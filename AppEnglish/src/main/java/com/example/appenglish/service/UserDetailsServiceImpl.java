@@ -3,6 +3,7 @@ package com.example.appenglish.service;
 
 import com.example.appenglish.entity.User;
 import com.example.appenglish.enums.UserRole;
+import com.example.appenglish.common.exception.ApiException;
 import com.example.appenglish.modules.auth.dto.RegisterRequest;
 import com.example.appenglish.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -19,7 +20,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -54,28 +54,25 @@ public class UserDetailsServiceImpl implements UserDetailsService {
 
         if (userRepository.existsByEmail(req.getEmail())) {
             log.warn("Register failed: email already exists {}", req.getEmail());
-            return false;
-        }
-
-        if (req.getRole() == null) {
-            log.warn("Register failed: role is null for email={}", req.getEmail());
-            return false;
+            throw new ApiException("Email đã tồn tại, vui lòng dùng email khác!", "DUPLICATE_EMAIL");
         }
 
         // 1. Map role name -> enum
         UserRole userRole;
-        if ("STUDENT".equalsIgnoreCase(req.getRole())) {
+        String role = req.getRole() != null ? req.getRole().trim() : "";
+        if ("STUDENT".equalsIgnoreCase(role)) {
             userRole = UserRole.STUDENT;
-        } else if ("TEACHER".equalsIgnoreCase(req.getRole())) {
+        } else if ("TEACHER".equalsIgnoreCase(role)) {
             userRole = UserRole.TEACHER;
+        } else if ("ADMIN".equalsIgnoreCase(role)) {
+            userRole = UserRole.ADMIN;
         } else {
             log.warn("Register failed: unsupported role {} for email={}", req.getRole(), req.getEmail());
-            return false;
+            throw new ApiException("Vai trò không hợp lệ", "INVALID_ROLE");
         }
 
-        // 2. Tạo user (id dạng String: UUID cho user mới)
+        // 2. Tạo user (id để Hibernate tự generate)
         User newUser = new User();
-        newUser.setId(UUID.randomUUID().toString());
         newUser.setEmail(req.getEmail());
         newUser.setFullName(req.getFullName());
         newUser.setPasswordHash(passwordEncoder.encode(req.getPassword()));
