@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import apiService from '@/services/apiService';
+import { API_BASE_URL } from '@/services/baseUrl';
 import { useAppStore } from '@/store/appStore';
 import { RecordingButton } from '@/shared/ui/RecordingButton';
 import type { PronunciationScoreResponse } from '@/services/apiService';
@@ -65,6 +66,19 @@ function buildWordIpaPairs(text: string, ipa: string): Array<{ word: string; ipa
 function extractYoutubeId(url: string): string | null {
   const m = url.match(/(?:v=|youtu\.be\/|embed\/)([A-Za-z0-9_-]{11})/);
   return m ? m[1] : null;
+}
+
+/** Lấy lesson object từ response API (hỗ trợ nhiều dạng bọc: data, data.data, data.lesson) và chuẩn hóa videoUrl. */
+function normalizeLessonFromApi(resData: any): any {
+  if (resData == null) return null;
+  const raw = resData?.data ?? resData?.lesson ?? resData;
+  if (!raw || typeof raw !== 'object') return raw;
+  const videoUrl = (typeof raw.videoUrl === 'string' && raw.videoUrl.trim())
+    ? raw.videoUrl.trim()
+    : (typeof raw.video_url === 'string' && raw.video_url.trim())
+      ? raw.video_url.trim()
+      : '';
+  return { ...raw, videoUrl };
 }
 
 // ─── Toggle Pill: một màu chủ đạo (Indigo #4F46E5) khi active ─────────────────
@@ -164,8 +178,18 @@ export function VideoConversationLesson() {
 
   const isYoutube = !!(lesson?.youtubeUrl && extractYoutubeId(lesson.youtubeUrl));
   const ytVideoId = isYoutube ? extractYoutubeId(lesson?.youtubeUrl) : null;
+  // URL video: API có thể trả về videoUrl (camelCase) hoặc video_url (snake_case)
+  const displayVideoUrl = lesson && (
+    (typeof lesson.videoUrl === 'string' && lesson.videoUrl.trim()) ||
+    (typeof (lesson as any).video_url === 'string' && (lesson as any).video_url.trim())
+  ) ? ((lesson.videoUrl || (lesson as any).video_url) as string).trim() : '';
+  // Tránh CORS: nếu video từ S3 (presigned hoặc public URL) thì phát qua proxy backend (same-origin).
+  const isS3VideoUrl = !!(displayVideoUrl && (displayVideoUrl.includes('amazonaws.com') || displayVideoUrl.includes('X-Amz')));
+  const videoSrcForPlayer = (displayVideoUrl && lessonId && isS3VideoUrl)
+    ? `${API_BASE_URL}/v1/lessons/${lessonId}/video-stream`
+    : displayVideoUrl;
   // Chỉ dùng videoUrl để phát native khi KHÔNG phải URI S3 nội bộ (s3://...)
-  const hasNativeVideo = !!(lesson?.videoUrl && !String(lesson.videoUrl).startsWith('s3://'));
+  const hasNativeVideo = !!(videoSrcForPlayer && !displayVideoUrl.startsWith('s3://'));
 
   // ── Load lesson ──────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -173,18 +197,24 @@ export function VideoConversationLesson() {
     setLoading(true);
     apiService.lesson.getById(Number(lessonId))
       .then((res) => {
-        const data = res.data?.data ?? res.data;
+        const data = normalizeLessonFromApi(res.data);
         setLesson(data);
-        if (Array.isArray(data?.transcriptJson) && data.transcriptJson.length > 0) {
+        if (!data) return;
+        if (Array.isArray(data.transcriptJson) && data.transcriptJson.length > 0) {
           setTranscript(data.transcriptJson as TranscriptLine[]);
-        } else if (data?.s3Status === 'PROCESSING') {
+        } else if (data.s3Status === 'PROCESSING') {
           pollRef.current = setInterval(async () => {
             try {
               const r = await apiService.transcribe.getTranscript(Number(lessonId));
-              const t = r.data?.data ?? r.data;
-              if (Array.isArray(t) && t.length > 0) {
-                clearInterval(pollRef.current!);
-                setTranscript(t as TranscriptLine[]);
+              const payload = r.data?.data ?? r.data;
+              const transcriptList = Array.isArray(payload) ? payload : (payload?.transcript ?? null);
+              if (Array.isArray(transcriptList) && transcriptList.length > 0) {
+                if (pollRef.current) clearInterval(pollRef.current);
+                pollRef.current = null;
+                setTranscript(transcriptList as TranscriptLine[]);
+                const lessonRes = await apiService.lesson.getById(Number(lessonId));
+                const updated = normalizeLessonFromApi(lessonRes.data);
+                if (updated) setLesson(updated);
                 toast.success('Transcript đã sẵn sàng!');
               }
             } catch { /* ignore */ }
@@ -401,8 +431,9 @@ export function VideoConversationLesson() {
         }
         const idx = sentenceIndex;
         setScoringSentenceIndex(idx);
+        const expectedText = transcript[idx]?.text?.trim();
         try {
-          const res = await apiService.pronunciation.getScore(Number(lessonId), sentenceIndex, blob);
+          const res = await apiService.pronunciation.getScore(Number(lessonId), sentenceIndex, blob, expectedText);
           const data = res.data?.data;
           if (data) {
             setSentenceScores((prev) => {
@@ -448,7 +479,7 @@ export function VideoConversationLesson() {
     } catch {
       toast.error('Không thể truy cập micro. Kiểm tra quyền trình duyệt.');
     }
-  }, [lessonId]);
+  }, [lessonId, transcript]);
 
   const stopRecordingForSentence = useCallback(() => {
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
@@ -534,15 +565,18 @@ export function VideoConversationLesson() {
                   <div id="yt-player" className="w-full h-full" />
                 ) : hasNativeVideo ? (
                   <video
+                    key={videoSrcForPlayer}
                     ref={videoRef}
                     className="w-full h-full object-contain"
+                    {...(isS3VideoUrl ? {} : { crossOrigin: 'anonymous' as const })}
                     onTimeUpdate={handleTimeUpdate}
                     onLoadedMetadata={e => setDuration(e.currentTarget.duration * 1000)}
                     onPlay={() => setIsPlaying(true)}
                     onPause={() => setIsPlaying(false)}
                     onEnded={() => setIsPlaying(false)}
+                    onError={() => toast.error('Không tải được video. Kiểm tra link hoặc kết nối.')}
                   >
-                    <source src={lesson.videoUrl} type="video/mp4" />
+                    <source src={videoSrcForPlayer} type="video/mp4" />
                   </video>
                 ) : (
                   <div className="w-full h-full flex flex-col items-center justify-center text-white/40 gap-3">

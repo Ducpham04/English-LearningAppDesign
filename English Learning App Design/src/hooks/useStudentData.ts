@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import apiService from '@/services/apiService';
+import { useAuthStore } from '@/store/authStore';
 
 export interface UserInfo {
   id: string;
@@ -75,8 +76,10 @@ export function useStudentDashboard() {
   const [data, setData] = useState<StudentDashboard | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const accessToken = useAuthStore((s) => s.tokens?.accessToken);
 
   const fetchDashboard = async () => {
+    if (!accessToken) return;
     try {
       setLoading(true);
       setError(null);
@@ -91,8 +94,9 @@ export function useStudentDashboard() {
   };
 
   useEffect(() => {
+    if (!accessToken) return;
     fetchDashboard();
-  }, []);
+  }, [accessToken]);
 
   return {
     data,

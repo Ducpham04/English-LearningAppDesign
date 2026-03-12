@@ -9,6 +9,7 @@ import com.example.appenglish.modules.lesson.dto.LessonCreateRequest;
 import com.example.appenglish.modules.lesson.dto.LessonDto;
 import com.example.appenglish.modules.lesson.dto.LessonVideoRequest;
 import com.example.appenglish.modules.transcribe.service.transcript.EspeakIpaService;
+import com.example.appenglish.modules.transcribe.service.s3.StorageService;
 import com.example.appenglish.repository.LessonRepository;
 import com.example.appenglish.repository.LessonVideoRepository;
 import com.example.appenglish.repository.SessionRepository;
@@ -31,6 +32,7 @@ public class LessonService {
     private final SessionRepository sessionRepository;
     private final LessonVideoRepository lessonVideoRepository;
     private final EspeakIpaService espeakIpaService;
+    private final StorageService storageService;
 
     public List<LessonDto> getAll() {
         return lessonRepository.findAll().stream().map(this::toDto).collect(Collectors.toList());
@@ -166,7 +168,7 @@ public class LessonService {
                 .durationMinutes(l.getDurationMinutes())
                 .sessionId(l.getSession() != null ? l.getSession().getId() : null)
                 .courseId(l.getCourse() != null ? l.getCourse().getId() : null)
-                .videoUrl(lv != null ? lv.getVideoUrl() : null)
+                .videoUrl(lv != null && lv.getVideoUrl() != null ? storageService.getVideoPlaybackUrl(lv.getVideoUrl()) : null)
                 .youtubeUrl(lv != null ? lv.getYoutubeUrl() : null)
                 .s3Status(s3Status)
                 .transcriptJson(lv != null ? lv.getTranscriptJson() : null)

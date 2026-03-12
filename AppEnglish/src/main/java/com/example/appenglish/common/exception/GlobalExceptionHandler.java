@@ -10,7 +10,9 @@ import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
 
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -86,6 +88,34 @@ public class GlobalExceptionHandler {
         String message = ConstraintMessageHelper.buildDeleteConstraintMessage(ex, "mục này");
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(BaseResponse.error(message, "CONSTRAINT_VIOLATION", request.getRequestURI()));
+    }
+
+    // 5c. Client đóng kết nối sớm (Broken pipe) – thường khi stream video, user seek/refresh/thoát trang.
+    @ExceptionHandler(AsyncRequestNotUsableException.class)
+    public ResponseEntity<BaseResponse<Void>> handleAsyncRequestNotUsable(AsyncRequestNotUsableException ex, HttpServletRequest request) {
+        Throwable cause = ex.getCause();
+        if (cause instanceof IOException) {
+            String msg = cause.getMessage() != null ? cause.getMessage() : "";
+            if (msg.contains("Broken pipe") || msg.contains("Connection reset")) {
+                log.debug("Client closed connection while streaming: {}", msg);
+                return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
+            }
+        }
+        log.warn("Async request not usable: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(BaseResponse.error("Request closed by client", "CLIENT_CLOSED", request.getRequestURI()));
+    }
+
+    @ExceptionHandler(IOException.class)
+    public ResponseEntity<BaseResponse<Void>> handleIOException(IOException ex, HttpServletRequest request) {
+        String msg = ex.getMessage() != null ? ex.getMessage() : "";
+        if (msg.contains("Broken pipe") || msg.contains("Connection reset")) {
+            log.debug("Client closed connection: {}", msg);
+            return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
+        }
+        log.warn("IO error: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(BaseResponse.error("I/O error", "IO_ERROR", request.getRequestURI()));
     }
 
     // 6. Xử lý lỗi chung (Luôn để cuối cùng)

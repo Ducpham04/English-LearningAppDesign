@@ -15,10 +15,12 @@ public class ClassStudent {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @MapsId("classId")
+    @JoinColumn(name = "class_id")
     private Classroom classroom;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @MapsId("studentId")
+    @JoinColumn(name = "student_id")
     private User student;
 
     private LocalDateTime joinedAt;

@@ -300,19 +300,20 @@ export default function AdminTopicManagement() {
       setAnalyzeMessage('Đang xử lý... (có thể mất 1-3 phút)');
       toast.success('Đã gửi yêu cầu phân tích video YouTube');
 
-      // Poll every 8s
+      // Poll every 8s — backend trả { transcript: [...], s3Url }; cần lấy mảng transcript
       stopPolling();
       const id = setInterval(async () => {
         try {
           const res = await apiService.transcribe.getTranscript(lessonId);
-          const transcript = res.data?.data ?? res.data;
+          const data = res.data?.data ?? res.data;
+          const transcript = Array.isArray(data) ? data : (data?.transcript ?? null);
           if (Array.isArray(transcript) && transcript.length > 0) {
             clearInterval(id);
             setPollingRef(null);
             setAnalyzeStatus('done');
             setAnalyzeMessage(`✅ Hoàn thành! ${transcript.length} câu đã được phân tích và dịch.`);
             toast.success(`Phân tích xong! ${transcript.length} câu`);
-            // Refresh lesson data in dialog
+            // Refresh lesson data in dialog (có cả IPA từ backend)
             const lessonRes = await apiService.lesson.getById(lessonId);
             const l = lessonRes.data?.data ?? lessonRes.data;
             if (l?.transcriptJson) {
@@ -333,6 +334,7 @@ export default function AdminTopicManagement() {
   const uploadAndTranscribe = async (lessonId: number) => {
     if (!uploadFile) { toast.error('Chọn file video trước'); return; }
     try {
+      stopPolling();
       setUploadStatus('uploading');
       setUploadMessage('Đang upload lên server...');
       setUploadProgress(10);
@@ -344,11 +346,12 @@ export default function AdminTopicManagement() {
       setUploadMessage('Upload xong! Đang phân tích âm thanh, dịch tiếng Việt, tạo IPA...');
       toast.success('Upload thành công! Đang xử lý transcript...');
 
-      // Poll every 8s
+      // Poll every 8s — backend trả { transcript: [...], s3Url }; cần lấy mảng transcript
       const id = setInterval(async () => {
         try {
           const res = await apiService.transcribe.getTranscript(lessonId);
-          const transcript = res.data?.data ?? res.data;
+          const data = res.data?.data ?? res.data;
+          const transcript = Array.isArray(data) ? data : (data?.transcript ?? null);
           if (Array.isArray(transcript) && transcript.length > 0) {
             clearInterval(id);
             setUploadStatus('done');

@@ -1,3 +1,4 @@
+import { forwardRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Clock, Lock, CheckCircle, Play } from 'lucide-react';
 import { Button } from '@/app/components/ui/button';
@@ -30,14 +31,14 @@ interface SessionCardProps {
   gradientClass: string;
 }
 
-export function SessionListCard({
+export const SessionListCard = forwardRef<HTMLElement, SessionCardProps>(function SessionListCard({
   session,
   index,
   status,
   progress,
   difficultyLabels = { BEGINNER: 'Cơ bản', INTERMEDIATE: 'Trung cấp', ADVANCED: 'Nâng cao' },
   gradientClass,
-}: SessionCardProps) {
+}, ref) {
   const navigate = useNavigate();
   const isLocked = status === 'locked';
   const isCompleted = status === 'completed';
@@ -50,6 +51,7 @@ export function SessionListCard({
 
   return (
     <motion.article
+      ref={ref}
       layout
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
@@ -145,4 +147,4 @@ export function SessionListCard({
       </div>
     </motion.article>
   );
-}
+});

@@ -16,6 +16,7 @@ import lombok.experimental.FieldDefaults;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.HashMap;
 import java.util.Map;
 
 @RestController
@@ -44,10 +45,9 @@ public class YoutubeTranscribeController {
         LessonVideo lv = lessonVideoRepository.findById(lessonId)
                 .orElseThrow(() -> new ApiException("Lesson video not found", "LESSON_VIDEO_NOT_FOUND"));
 
-        Map<String, Object> response = Map.of(
-                "transcript", lv.getTranscriptJson(),
-                "s3Url", lv.getVideoUrl()
-        );
+        Map<String, Object> response = new HashMap<>();
+        response.put("transcript", lv.getTranscriptJson());
+        response.put("s3Url", lv.getVideoUrl());
 
         return ResponseEntity.ok(BaseResponse.ok(response, "OK", request.getRequestURI()));
     }
