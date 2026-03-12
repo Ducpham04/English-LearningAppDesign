@@ -19,7 +19,6 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
-import java.util.UUID;
 
 /**
  * Chạy tự động sau khi Spring Boot khởi động:
@@ -82,7 +81,6 @@ public class DataInitializer implements ApplicationRunner {
 
         if (!adminExists) {
             User admin = new User();
-            admin.setId(UUID.randomUUID().toString());
             admin.setEmail("admin@lms.com");
             admin.setPasswordHash(passwordEncoder.encode("Admin@123"));
             admin.setFullName("System Admin");

@@ -2,12 +2,13 @@ package com.example.appenglish.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
-import java.io.Serializable;
+
 import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "class_students")
-@Getter @Setter
+@Getter
+@Setter
 public class ClassStudent {
     @EmbeddedId
     private ClassStudentId id;
@@ -22,11 +23,4 @@ public class ClassStudent {
 
     private LocalDateTime joinedAt;
     private Boolean isFaceVerified;
-}
-
-@Embeddable
-@Getter @Setter @EqualsAndHashCode
-public class ClassStudentId implements Serializable {
-    private Long classId;
-    private String studentId; // matches User.id (UUID)
 }
