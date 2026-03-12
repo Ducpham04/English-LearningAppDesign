@@ -11,7 +11,6 @@ import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.TimeUnit;
 
 @Slf4j
 @Service
@@ -25,7 +24,7 @@ public class AudioFfmpegTranscoder {
     @Value("${app.pronunciation.ffmpeg.wait-timeout-seconds:45}")
     private long waitTimeoutSeconds;
 
-    public TranscodeResult transcodeToPcm16kMono(InputStream input) throws IOException, InterruptedException {
+    public TranscodeResult transcodeToPcm16kMono(InputStream input) throws IOException {
         List<String> cmd = new ArrayList<>();
         cmd.add(ffmpegPath);
         cmd.add("-hide_banner");
@@ -64,16 +63,13 @@ public class AudioFfmpegTranscoder {
             throw e;
         }
 
-        boolean exited = p.waitFor(waitTimeoutSeconds, TimeUnit.SECONDS);
-        if (!exited) {
-            p.destroyForcibly();
-            throw new IOException("ffmpeg process timed out after " + waitTimeoutSeconds + "s");
-        }
-
-        String err = errFuture.join();
-        return new TranscodeResult(p.getInputStream(), p.exitValue(), err, bytesWritten);
+        return new TranscodeResult(p, p.getInputStream(), errFuture, bytesWritten, waitTimeoutSeconds);
     }
 
-    public record TranscodeResult(InputStream pcmStream, int exitCode, String error, long bytesWritten) {
+    public record TranscodeResult(Process process,
+                                  InputStream pcmStream,
+                                  CompletableFuture<String> errFuture,
+                                  long bytesWritten,
+                                  long waitTimeoutSeconds) {
     }
 }

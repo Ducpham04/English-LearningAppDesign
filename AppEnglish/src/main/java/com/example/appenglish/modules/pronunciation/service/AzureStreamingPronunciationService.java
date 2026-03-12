@@ -55,7 +55,20 @@ public class AzureStreamingPronunciationService {
 
             AudioStreamFormat format = AudioStreamFormat.getWaveFormatPCM(16000, (short) 16, (short) 1);
 
-            AzureAssessmentResult pipeAttempt = runAssessmentWithFfmpegPipe(speechConfig, format, audioBytes, referenceText);
+            if (shouldForceFileMode(fileSuffix)) {
+                return runAssessmentWithTempFile(speechConfig, format, audioBytes, referenceText, fileSuffix);
+            }
+
+            AzureAssessmentResult pipeAttempt;
+            try {
+                pipeAttempt = runAssessmentWithFfmpegPipe(speechConfig, format, audioBytes, referenceText);
+            } catch (Exception e) {
+                if (!ffmpegFileFallback) {
+                    throw e;
+                }
+                log.warn("ffmpeg pipe failed, fallback to file mode: {}", e.getMessage());
+                return runAssessmentWithTempFile(speechConfig, format, audioBytes, referenceText, fileSuffix);
+            }
 
             Map<String, Object> fb = pipeAttempt.getRawFeedback() == null ? new HashMap<>() : new HashMap<>(pipeAttempt.getRawFeedback());
             String ffmpegErr = fb.get("ffmpegErr") == null ? null : String.valueOf(fb.get("ffmpegErr"));
@@ -70,21 +83,7 @@ public class AzureStreamingPronunciationService {
                 return pipeAttempt;
             }
 
-            Path dir = Path.of(tempDir, "pronunciation");
-            Files.createDirectories(dir);
-            String suffix = (fileSuffix == null || fileSuffix.isBlank()) ? ".dat" : fileSuffix;
-            Path tmp = Files.createTempFile(dir, "ffmpeg-input-", suffix);
-
-            try {
-                Files.write(tmp, audioBytes);
-                return runAssessmentWithFfmpegFile(speechConfig, format, tmp.toFile(), referenceText);
-            } finally {
-                try {
-                    Files.deleteIfExists(tmp);
-                } catch (Exception e) {
-                    log.warn("Could not delete temp file {}: {}", tmp, e.getMessage());
-                }
-            }
+            return runAssessmentWithTempFile(speechConfig, format, audioBytes, referenceText, fileSuffix);
 
         } catch (Exception e) {
             throw new RuntimeException("Azure pronunciation assessment failed: " + e.getMessage(), e);
@@ -102,6 +101,9 @@ public class AzureStreamingPronunciationService {
 
         AudioFfmpegTranscoder.TranscodeResult tr = ffmpegTranscoder.transcodeToPcm16kMono(new java.io.ByteArrayInputStream(audioBytes));
         long pcmBytes = pipePcmToAzure(tr.pcmStream(), pushStream);
+        int ffmpegExit = waitForFfmpegExit(tr.process(), tr.waitTimeoutSeconds());
+        String ffmpegErr = tr.errFuture().join();
+
         SpeechRecognitionResult result = resultFuture.get(timeoutSeconds, TimeUnit.SECONDS);
 
         AzureAssessmentResult parsed = parseResult(result);
@@ -109,8 +111,8 @@ public class AzureStreamingPronunciationService {
         Map<String, Object> fb = parsed.getRawFeedback() == null ? new HashMap<>() : new HashMap<>(parsed.getRawFeedback());
         fb.put("ffmpegMode", "pipe");
         fb.put("ffmpegBytesWritten", tr.bytesWritten());
-        fb.put("ffmpegExit", tr.exitCode());
-        fb.put("ffmpegErr", tr.error());
+        fb.put("ffmpegExit", ffmpegExit);
+        fb.put("ffmpegErr", ffmpegErr);
         fb.put("pcmBytes", pcmBytes);
 
         return AzureAssessmentResult.builder()
@@ -124,6 +126,29 @@ public class AzureStreamingPronunciationService {
                 .rawFeedback(fb)
                 .cancellationDetails(parsed.getCancellationDetails())
                 .build();
+    }
+
+    private AzureAssessmentResult runAssessmentWithTempFile(SpeechConfig speechConfig,
+                                                            AudioStreamFormat format,
+                                                            byte[] audioBytes,
+                                                            String referenceText,
+                                                            String fileSuffix) throws Exception {
+
+        Path dir = Path.of(tempDir, "pronunciation");
+        Files.createDirectories(dir);
+        String suffix = (fileSuffix == null || fileSuffix.isBlank()) ? ".dat" : fileSuffix;
+        Path tmp = Files.createTempFile(dir, "ffmpeg-input-", suffix);
+
+        try {
+            Files.write(tmp, audioBytes);
+            return runAssessmentWithFfmpegFile(speechConfig, format, tmp.toFile(), referenceText);
+        } finally {
+            try {
+                Files.deleteIfExists(tmp);
+            } catch (Exception e) {
+                log.warn("Could not delete temp file {}: {}", tmp, e.getMessage());
+            }
+        }
     }
 
     private AzureAssessmentResult runAssessmentWithFfmpegFile(SpeechConfig speechConfig,
@@ -210,6 +235,31 @@ public class AzureStreamingPronunciationService {
         return total;
     }
 
+    private int waitForFfmpegExit(Process process, long timeoutSeconds) throws IOException {
+        try {
+            boolean exited = process.waitFor(timeoutSeconds, TimeUnit.SECONDS);
+            if (!exited) {
+                process.destroyForcibly();
+                throw new IOException("ffmpeg process timed out after " + timeoutSeconds + "s");
+            }
+            return process.exitValue();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IOException("ffmpeg process interrupted", e);
+        }
+    }
+
+    private boolean shouldForceFileMode(String fileSuffix) {
+        if (!ffmpegFileFallback) {
+            return false;
+        }
+        if (fileSuffix == null || fileSuffix.isBlank()) {
+            return false;
+        }
+        String suffix = fileSuffix.toLowerCase();
+        return suffix.equals(".webm") || suffix.equals(".ogg");
+    }
+
     private AzureAssessmentResult parseResult(SpeechRecognitionResult result) throws Exception {
         ResultReason reason = result.getReason();
 
@@ -253,7 +303,7 @@ public class AzureStreamingPronunciationService {
                     completenessScore = getDouble(pa, "CompletenessScore");
                 }
 
-                raw = objectMapper.convertValue(nbest0, Map.class);
+                raw = objectMapper.convertValue(nbest0, new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {});
             }
         }
 
