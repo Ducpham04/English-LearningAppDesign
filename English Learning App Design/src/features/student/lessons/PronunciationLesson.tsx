@@ -7,7 +7,6 @@ import { Badge } from '@/app/components/ui/badge';
 import { Mic, Volume2, RotateCcw, CheckCircle2, Square, ArrowLeft, ArrowRight, Trophy, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import apiService from '@/services/apiService';
-import { useAppStore } from '@/store/appStore';
 
 interface PhraseItem {
   id: number;
@@ -45,6 +44,7 @@ export function PronunciationLesson() {
   const [scores, setScores] = useState<number[]>([]);
   const [attempts, setAttempts] = useState(0);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [lastResponse, setLastResponse] = useState<any>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
@@ -142,21 +142,6 @@ export function PronunciationLesson() {
     }
   };
 
-  const handleComplete = async () => {
-    const allPassed = phrases.length > 0 && phrases.every((_, i) => (scores[i] ?? 0) >= 70);
-    if (!lessonId || !allPassed) {
-      toast.error('Hãy luyện phát âm và đạt ≥70 điểm cho mỗi từ/câu trước khi hoàn thành.');
-      return;
-    }
-    const validScores = phrases.map((_, i) => scores[i]).filter((s): s is number => s != null);
-    const avgScore = validScores.length ? validScores.reduce((a, b) => a + b, 0) / validScores.length : 0;
-    try {
-      await apiService.student.completeLesson(lessonId, Math.round(avgScore));
-      useAppStore.getState().invalidateProgress();
-    } catch { /* ignore */ }
-    toast.success(`🎉 Hoàn thành bài học! +${Math.round(avgScore / 2)} XP`);
-    navigate(-1);
-  };
 
   const getDifficultyColor = (difficulty: string) => {
     switch (difficulty) {
@@ -193,6 +178,7 @@ export function PronunciationLesson() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <Button
+            type="button"
             variant="ghost"
             onClick={() => navigate(-1)}
             className="gap-2"
@@ -235,6 +221,7 @@ export function PronunciationLesson() {
 
             {/* Listen Button */}
             <Button
+              type="button"
               onClick={playAudio}
               variant="outline"
               size="lg"
@@ -286,12 +273,13 @@ export function PronunciationLesson() {
                     <Mic className="w-16 h-16 text-white" />
                   </div>
                   <p className="text-lg font-semibold text-red-600">Đang thu âm...</p>
-                  <Button onClick={stopRecording} variant="outline" className="gap-2 border-red-300 text-red-700">
+                  <Button type="button" onClick={stopRecording} variant="outline" className="gap-2 border-red-300 text-red-700">
                     <Square className="w-4 h-4" /> Dừng
                   </Button>
                 </div>
               ) : (
                 <Button
+                  type="button"
                   onClick={startRecording}
                   size="lg"
                   className="w-32 h-32 rounded-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
@@ -305,8 +293,11 @@ export function PronunciationLesson() {
 
               {selectedFile && !isAnalyzing && (
                 <Button
+                  type="button"
                   disabled={!fileReady}
-                  onClick={async () => {
+                  onClick={async (event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
                     if (!lessonId || !currentPhrase) return;
                     if (!fileReady) {
                       toast.error('File không hợp lệ. Vui lòng chọn lại.');
@@ -320,6 +311,7 @@ export function PronunciationLesson() {
                       sentenceIndex: currentWordIndex,
                     });
                     setIsAnalyzing(true);
+                    setLastResponse(null);
                     try {
                       const res = await apiService.pronunciation.getScore(
                         Number(lessonId),
@@ -329,6 +321,7 @@ export function PronunciationLesson() {
                       );
                       const d = res.data?.data;
                       if (d) {
+                        setLastResponse(res.data);
                         const score = overallScore(d);
                         setScores((prev) => {
                           const next = [...prev];
@@ -340,6 +333,7 @@ export function PronunciationLesson() {
                         else toast.info(`${score}/100. Nghe mẫu và thử lại.`);
                       } else toast.error('Không nhận được kết quả chấm điểm.');
                     } catch (err: any) {
+                      setLastResponse(err?.response?.data ?? null);
                       toast.error(err?.response?.data?.message || 'Chấm phát âm thất bại. Thử lại.');
                     } finally {
                       setIsAnalyzing(false);
@@ -349,6 +343,25 @@ export function PronunciationLesson() {
                 >
                   Chấm phát âm từ file
                 </Button>
+              )}
+
+              {lastResponse && (
+                <Card className="p-4 border border-purple-100 dark:border-gray-700 text-left">
+                  <div className="flex items-center justify-between mb-2">
+                    <h4 className="font-semibold text-sm">Response chi tiết</h4>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setLastResponse(null)}
+                    >
+                      Đóng
+                    </Button>
+                  </div>
+                  <pre className="text-xs text-gray-700 dark:text-gray-300 whitespace-pre-wrap break-words max-h-80 overflow-auto">
+                    {JSON.stringify(lastResponse, null, 2)}
+                  </pre>
+                </Card>
               )}
             </div>
 
@@ -382,6 +395,7 @@ export function PronunciationLesson() {
         {/* Navigation */}
         <div className="flex justify-between items-center">
           <Button
+            type="button"
             variant="outline"
             onClick={handlePrevious}
             disabled={currentWordIndex === 0}
@@ -391,25 +405,15 @@ export function PronunciationLesson() {
             Previous
           </Button>
 
-          {currentWordIndex === phrases.length - 1 ? (
-            <Button
-              onClick={handleComplete}
-              className="bg-green-600 hover:bg-green-700 text-white gap-2"
-              disabled={!canComplete}
-            >
-              <CheckCircle2 className="w-5 h-5" />
-              Hoàn thành
-            </Button>
-          ) : (
-            <Button
-              onClick={handleNext}
-              disabled={scores[currentWordIndex] == null || scores[currentWordIndex] < 70}
-              className="gap-2"
-            >
-              Tiếp theo
-              <ArrowRight className="w-4 h-4" />
-            </Button>
-          )}
+          <Button
+            type="button"
+            onClick={handleNext}
+            disabled={scores[currentWordIndex] == null || scores[currentWordIndex] < 70}
+            className="gap-2"
+          >
+            Tiếp theo
+            <ArrowRight className="w-4 h-4" />
+          </Button>
         </div>
 
         {/* Score Overview */}

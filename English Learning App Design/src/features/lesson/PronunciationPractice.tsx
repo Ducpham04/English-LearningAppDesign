@@ -1,6 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
 import { useAppStore } from '@/store/appStore';
-import { useCompleteLesson } from '@/hooks/useCompleteLesson';
 import { Card } from '@/app/components/ui/card';
 import { Button } from '@/app/components/ui/button';
 import { Badge } from '@/app/components/ui/badge';
@@ -84,7 +83,6 @@ function mapApiResponseToResult(
 
 export function PronunciationPractice() {
   const { selectedLessonId, setCurrentView } = useAppStore();
-  const { completeAndSave } = useCompleteLesson();
   const lesson = getLessonById(selectedLessonId || '');
 
   const [phrases, setPhrases] = useState<PhraseItem[]>(MOCK_PHRASES);
@@ -95,6 +93,7 @@ export function PronunciationPractice() {
   const [hasRecorded, setHasRecorded] = useState(false);
   const [analysisResult, setAnalysisResult] = useState<PronunciationResult | null>(null);
   const [showResult, setShowResult] = useState(false);
+  const [lastResponse, setLastResponse] = useState<any>(null);
   const recordingTimerRef = useRef<NodeJS.Timeout | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
@@ -196,12 +195,14 @@ export function PronunciationPractice() {
           const res = await apiService.pronunciation.getScore(Number(lid), idx, blob);
           const d = res.data?.data;
           if (d) {
+            setLastResponse(res.data);
             setAnalysisResult(mapApiResponseToResult(d, expected));
             setShowResult(true);
           } else {
             toast.error('Không nhận được kết quả chấm điểm');
           }
         } catch (err: any) {
+          setLastResponse(err?.response?.data ?? null);
           toast.error(err?.response?.data?.message || 'Chấm phát âm thất bại. Thử lại.');
           setAnalysisResult(
             mapApiResponseToResult(
@@ -241,14 +242,7 @@ export function PronunciationPractice() {
       setShowResult(false);
       setAnalysisResult(null);
     } else {
-      const avgScore = analysisResult?.score.overall || 85;
-      const lid = selectedLessonId || '';
-      if (lid) {
-        const ok = await completeAndSave(lid, avgScore);
-        if (ok) setCurrentView('session-detail');
-      } else {
-        setCurrentView('session-detail');
-      }
+      toast.info('Đã chấm xong. Bạn có thể xem chi tiết kết quả ngay bên dưới.');
     }
   };
 
@@ -422,9 +416,9 @@ export function PronunciationPractice() {
                     <div>
                       <h2 className="text-lg font-bold mb-1">Điểm tổng quan</h2>
                       <p className="text-sm text-gray-600 dark:text-gray-400">
-                        {analysisResult.score.overall >= 90 ? 'Xuất sắc! 🎉' : 
-                         analysisResult.score.overall >= 75 ? 'Tốt! 👍' : 
-                         'Cần cải thiện 💪'}
+                        {analysisResult.score.overall >= 90 ? 'Xuất sắc!' : 
+                         analysisResult.score.overall >= 75 ? 'Tốt!' : 
+                         'Cần cải thiện'}
                       </p>
                     </div>
                     <div className="text-center">
