@@ -10,9 +10,6 @@ import { API_BASE_URL } from './baseUrl';
 export const axiosInstance = axios.create({
   baseURL: API_BASE_URL,
   timeout: 30000,
-  headers: {
-    'Content-Type': 'application/json',
-  },
 });
 
 let isRefreshing = false;

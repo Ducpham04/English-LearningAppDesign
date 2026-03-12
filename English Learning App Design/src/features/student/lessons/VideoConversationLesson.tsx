@@ -423,7 +423,7 @@ export function VideoConversationLesson() {
         setRecordingForSentenceIndex(null);
         setIsRecording(false);
         const blob = chunksRef.current.length
-          ? new Blob(chunksRef.current, { type: mr.mimeType || 'audio/wav' })
+          ? new Blob(chunksRef.current, { type: mr.mimeType || 'audio/webm' })
           : null;
         if (!lessonId || blob == null) {
           toast.error('Không có bản ghi âm. Thử lại.');

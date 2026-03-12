@@ -86,17 +86,19 @@ const apiService = {
   pronunciation: {
     getScore: (lessonId: number, sentenceIndex: number, audioBlob: Blob, expectedText?: string) => {
       const formData = new FormData();
-      formData.append('file', audioBlob, 'recording.wav');
+      // Tên file theo đúng type của blob (MediaRecorder thường ra webm/opus) để backend/ffmpeg nhận đúng format.
+      const ext = audioBlob.type?.includes('webm') ? '.webm' : audioBlob.type?.includes('ogg') ? '.ogg' : audioBlob.type?.includes('wav') ? '.wav' : '.webm';
+      const filename = `recording${ext}`;
+      formData.append('file', audioBlob, filename);
       formData.append('lessonId', lessonId.toString());
       formData.append('sentenceIndex', sentenceIndex.toString());
       if (expectedText && expectedText.trim()) {
         formData.append('expectedText', expectedText.trim());
       }
-      
+      // Không set Content-Type: để browser tự set multipart/form-data; boundary=... (bắt buộc cho server parse đúng).
       return axiosInstance.post<BaseResponse<PronunciationScoreResponse>>(
-        '/pronunciation/score', 
-        formData,
-        { headers: { 'Content-Type': 'multipart/form-data' } }
+        '/pronunciation/score',
+        formData
       );
     },
   },
@@ -118,10 +120,7 @@ const apiService = {
       formData.append('languageCode', languageCode);
       return axiosInstance.post<BaseResponse<string>>(
         '/v1/upload/transcribe',
-        formData,
-        {
-          headers: { 'Content-Type': 'multipart/form-data' },
-        }
+        formData
       );
     },
   },

@@ -12,4 +12,7 @@ function normalizeApiBaseUrl(input: string | undefined): string {
   return `${trimmed}/api`;
 }
 
-export const API_BASE_URL = isDev ? '/api' : normalizeApiBaseUrl(envUrl);
+// Dev: prefer explicit env (avoid Vite proxy mismatch); fallback to '/api' for proxy-based dev.
+export const API_BASE_URL = isDev
+  ? (envUrl ? normalizeApiBaseUrl(envUrl) : '/api')
+  : normalizeApiBaseUrl(envUrl);
