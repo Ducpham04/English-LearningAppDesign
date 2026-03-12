@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState, useEffect, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/app/components/ui/button';
 import { Card } from '@/app/components/ui/card';
@@ -11,7 +11,7 @@ import type { UserRole } from '@/types/auth';
 
 export function Register() {
   const navigate = useNavigate();
-  const { register, isLoading } = useAuthStore();
+  const { register, isLoading, isAuthenticated, user } = useAuthStore();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -41,57 +41,41 @@ export function Register() {
   ];
 
   const validateForm = () => {
-    console.log('--- Register.tsx: validateForm start ---', { name, email, password, confirmPassword });
     if (!name.trim()) {
       setError('Please enter your name');
-      console.log('--- Register.tsx: Name validation failed ---');
       return false;
     }
     if (!email.trim() || !email.includes('@')) {
       setError('Please enter a valid email');
-      console.log('--- Register.tsx: Email validation failed ---');
       return false;
     }
     if (password.length < 6) {
       setError('Password must be at least 6 characters');
-      console.log('--- Register.tsx: Password validation failed ---');
       return false;
     }
     if (password !== confirmPassword) {
       setError('Passwords do not match');
-      console.log('--- Register.tsx: Passwords do not match ---');
       return false;
     }
-    console.log('--- Register.tsx: validateForm passed ---');
     return true;
   };
 
   useEffect(() => {
-    // Nếu đã đăng nhập thì tự động chuyển hướng về trang phù hợp
     if (isAuthenticated) {
-      console.log('--- Register.tsx: User already authenticated, redirecting ---', user?.role);
       const target = user?.role === 'teacher' ? '/teacher' : user?.role === 'admin' ? '/admin' : '/';
       navigate(target, { replace: true });
     }
   }, [isAuthenticated, user, navigate]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    console.log('--- Register.tsx: handleSubmit triggered ---');
     setError('');
 
-    if (!validateForm()) {
-      console.log('--- Register.tsx: Validation failed ---', { name, email, password, confirmPassword });
-      return;
-    }
+    if (!validateForm()) return;
 
     try {
-      console.log('--- Register.tsx: Calling authStore.register ---', { name, email, selectedRole });
       await register(name, email, password, selectedRole);
-      console.log('--- Register.tsx: Registration success ---');
-      // Điều hướng sẽ được xử lý bởi useEffect khi isAuthenticated thay đổi
     } catch (err: any) {
-      console.error('--- Register.tsx: Registration error ---', err);
       setError(err.message || 'Registration failed. Please try again.');
     }
   };
@@ -265,7 +249,7 @@ export function Register() {
                   size="lg"
                   disabled={isLoading}
                   className="w-full bg-green-500 hover:bg-green-600 text-white rounded-xl py-6 text-lg shadow-lg hover:shadow-xl transition-all"
-                  onClick={() => console.log('--- Button: onClick triggered ---')}
+                  onClick={() => {}}
                 >
                   {isLoading ? (
                     <>
