@@ -136,6 +136,7 @@ export function VideoConversationLesson() {
 
   // Display toggles – word IPA bật mặc định vì data API đã có sẵn
   const [showScript, setShowScript] = useState(true);
+  const [showOverlaySub, setShowOverlaySub] = useState(true); // subtitle overlay trên video
   const [showVI, setShowVI] = useState(true);
   const [showIPA, setShowIPA] = useState(false);      // sentence IPA: tắt mặc định (tránh trùng với word IPA)
   const [showWordIPA, setShowWordIPA] = useState(true); // word IPA: bật mặc định
@@ -153,6 +154,7 @@ export function VideoConversationLesson() {
   const [sentenceScores, setSentenceScores] = useState<Record<number, PronunciationScoreResponse>>({});
   const [autoCompleted, setAutoCompleted] = useState(false);
   const [recordingForSentenceIndex, setRecordingForSentenceIndex] = useState<number | null>(null);
+  const [scoringSentenceIndex, setScoringSentenceIndex] = useState<number | null>(null);
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
   const recordingTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -397,6 +399,8 @@ export function VideoConversationLesson() {
           toast.error('Không có bản ghi âm. Thử lại.');
           return;
         }
+        const idx = sentenceIndex;
+        setScoringSentenceIndex(idx);
         try {
           const res = await apiService.pronunciation.getScore(Number(lessonId), sentenceIndex, blob);
           const data = res.data?.data;
@@ -423,7 +427,15 @@ export function VideoConversationLesson() {
             toast.error('Không nhận được kết quả chấm điểm');
           }
         } catch (err: any) {
-          toast.error(err?.response?.data?.message || 'Chấm phát âm thất bại. Thử lại.');
+          const status = err?.response?.status;
+          const msg = err?.response?.data?.message || err?.message || '';
+          if (status === 500) {
+            toast.error('Máy chủ tạm thời bận. Vui lòng thử lại sau (ghi âm ngắn dưới 15 giây).');
+          } else {
+            toast.error(msg || 'Chấm phát âm thất bại. Thử lại.');
+          }
+        } finally {
+          setScoringSentenceIndex(null);
         }
       };
       mr.start(200);
@@ -671,21 +683,22 @@ export function VideoConversationLesson() {
                       : null;
                     const score = sentenceScores[idx];
                     const isRecordingThis = recordingForSentenceIndex === idx;
+                    const isScoringThis = scoringSentenceIndex === idx;
 
                     return (
                       <div
                         key={idx}
                         ref={isActive ? activeLineRef : undefined}
                         onClick={mode !== 'shadowing' ? () => seekToLine(line) : undefined}
-                        className={`px-3 py-2.5 group transition-colors ${
+                        className={`px-4 py-3 group transition-colors rounded-lg mx-1 my-0.5 ${
                           mode === 'shadowing' ? '' : 'cursor-pointer'
                         } ${
                           isActive && mode !== 'shadowing'
-                            ? 'border-l-2 border-l-[#4F46E5] bg-[#EEF2FF] dark:bg-indigo-950/40'
+                            ? 'border-l-4 border-l-[#4F46E5] bg-[#EEF2FF] dark:bg-indigo-950/40'
                             : mode === 'shadowing' && score
                               ? getScoreBg(overallFromResponse(score))
                               : 'hover:bg-muted/40'
-                        }`}
+                        } ${isScoringThis ? 'ring-2 ring-primary/30' : ''}`}
                       >
                         <div className="flex items-start gap-2">
                           {/* Timestamp */}
@@ -765,8 +778,13 @@ export function VideoConversationLesson() {
 
                             {/* Thoại theo: nút Thu âm + điểm phát âm cụ thể */}
                             {mode === 'shadowing' && (
-                              <div className="mt-2 space-y-2">
-                                {isRecordingThis ? (
+                              <div className="mt-3 pt-2 border-t border-border/60 space-y-2">
+                                {isScoringThis ? (
+                                  <div className="flex items-center gap-2 py-2 px-3 rounded-lg bg-primary/10 text-primary">
+                                    <Loader2 className="w-4 h-4 animate-spin flex-shrink-0" />
+                                    <span className="text-sm font-medium">Đang chấm điểm...</span>
+                                  </div>
+                                ) : isRecordingThis ? (
                                   <div className="flex flex-col items-center py-2">
                                     <RecordingButton
                                       isRecording={isRecording}
@@ -777,21 +795,21 @@ export function VideoConversationLesson() {
                                       size="sm"
                                       showWaveform={false}
                                     />
-                                    <p className="text-xs text-gray-500 mt-1">Nhấn nút để dừng thu âm</p>
+                                    <p className="text-xs text-muted-foreground mt-1">Nhấn nút để dừng thu âm</p>
                                   </div>
                                 ) : (
                                   <Button
                                     type="button"
                                     size="sm"
                                     variant="outline"
-                                    className="gap-1.5"
+                                    className="gap-2 h-9 min-w-[7rem]"
                                     onClick={(e) => { e.stopPropagation(); startRecordingForSentence(idx); }}
                                   >
-                                    <Mic className="w-3.5 h-3.5" /> Thu âm
+                                    <Mic className="w-4 h-4" /> Thu âm
                                   </Button>
                                 )}
-                                {score && (
-                                  <div className={`rounded-lg p-2 text-sm ${getScoreBg(overallFromResponse(score))}`}>
+                                {score && !isScoringThis && (
+                                  <div className={`rounded-lg p-2.5 text-sm ${getScoreBg(overallFromResponse(score))}`}>
                                     <div className="flex items-center gap-2 flex-wrap">
                                       <span className={`font-bold ${getScoreColor(overallFromResponse(score))}`}>
                                         {overallFromResponse(score)} điểm

@@ -21,6 +21,10 @@ public class AudioFfmpegTranscoder {
     @Value("${app.ffmpeg.path:ffmpeg}")
     private String ffmpegPath;
 
+    /** Thời gian chờ ffmpeg xử lý xong sau khi đã ghi hết dữ liệu vào stdin (giây). */
+    @Value("${app.pronunciation.ffmpeg.wait-timeout-seconds:45}")
+    private long waitTimeoutSeconds;
+
     public TranscodeResult transcodeToPcm16kMono(InputStream input) throws IOException, InterruptedException {
         List<String> cmd = new ArrayList<>();
         cmd.add(ffmpegPath);
@@ -60,10 +64,10 @@ public class AudioFfmpegTranscoder {
             throw e;
         }
 
-        boolean exited = p.waitFor(10, TimeUnit.SECONDS);
+        boolean exited = p.waitFor(waitTimeoutSeconds, TimeUnit.SECONDS);
         if (!exited) {
             p.destroyForcibly();
-            throw new IOException("ffmpeg process timed out");
+            throw new IOException("ffmpeg process timed out after " + waitTimeoutSeconds + "s");
         }
 
         String err = errFuture.join();

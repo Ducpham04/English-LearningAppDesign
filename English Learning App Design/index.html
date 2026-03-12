@@ -64,21 +64,6 @@
     
     <!-- Vite Entry Point -->
     <script type="module" src="/src/main.tsx"></script>
-    
-    <!-- PWA Registration Script -->
-    <script>
-      // Register service worker
-      if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/service-worker.js')
-            .then(registration => {
-              console.log('SW registered:', registration);
-            })
-            .catch(error => {
-              console.log('SW registration failed:', error);
-            });
-        });
-      }
-    </script>
+    <!-- PWA: Service worker được đăng ký trong app (src/utils/pwa.ts) để tránh đăng ký trong dev -->
   </body>
 </html>

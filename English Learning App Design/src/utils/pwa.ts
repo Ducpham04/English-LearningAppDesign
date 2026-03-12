@@ -6,12 +6,11 @@ export function registerServiceWorker() {
     return;
   }
 
-  // Không đăng ký SW trong môi trường dev để tránh cache chặn API calls
+  // Không đăng ký SW trong môi trường dev để tránh cache chặn API calls và lỗi ServiceWorkerRegistration
   if (import.meta.env.DEV) {
-    // Hủy bất kỳ SW nào đang chạy từ lần trước
     navigator.serviceWorker.getRegistrations().then((registrations) => {
-      registrations.forEach((r) => r.unregister());
-    });
+      registrations.forEach((r) => r.unregister().catch(() => {}));
+    }).catch(() => {});
     return;
   }
   
@@ -279,8 +278,7 @@ export async function releaseWakeLock() {
 
 // Check for updates
 export async function checkForUpdates() {
-  if ('serviceWorker' in navigator) {
-    const registration = await navigator.serviceWorker.ready;
-    await registration.update();
-  }
+  if (import.meta.env.DEV || !('serviceWorker' in navigator)) return;
+  const registration = await navigator.serviceWorker.ready;
+  await registration.update();
 }
