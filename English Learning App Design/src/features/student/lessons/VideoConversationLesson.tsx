@@ -127,6 +127,21 @@ function getScoreBg(score: number) {
   return 'bg-red-100 dark:bg-red-900/30';
 }
 
+function getAccuracyLevel(score?: number) {
+  if (score == null) return 'unknown';
+  if (score >= 85) return 'good';
+  if (score >= 70) return 'ok';
+  return 'bad';
+}
+
+function getAccuracyClasses(score?: number) {
+  const level = getAccuracyLevel(score);
+  if (level === 'good') return 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300';
+  if (level === 'ok') return 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300';
+  if (level === 'bad') return 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300';
+  return 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300';
+}
+
 export function VideoConversationLesson() {
   const navigate = useNavigate();
   const { lessonId } = useParams();
@@ -167,6 +182,7 @@ export function VideoConversationLesson() {
   const [showVideoInShadowing, setShowVideoInShadowing] = useState(true);
   const [sentenceScores, setSentenceScores] = useState<Record<number, PronunciationScoreResponse>>({});
   const [autoCompleted, setAutoCompleted] = useState(false);
+  const [lastResponse, setLastResponse] = useState<any>(null);
   const [recordingForSentenceIndex, setRecordingForSentenceIndex] = useState<number | null>(null);
   const [scoringSentenceIndex, setScoringSentenceIndex] = useState<number | null>(null);
   const [isRecording, setIsRecording] = useState(false);
@@ -432,10 +448,12 @@ export function VideoConversationLesson() {
         const idx = sentenceIndex;
         setScoringSentenceIndex(idx);
         const expectedText = transcript[idx]?.text?.trim();
+        setLastResponse(null);
         try {
           const res = await apiService.pronunciation.getScore(Number(lessonId), sentenceIndex, blob, expectedText);
           const data = res.data?.data;
           if (data) {
+            setLastResponse(res.data);
             setSentenceScores((prev) => {
               const next = { ...prev, [sentenceIndex]: data };
               const scores = Object.values(next);
@@ -450,7 +468,6 @@ export function VideoConversationLesson() {
               if (!autoCompleted && avg >= 80) {
                 setAutoCompleted(true);
                 toast.success(`Điểm trung bình ${avg}%. Hệ thống tự động hoàn thành bài học!`);
-                handleComplete();
               }
               return next;
             });
@@ -458,6 +475,7 @@ export function VideoConversationLesson() {
             toast.error('Không nhận được kết quả chấm điểm');
           }
         } catch (err: any) {
+          setLastResponse(err?.response?.data ?? null);
           const status = err?.response?.status;
           const msg = err?.response?.data?.message || err?.message || '';
           if (status === 500) {
@@ -550,6 +568,115 @@ export function VideoConversationLesson() {
               {Object.keys(sentenceScores).length}/{transcript.length} câu đã chấm
             </span>
           </div>
+        )}
+
+        {lastResponse && (
+          <Card className="p-4 border border-purple-100 dark:border-gray-700 text-left">
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <h4 className="font-semibold text-sm">Kết quả chấm phát âm</h4>
+                <p className="text-xs text-muted-foreground">Hiển thị chi tiết từ Azure</p>
+              </div>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => setLastResponse(null)}
+              >
+                Đóng
+              </Button>
+            </div>
+
+            <div className="grid gap-3 md:grid-cols-2">
+              <div className="space-y-1">
+                <p className="text-xs text-muted-foreground">Câu gốc</p>
+                <p className="text-sm font-medium">{lastResponse?.data?.expectedText || '-'}</p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-xs text-muted-foreground">Nhận diện</p>
+                <p className="text-sm font-medium">{lastResponse?.data?.recognizedText || '-'}</p>
+              </div>
+            </div>
+
+            <div className="mt-3 grid gap-3 md:grid-cols-5">
+              {[
+                { label: 'Pron', value: lastResponse?.data?.pronunciationScore },
+                { label: 'Acc', value: lastResponse?.data?.accuracyScore },
+                { label: 'Fluency', value: lastResponse?.data?.fluencyScore },
+                { label: 'Prosody', value: lastResponse?.data?.prosodyScore },
+                { label: 'Complete', value: lastResponse?.data?.completenessScore },
+              ].map((item) => (
+                <div key={item.label} className="rounded-lg border p-2 text-center">
+                  <div className="text-[11px] text-muted-foreground">{item.label}</div>
+                  <div className="text-lg font-semibold">
+                    {typeof item.value === 'number' ? Math.round(item.value) : '-'}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-4">
+              <h5 className="text-sm font-semibold mb-2">Phân tích từng từ</h5>
+              <div className="flex flex-wrap gap-2">
+                {(lastResponse?.data?.feedback?.Words || []).map((w: any, idx: number) => (
+                  <div
+                    key={`${w.Word}-${idx}`}
+                    className={`px-2 py-1 rounded-md text-xs font-medium ${getAccuracyClasses(w?.PronunciationAssessment?.AccuracyScore)}`}
+                    title={`Accuracy: ${w?.PronunciationAssessment?.AccuracyScore ?? 'N/A'}`}
+                  >
+                    {w.Word}
+                  </div>
+                ))}
+                {(!lastResponse?.data?.feedback?.Words || lastResponse?.data?.feedback?.Words.length === 0) && (
+                  <span className="text-xs text-muted-foreground">Không có dữ liệu từ</span>
+                )}
+              </div>
+            </div>
+
+            <div className="mt-4">
+              <h5 className="text-sm font-semibold mb-2">Chi tiết âm tiết / âm vị</h5>
+              <div className="space-y-3">
+                {(lastResponse?.data?.feedback?.Words || []).map((w: any, idx: number) => (
+                  <div key={`${w.Word}-${idx}`} className="rounded-lg border p-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-semibold">{w.Word}</span>
+                      <span className="text-xs text-muted-foreground">Accuracy: {w?.PronunciationAssessment?.AccuracyScore ?? '-'}</span>
+                    </div>
+                    {Array.isArray(w?.Syllables) && w.Syllables.length > 0 && (
+                      <div className="mb-2">
+                        <p className="text-xs text-muted-foreground mb-1">Syllables</p>
+                        <div className="flex flex-wrap gap-2">
+                          {w.Syllables.map((s: any, sIdx: number) => (
+                            <span
+                              key={`${w.Word}-s-${sIdx}`}
+                              className={`px-2 py-1 rounded text-xs ${getAccuracyClasses(s?.PronunciationAssessment?.AccuracyScore)}`}
+                            >
+                              {s.Syllable} ({s?.PronunciationAssessment?.AccuracyScore ?? '-'})
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {Array.isArray(w?.Phonemes) && w.Phonemes.length > 0 && (
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-1">Phonemes</p>
+                        <div className="flex flex-wrap gap-2">
+                          {w.Phonemes.map((p: any, pIdx: number) => (
+                            <span
+                              key={`${w.Word}-p-${pIdx}`}
+                              className={`px-2 py-1 rounded text-xs ${getAccuracyClasses(p?.PronunciationAssessment?.AccuracyScore)}`}
+                            >
+                              {p.Phoneme} ({p?.PronunciationAssessment?.AccuracyScore ?? '-'})
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </Card>
         )}
 
         {/* ── Main Grid ── */}

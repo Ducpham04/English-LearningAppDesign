@@ -7,7 +7,6 @@ import { Badge } from '@/app/components/ui/badge';
 import { Mic, Volume2, RotateCcw, CheckCircle2, Square, ArrowLeft, ArrowRight, Trophy, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import apiService from '@/services/apiService';
-import { useAppStore } from '@/store/appStore';
 
 interface PhraseItem {
   id: number;
@@ -44,6 +43,8 @@ export function PronunciationLesson() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [scores, setScores] = useState<number[]>([]);
   const [attempts, setAttempts] = useState(0);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [lastResponse, setLastResponse] = useState<any>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
@@ -87,42 +88,32 @@ export function PronunciationLesson() {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
-      const mr = new MediaRecorder(stream);
+      const preferredMimeTypes = [
+        'audio/mp4',
+        'audio/m4a',
+        'audio/aac',
+        'audio/webm;codecs=opus',
+        'audio/webm',
+      ];
+      const selectedMimeType = preferredMimeTypes.find((type) => MediaRecorder.isTypeSupported(type));
+      const mr = selectedMimeType ? new MediaRecorder(stream, { mimeType: selectedMimeType }) : new MediaRecorder(stream);
       mediaRecorderRef.current = mr;
       mr.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data); };
-      mr.onstop = async () => {
+      mr.onstop = () => {
         stream.getTracks().forEach((t) => t.stop());
         setIsRecording(false);
         if (chunksRef.current.length === 0) {
           toast.error('Không có bản ghi âm. Hãy nói rồi nhấn Dừng.');
           return;
         }
-        setIsAnalyzing(true);
-        const blob = new Blob(chunksRef.current, { type: mr.mimeType || 'audio/wav' });
-        try {
-          const res = await apiService.pronunciation.getScore(
-            Number(lessonId),
-            currentWordIndex,
-            blob,
-            currentPhrase.word
-          );
-          const d = res.data?.data;
-          if (d) {
-            const score = overallScore(d);
-            setScores((prev) => {
-              const next = [...prev];
-              next[currentWordIndex] = Math.max(score, next[currentWordIndex] ?? 0);
-              return next;
-            });
-            if (score >= 85) toast.success(`Xuất sắc! ${score}/100 🎉`);
-            else if (score >= 70) toast.success(`Tốt! ${score}/100.`);
-            else toast.info(`${score}/100. Nghe mẫu và thử lại.`);
-          } else toast.error('Không nhận được kết quả chấm điểm.');
-        } catch (err: any) {
-          toast.error(err?.response?.data?.message || 'Chấm phát âm thất bại. Thử lại.');
-        } finally {
-          setIsAnalyzing(false);
-        }
+        const blob = new Blob(chunksRef.current, { type: mr.mimeType || 'audio/mp4' });
+        const ext = mr.mimeType?.includes('mp4') || mr.mimeType?.includes('m4a') ? '.m4a'
+          : mr.mimeType?.includes('aac') ? '.aac'
+          : mr.mimeType?.includes('wav') ? '.wav'
+          : '.webm';
+        const file = new File([blob], `recording${ext}`, { type: blob.type || 'audio/mp4' });
+        setSelectedFile(file);
+        toast.success('Đã lưu bản ghi âm. Hãy bấm "Chấm phát âm từ file".');
       };
       mr.start(200);
     } catch {
@@ -151,21 +142,6 @@ export function PronunciationLesson() {
     }
   };
 
-  const handleComplete = async () => {
-    const allPassed = phrases.length > 0 && phrases.every((_, i) => (scores[i] ?? 0) >= 70);
-    if (!lessonId || !allPassed) {
-      toast.error('Hãy luyện phát âm và đạt ≥70 điểm cho mỗi từ/câu trước khi hoàn thành.');
-      return;
-    }
-    const validScores = phrases.map((_, i) => scores[i]).filter((s): s is number => s != null);
-    const avgScore = validScores.length ? validScores.reduce((a, b) => a + b, 0) / validScores.length : 0;
-    try {
-      await apiService.student.completeLesson(lessonId, Math.round(avgScore));
-      useAppStore.getState().invalidateProgress();
-    } catch { /* ignore */ }
-    toast.success(`🎉 Hoàn thành bài học! +${Math.round(avgScore / 2)} XP`);
-    navigate(-1);
-  };
 
   const getDifficultyColor = (difficulty: string) => {
     switch (difficulty) {
@@ -183,6 +159,7 @@ export function PronunciationLesson() {
   };
 
   const canComplete = phrases.length > 0 && phrases.every((_, i) => (scores[i] ?? 0) >= 70);
+  const fileReady = !!selectedFile && selectedFile.size > 0;
 
   if (phrasesLoading || !currentPhrase) {
     return (
@@ -201,6 +178,7 @@ export function PronunciationLesson() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <Button
+            type="button"
             variant="ghost"
             onClick={() => navigate(-1)}
             className="gap-2"
@@ -243,6 +221,7 @@ export function PronunciationLesson() {
 
             {/* Listen Button */}
             <Button
+              type="button"
               onClick={playAudio}
               variant="outline"
               size="lg"
@@ -253,7 +232,36 @@ export function PronunciationLesson() {
             </Button>
 
             {/* Recording Section */}
-            <div className="py-8">
+            <div className="py-8 space-y-6">
+              <div className="flex flex-col items-center gap-4">
+                <div className="flex items-center gap-3">
+                  <input
+                    type="file"
+                    accept="audio/m4a,audio/mp4,audio/aac"
+                    className="block w-full max-w-xs text-sm text-gray-600 dark:text-gray-300 file:mr-4 file:rounded-md file:border-0 file:bg-purple-600 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-purple-700"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0] || null;
+                      setSelectedFile(file);
+                      if (file) {
+                        console.info('Pronunciation file selected:', {
+                          name: file.name,
+                          type: file.type,
+                          size: file.size,
+                        });
+                      }
+                    }}
+                  />
+                  {selectedFile && (
+                    <span className="text-xs text-gray-500 dark:text-gray-400 truncate max-w-[180px]">
+                      {selectedFile.name} ({Math.round(selectedFile.size / 1024)} KB)
+                    </span>
+                  )}
+                </div>
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  Tải lên file .m4a/.mp4 để chấm phát âm (giống Swagger)
+                </p>
+              </div>
+
               {isAnalyzing ? (
                 <div className="flex flex-col items-center gap-4">
                   <Loader2 className="w-16 h-16 text-purple-600 animate-spin" />
@@ -265,12 +273,13 @@ export function PronunciationLesson() {
                     <Mic className="w-16 h-16 text-white" />
                   </div>
                   <p className="text-lg font-semibold text-red-600">Đang thu âm...</p>
-                  <Button onClick={stopRecording} variant="outline" className="gap-2 border-red-300 text-red-700">
+                  <Button type="button" onClick={stopRecording} variant="outline" className="gap-2 border-red-300 text-red-700">
                     <Square className="w-4 h-4" /> Dừng
                   </Button>
                 </div>
               ) : (
                 <Button
+                  type="button"
                   onClick={startRecording}
                   size="lg"
                   className="w-32 h-32 rounded-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
@@ -281,6 +290,79 @@ export function PronunciationLesson() {
               <p className="text-sm text-gray-600 dark:text-gray-400 mt-4">
                 Nhấn micro để thu âm, nói xong nhấn Dừng
               </p>
+
+              {selectedFile && !isAnalyzing && (
+                <Button
+                  type="button"
+                  disabled={!fileReady}
+                  onClick={async (event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    if (!lessonId || !currentPhrase) return;
+                    if (!fileReady) {
+                      toast.error('File không hợp lệ. Vui lòng chọn lại.');
+                      return;
+                    }
+                    console.info('Pronunciation upload payload:', {
+                      name: selectedFile.name,
+                      type: selectedFile.type,
+                      size: selectedFile.size,
+                      lessonId,
+                      sentenceIndex: currentWordIndex,
+                    });
+                    setIsAnalyzing(true);
+                    setLastResponse(null);
+                    try {
+                      const res = await apiService.pronunciation.getScore(
+                        Number(lessonId),
+                        currentWordIndex,
+                        selectedFile,
+                        currentPhrase.word
+                      );
+                      const d = res.data?.data;
+                      if (d) {
+                        setLastResponse(res.data);
+                        const score = overallScore(d);
+                        setScores((prev) => {
+                          const next = [...prev];
+                          next[currentWordIndex] = Math.max(score, next[currentWordIndex] ?? 0);
+                          return next;
+                        });
+                        if (score >= 85) toast.success(`Xuất sắc! ${score}/100 🎉`);
+                        else if (score >= 70) toast.success(`Tốt! ${score}/100.`);
+                        else toast.info(`${score}/100. Nghe mẫu và thử lại.`);
+                      } else toast.error('Không nhận được kết quả chấm điểm.');
+                    } catch (err: any) {
+                      setLastResponse(err?.response?.data ?? null);
+                      toast.error(err?.response?.data?.message || 'Chấm phát âm thất bại. Thử lại.');
+                    } finally {
+                      setIsAnalyzing(false);
+                    }
+                  }}
+                  className="w-full max-w-xs"
+                >
+                  Chấm phát âm từ file
+                </Button>
+              )}
+
+              {lastResponse && (
+                <Card className="p-4 border border-purple-100 dark:border-gray-700 text-left">
+                  <div className="flex items-center justify-between mb-2">
+                    <h4 className="font-semibold text-sm">Response chi tiết</h4>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setLastResponse(null)}
+                    >
+                      Đóng
+                    </Button>
+                  </div>
+                  <pre className="text-xs text-gray-700 dark:text-gray-300 whitespace-pre-wrap break-words max-h-80 overflow-auto">
+                    {JSON.stringify(lastResponse, null, 2)}
+                  </pre>
+                </Card>
+              )}
             </div>
 
             {/* Score Display */}
@@ -313,6 +395,7 @@ export function PronunciationLesson() {
         {/* Navigation */}
         <div className="flex justify-between items-center">
           <Button
+            type="button"
             variant="outline"
             onClick={handlePrevious}
             disabled={currentWordIndex === 0}
@@ -322,25 +405,15 @@ export function PronunciationLesson() {
             Previous
           </Button>
 
-          {currentWordIndex === phrases.length - 1 ? (
-            <Button
-              onClick={handleComplete}
-              className="bg-green-600 hover:bg-green-700 text-white gap-2"
-              disabled={!canComplete}
-            >
-              <CheckCircle2 className="w-5 h-5" />
-              Hoàn thành
-            </Button>
-          ) : (
-            <Button
-              onClick={handleNext}
-              disabled={scores[currentWordIndex] == null || scores[currentWordIndex] < 70}
-              className="gap-2"
-            >
-              Tiếp theo
-              <ArrowRight className="w-4 h-4" />
-            </Button>
-          )}
+          <Button
+            type="button"
+            onClick={handleNext}
+            disabled={scores[currentWordIndex] == null || scores[currentWordIndex] < 70}
+            className="gap-2"
+          >
+            Tiếp theo
+            <ArrowRight className="w-4 h-4" />
+          </Button>
         </div>
 
         {/* Score Overview */}
