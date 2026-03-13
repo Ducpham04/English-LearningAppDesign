@@ -19,6 +19,7 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import apiService from '@/services/apiService';
 import { toast } from 'sonner';
+import { RealtimeSpeechClient, type RealtimeClientState } from '@/services/realtimeSpeechClient';
 
 interface Message {
   id: string;
@@ -38,13 +39,13 @@ export function AIConversation() {
   const [loading, setLoading] = useState(true);
   const [messages, setMessages] = useState<Message[]>([]);
   const [isRecording, setIsRecording] = useState(false);
-  const [recordingTime, setRecordingTime] = useState(0);
   const [inputText, setInputText] = useState('');
   const [isAITyping, setIsAITyping] = useState(false);
   const [turnCount, setTurnCount] = useState(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const recognitionRef = useRef<SpeechRecognition | null>(null);
+  const [rtState, setRtState] = useState<RealtimeClientState>('idle');
+  const rtRef = useRef<RealtimeSpeechClient | null>(null);
+  const aiDraftRef = useRef<string>('');
 
   const lessonContext = lesson ? [lesson.title, lesson.description].filter(Boolean).join('\n') : '';
 
@@ -77,70 +78,75 @@ export function AIConversation() {
       .finally(() => setLoading(false));
   }, [lessonId]);
 
-  // Speech recognition
   useEffect(() => {
-    if (!('SpeechRecognition' in window) && !('webkitSpeechRecognition' in window)) return;
-    const SpeechRec = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    const rec = new SpeechRec();
-    rec.lang = 'en-US';
-    rec.continuous = false;
-    rec.interimResults = false;
-    rec.onresult = (e: any) => {
-      const text = e.results[0][0].transcript;
-      setIsRecording(false);
-      if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
-      handleSendMessage(text);
+    rtRef.current = new RealtimeSpeechClient({
+      onState: (s) => {
+        setRtState(s);
+        setIsRecording(s === 'listening' || s === 'ai_speaking');
+      },
+      onTranscript: (evt) => {
+        if (evt.role === 'user' && evt.isFinal) {
+          const userMessage: Message = {
+            id: `user-${Date.now()}`,
+            role: 'user',
+            text: evt.text,
+            timestamp: new Date(),
+          };
+          setMessages((prev) => [
+            ...prev,
+            userMessage,
+            { id: `ai-${Date.now()}`, role: 'ai', text: '...', timestamp: new Date() },
+          ]);
+          setTurnCount((prev) => prev + 1);
+          aiDraftRef.current = '';
+        } else if (evt.role === 'assistant' && evt.isDelta) {
+          aiDraftRef.current = aiDraftRef.current
+            ? `${aiDraftRef.current} ${evt.text}`
+            : evt.text;
+          const t = aiDraftRef.current.trim();
+          if (!t) return;
+          setMessages((prev) => {
+            const next = [...prev];
+            for (let i = next.length - 1; i >= 0; i--) {
+              if (next[i].role === 'ai') {
+                next[i] = { ...next[i], text: t };
+                return next;
+              }
+            }
+            next.push({ id: `ai-${Date.now()}`, role: 'ai', text: t, timestamp: new Date() });
+            return next;
+          });
+        }
+      },
+      onError: (m) => toast.error(m || 'Realtime voice error'),
+    });
+
+    return () => {
+      rtRef.current?.stop();
+      rtRef.current = null;
     };
-    rec.onerror = () => { setIsRecording(false); toast.error('Không nhận được giọng nói'); };
-    rec.onend = () => setIsRecording(false);
-    recognitionRef.current = rec;
   }, []);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  useEffect(() => {
-    if (isRecording) {
-      recordingTimerRef.current = setInterval(() => {
-        setRecordingTime((prev) => {
-          if (prev >= 30) {
-            handleStopRecording();
-            return 30;
-          }
-          return prev + 0.1;
-        });
-      }, 100);
+  const toggleVoice = async () => {
+    if (rtState === 'idle' || rtState === 'error') {
+      if (!lessonId) return;
+      await rtRef.current?.start({ instructions: lessonContext });
+      rtRef.current?.sendEvent({
+        type: 'conversation.item.create',
+        item: {
+          type: 'message',
+          role: 'user',
+          content: [{ type: 'input_text', text: 'Start with a short greeting.' }],
+        },
+      });
+      rtRef.current?.sendEvent({ type: 'response.create' });
     } else {
-      if (recordingTimerRef.current) {
-        clearInterval(recordingTimerRef.current);
-      }
+      rtRef.current?.stop();
     }
-    return () => {
-      if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
-    };
-  }, [isRecording]);
-
-  const speakText = (text: string) => {
-    if (!window.speechSynthesis) return;
-    window.speechSynthesis.cancel();
-    const u = new SpeechSynthesisUtterance(text);
-    u.lang = 'en-US';
-    u.rate = 0.85;
-    window.speechSynthesis.speak(u);
-  };
-
-  const handleStartRecording = () => {
-    if (!recognitionRef.current) { toast.error('Trình duyệt không hỗ trợ nhận diện giọng nói'); return; }
-    setIsRecording(true);
-    setRecordingTime(0);
-    recognitionRef.current.start();
-  };
-
-  const handleStopRecording = () => {
-    setIsRecording(false);
-    if (recognitionRef.current) recognitionRef.current.stop();
-    if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
   };
 
   const handleSendMessage = (text?: string) => {
@@ -172,7 +178,6 @@ export function AIConversation() {
         const aiMessage: Message = { id: `ai-${Date.now()}`, role: 'ai', text: reply, timestamp: new Date() };
         setMessages((prev) => [...prev, aiMessage]);
         setTurnCount((prev) => prev + 1);
-        speakText(reply);
       })
       .catch((err) => {
         toast.error(err?.response?.data?.message || 'Không thể kết nối AI. Thử lại sau.');
@@ -195,7 +200,8 @@ export function AIConversation() {
   };
 
   const handlePlayAudio = (text: string) => {
-    speakText(text);
+    // Voice output comes from realtime mode; keep button as no-op for now.
+    void text;
   };
 
   if (loading) {
@@ -348,8 +354,8 @@ export function AIConversation() {
                   <motion.button
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
-                    onClick={isRecording ? handleStopRecording : handleStartRecording}
-                    disabled={isAITyping}
+                    onClick={toggleVoice}
+                    disabled={rtState === 'ai_speaking' || isAITyping}
                     className={`flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full transition-all ${
                       isRecording
                         ? 'bg-red-500 shadow-lg shadow-red-500/50 animate-pulse'
@@ -364,17 +370,7 @@ export function AIConversation() {
                   </motion.button>
 
                   {/* Recording Timer */}
-                  {isRecording && (
-                    <motion.div
-                      initial={{ opacity: 0, scale: 0.8 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      className="flex-1 text-center"
-                    >
-                      <p className="text-sm font-medium text-red-600 dark:text-red-400">
-                        Đang ghi âm... {recordingTime.toFixed(1)}s
-                      </p>
-                    </motion.div>
-                  )}
+                  {isRecording && null}
 
                   {/* Text Input */}
                   {!isRecording && (

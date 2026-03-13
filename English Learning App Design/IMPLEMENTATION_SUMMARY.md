@@ -9,7 +9,7 @@ A modern English learning web application focusing on Listening, Speaking, and P
 - Mock video player with interactive controls (play/pause, restart, mute, fullscreen)
 - Synchronized subtitle display
 - Interactive vocabulary sidebar with:
-  - Word pronunciation (IPA notation)
+  - Word pronunciation (IPA notation) 
   - Vietnamese meanings
   - Audio playback buttons
 - Progress tracking

@@ -72,12 +72,25 @@ public class OpenAiRealtimeHandler extends TextWebSocketHandler {
                 if (session.isOpen()) {
                     session.sendMessage(new BinaryMessage(Base64.getDecoder().decode(base64Audio)));
                 }
+            } else if ("input_audio_buffer.speech_stopped".equals(type)) {
+                // Server VAD detected end of user turn. Trigger response automatically.
+                try {
+                    ObjectNode resp = objectMapper.createObjectNode();
+                    resp.put("type", "response.create");
+                    webSocket.send(objectMapper.writeValueAsString(resp));
+                } catch (Exception e) {
+                    log.warn("Failed to auto response.create on speech_stopped", e);
+                }
+                if (session.isOpen()) {
+                    session.sendMessage(new TextMessage(text));
+                }
             } else if ("conversation.item.created".equals(type) ||
                        "response.created".equals(type) ||
                        "response.done".equals(type) ||
                        "response.audio_transcript.delta".equals(type) || 
                        "conversation.item.input_audio_transcription.completed".equals(type) ||
                        "input_audio_buffer.speech_started".equals(type) ||
+                        "input_audio_buffer.speech_stopped".equals(type) ||
                        "error".equals(type)) {
                 if (session.isOpen()) {
                     session.sendMessage(new TextMessage(text));

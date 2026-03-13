@@ -9,6 +9,7 @@ import { Avatar, AvatarFallback } from '@/app/components/ui/avatar';
 import { Input } from '@/app/components/ui/input';
 import apiService from '@/services/apiService';
 import { useAppStore } from '@/store/appStore';
+import { RealtimeSpeechClient, type RealtimeClientState } from '@/services/realtimeSpeechClient';
 
 interface Message {
   id: number;
@@ -44,10 +45,11 @@ export function AIConversationLesson() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState('');
   const [isRecording, setIsRecording] = useState(false);
-  const [isAISpeaking, setIsAISpeaking] = useState(false);
+  const [rtState, setRtState] = useState<RealtimeClientState>('idle');
   const [isAITyping, setIsAITyping] = useState(false);
   const [turnCount, setTurnCount] = useState(0);
-  const [recognition, setRecognition] = useState<SpeechRecognition | null>(null);
+  const rtRef = useRef<RealtimeSpeechClient | null>(null);
+  const aiDraftRef = useRef<string>('');
 
   useEffect(() => {
     if (!lessonId) return;
@@ -67,17 +69,14 @@ export function AIConversationLesson() {
           const greeting = (typeof content === 'string' && content.trim()) ? content.trim() : buildGreeting(title);
           const msg: Message = { id: 1, sender: 'ai', text: greeting, timestamp: new Date() };
           setMessages([msg]);
-          speakText(greeting);
         }).catch(() => {
           const greeting = buildGreeting(title);
           setMessages([{ id: 1, sender: 'ai', text: greeting, timestamp: new Date() }]);
-          speakText(greeting);
         });
       })
       .catch(() => {
         const defaultGreeting = "Hello! Let's practice English conversation. How can I help you?";
         setMessages([{ id: 1, sender: 'ai', text: defaultGreeting, timestamp: new Date() }]);
-        speakText(defaultGreeting);
       })
       .finally(() => setLoading(false));
   }, [lessonId]);
@@ -86,46 +85,68 @@ export function AIConversationLesson() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // Setup Web Speech API
   useEffect(() => {
-    if ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window) {
-      const SpeechRec = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-      const rec = new SpeechRec();
-      rec.lang = 'en-US';
-      rec.continuous = false;
-      rec.interimResults = false;
-      rec.onresult = (e: any) => {
-        const text = e.results[0][0].transcript;
-        setIsRecording(false);
-        handleSendMessage(text);
-      };
-      rec.onerror = () => { setIsRecording(false); toast.error('Không nhận được giọng nói'); };
-      rec.onend = () => setIsRecording(false);
-      setRecognition(rec);
-    }
+    rtRef.current = new RealtimeSpeechClient({
+      onState: (s) => {
+        setRtState(s);
+        setIsRecording(s === 'listening' || s === 'ai_speaking');
+      },
+      onTranscript: (evt) => {
+        if (evt.role === 'user' && evt.isFinal) {
+          const userMsg: Message = { id: Date.now(), sender: 'user', text: evt.text, timestamp: new Date() };
+          setMessages((prev) => [...prev, userMsg]);
+          setTurnCount((prev) => prev + 1);
+          aiDraftRef.current = '';
+          // placeholder assistant bubble
+          setMessages((prev) => [...prev, { id: Date.now() + 1, sender: 'ai', text: '...', timestamp: new Date() }]);
+        } else if (evt.role === 'assistant' && evt.isDelta) {
+          aiDraftRef.current = aiDraftRef.current
+            ? `${aiDraftRef.current} ${evt.text}`
+            : evt.text;
+          const t = aiDraftRef.current.trim();
+          if (!t) return;
+          setMessages((prev) => {
+            const next = [...prev];
+            for (let i = next.length - 1; i >= 0; i--) {
+              if (next[i].sender === 'ai') {
+                next[i] = { ...next[i], text: t };
+                return next;
+              }
+            }
+            next.push({ id: Date.now(), sender: 'ai', text: t, timestamp: new Date() });
+            return next;
+          });
+        }
+      },
+      onError: (m) => toast.error(m || 'Realtime voice error'),
+    });
+
+    return () => {
+      rtRef.current?.stop();
+      rtRef.current = null;
+    };
   }, []);
 
-  const speakText = (text: string) => {
-    if (!window.speechSynthesis) return;
-    window.speechSynthesis.cancel();
-    setIsAISpeaking(true);
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = 'en-US';
-    utterance.rate = 0.85;
-    utterance.pitch = 1;
-    utterance.onend = () => setIsAISpeaking(false);
-    utterance.onerror = () => setIsAISpeaking(false);
-    window.speechSynthesis.speak(utterance);
-  };
+  const toggleRecording = async () => {
+    if (rtState === 'idle' || rtState === 'error') {
+      if (!lessonId) return;
+      const title = lesson?.title ?? 'Luyện hội thoại';
+      const desc = lesson?.description ?? '';
+      const lessonContext = [title, desc].filter(Boolean).join('\n');
+      await rtRef.current?.start({ instructions: lessonContext });
 
-  const toggleRecording = () => {
-    if (!recognition) { toast.error('Trình duyệt không hỗ trợ nhận diện giọng nói'); return; }
-    if (isRecording) {
-      recognition.stop();
-      setIsRecording(false);
+      // voice greeting once when starting
+      rtRef.current?.sendEvent({
+        type: 'conversation.item.create',
+        item: {
+          type: 'message',
+          role: 'user',
+          content: [{ type: 'input_text', text: `Start with a short greeting for this English conversation practice: ${title}.` }],
+        },
+      });
+      rtRef.current?.sendEvent({ type: 'response.create' });
     } else {
-      recognition.start();
-      setIsRecording(true);
+      rtRef.current?.stop();
     }
   };
 
@@ -153,7 +174,6 @@ export function AIConversationLesson() {
         const aiMsg: Message = { id: Date.now() + 1, sender: 'ai', text: response, timestamp: new Date() };
         setMessages((prev) => [...prev, aiMsg]);
         setTurnCount((prev) => prev + 1);
-        speakText(response);
       })
       .catch((err) => {
         toast.error(err?.response?.data?.message || 'Không thể kết nối AI. Thử lại sau.');
@@ -215,7 +235,7 @@ export function AIConversationLesson() {
               <h2 className="font-bold">{lesson?.title ?? 'Luyện hội thoại AI'}</h2>
               <p className="text-xs text-gray-500">{lesson?.description ?? 'Hãy nói chuyện tự nhiên bằng tiếng Anh'}</p>
             </div>
-            {isAISpeaking && (
+            {rtState === 'ai_speaking' && (
               <div className="ml-auto flex items-center gap-1 text-xs text-purple-500 animate-pulse">
                 <Volume2 className="w-3 h-3" />
                 <span>AI đang nói...</span>
@@ -244,12 +264,7 @@ export function AIConversationLesson() {
                   }`}>
                     {message.text}
                   </div>
-                  {message.sender === 'ai' && (
-                    <button onClick={() => speakText(message.text)} className="flex items-center gap-1 text-xs text-gray-400 hover:text-purple-500 transition-colors">
-                      <Volume2 className="w-3 h-3" />
-                      Nghe lại
-                    </button>
-                  )}
+                  {message.sender === 'ai' && null}
                 </div>
               </div>
             ))}
@@ -276,7 +291,7 @@ export function AIConversationLesson() {
               size="icon"
               variant={isRecording ? 'destructive' : 'outline'}
               onClick={toggleRecording}
-              disabled={isAISpeaking || isAITyping}
+              disabled={rtState === 'ai_speaking' || isAITyping}
               className={`flex-shrink-0 ${isRecording ? 'animate-pulse' : ''}`}
               title={isRecording ? 'Nhấn để dừng' : 'Nhấn để nói'}
             >
