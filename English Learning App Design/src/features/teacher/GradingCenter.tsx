@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card } from '@/app/components/ui/card';
 import { Button } from '@/app/components/ui/button';
 import { Input } from '@/app/components/ui/input';
@@ -34,8 +34,10 @@ import {
   FileText,
   Users,
   BookOpen,
+  Loader2,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import apiService from '@/services/apiService';
 
 interface Submission {
   id: string;
@@ -71,112 +73,32 @@ export function GradingCenter() {
   const [selectedSubmission, setSelectedSubmission] = useState<Submission | null>(null);
   const [showGradeModal, setShowGradeModal] = useState(false);
   const [gradeData, setGradeData] = useState({ score: '', feedback: '' });
+  const [classesWithPending, setClassesWithPending] = useState<ClassGrading[]>([]);
+  const [allSubmissions, setAllSubmissions] = useState<Submission[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  // Mock data - Classes with pending assignments
-  const classesWithPending: ClassGrading[] = [
-    {
-      id: '1',
-      name: 'Beginner A1 - Morning',
-      code: 'BEG1AM',
-      pendingCount: 12,
-      totalStudents: 25,
-      recentSubmissions: [],
-    },
-    {
-      id: '2',
-      name: 'Intermediate B1 - Evening',
-      code: 'INT1EV',
-      pendingCount: 8,
-      totalStudents: 20,
-      recentSubmissions: [],
-    },
-    {
-      id: '3',
-      name: 'Advanced C1 - Weekend',
-      code: 'ADV1WE',
-      pendingCount: 5,
-      totalStudents: 15,
-      recentSubmissions: [],
-    },
-  ];
-
-  // Mock data - Submissions
-  const allSubmissions: Submission[] = [
-    {
-      id: '1',
-      studentId: '1',
-      studentName: 'John Smith',
-      assignmentId: 'test-1',
-      assignmentTitle: 'Week 1 Grammar Test',
-      type: 'test',
-      status: 'pending',
-      maxScore: 100,
-      submittedAt: '2026-01-15T10:30:00',
-      classId: '1',
-      className: 'Beginner A1 - Morning',
-    },
-    {
-      id: '2',
-      studentId: '2',
-      studentName: 'Sarah Johnson',
-      assignmentId: 'test-1',
-      assignmentTitle: 'Week 1 Grammar Test',
-      type: 'test',
-      status: 'graded',
-      score: 95,
-      maxScore: 100,
-      submittedAt: '2026-01-15T09:15:00',
-      gradedAt: '2026-01-15T14:20:00',
-      feedback: 'Excellent work! Very thorough understanding.',
-      classId: '1',
-      className: 'Beginner A1 - Morning',
-    },
-    {
-      id: '3',
-      studentId: '3',
-      studentName: 'Mike Brown',
-      assignmentId: 'assign-1',
-      assignmentTitle: 'Pronunciation Practice Assignment',
-      type: 'assignment',
-      status: 'pending',
-      maxScore: 50,
-      submittedAt: '2026-01-16T08:45:00',
-      classId: '2',
-      className: 'Intermediate B1 - Evening',
-    },
-    {
-      id: '4',
-      studentId: '4',
-      studentName: 'Emily Davis',
-      assignmentId: 'quiz-1',
-      assignmentTitle: 'Vocabulary Quiz - Unit 2',
-      type: 'quiz',
-      status: 'graded',
-      score: 42,
-      maxScore: 50,
-      submittedAt: '2026-01-14T11:20:00',
-      gradedAt: '2026-01-14T15:30:00',
-      feedback: 'Good job! Review words 15-20.',
-      classId: '2',
-      className: 'Intermediate B1 - Evening',
-    },
-    {
-      id: '5',
-      studentId: '5',
-      studentName: 'David Wilson',
-      assignmentId: 'test-1',
-      assignmentTitle: 'Week 1 Grammar Test',
-      type: 'test',
-      status: 'returned',
-      score: 78,
-      maxScore: 100,
-      submittedAt: '2026-01-15T10:00:00',
-      gradedAt: '2026-01-15T16:45:00',
-      feedback: 'Review subject-verb agreement. Good effort overall.',
-      classId: '3',
-      className: 'Advanced C1 - Weekend',
-    },
-  ];
+  useEffect(() => {
+    apiService.teacherClasses.getAll()
+      .then((res) => {
+        const list = (res.data?.data ?? []) as any[];
+        const arr = Array.isArray(list) ? list : [];
+        setClassesWithPending(arr.map((c: any) => ({
+          id: String(c.id),
+          name: c.name || `Lớp ${c.id}`,
+          code: c.name?.slice(0, 6).toUpperCase() || String(c.id),
+          pendingCount: 0,
+          totalStudents: c.studentCount ?? 0,
+          recentSubmissions: [],
+        })));
+        setAllSubmissions([]);
+      })
+      .catch(() => {
+        setClassesWithPending([]);
+        setAllSubmissions([]);
+        toast.error('Không tải được danh sách lớp');
+      })
+      .finally(() => setLoading(false));
+  }, []);
 
   const filteredSubmissions = allSubmissions.filter((sub) => {
     const matchesClass = selectedClass === 'all' || sub.classId === selectedClass;
@@ -257,6 +179,14 @@ export function GradingCenter() {
         return FileText;
     }
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex items-center justify-center">
+        <Loader2 className="h-10 w-10 animate-spin text-purple-500" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950 pb-20 md:pb-6">
@@ -369,12 +299,16 @@ export function GradingCenter() {
                   </div>
                   <div>
                     <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
-                      No submissions found
+                      {allSubmissions.length === 0
+                        ? 'Chưa có bài nộp'
+                        : 'No submissions found'}
                     </h3>
                     <p className="text-gray-600 dark:text-gray-400">
-                      {selectedTab === 'pending'
-                        ? 'All caught up! No pending submissions to grade.'
-                        : 'Try adjusting your filters.'}
+                      {allSubmissions.length === 0
+                        ? 'Dữ liệu bài nộp từ học viên sẽ hiển thị khi có API nộp bài.'
+                        : selectedTab === 'pending'
+                          ? 'All caught up! No pending submissions to grade.'
+                          : 'Try adjusting your filters.'}
                     </p>
                   </div>
                 </div>

@@ -1,19 +1,18 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card } from '@/app/components/ui/card';
 import { Button } from '@/app/components/ui/button';
 import { Badge } from '@/app/components/ui/badge';
 import {
   Calendar as CalendarIcon,
-  Plus,
   ChevronLeft,
   ChevronRight,
   Clock,
   Users,
-  MapPin,
-  Video,
-  BookOpen,
+  Loader2,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import apiService from '@/services/apiService';
 
 interface ScheduleEvent {
   id: string;
@@ -35,16 +34,63 @@ interface DaySchedule {
   events: ScheduleEvent[];
 }
 
+const COLORS = ['bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-amber-500', 'bg-pink-500'];
+
 export function Schedule() {
+  const navigate = useNavigate();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [viewMode, setViewMode] = useState<'week' | 'day'>('week');
+  const [allEvents, setAllEvents] = useState<ScheduleEvent[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  // Get current week
+  useEffect(() => {
+    apiService.teacherClasses.getAll()
+      .then((res) => {
+        const list = (res.data?.data ?? []) as any[];
+        const arr = Array.isArray(list) ? list : [];
+        const events: ScheduleEvent[] = arr.map((c: any, i: number) => {
+          const start = c.startDate ? new Date(c.startDate) : new Date();
+          const end = c.endDate ? new Date(c.endDate) : new Date(start.getTime() + 90 * 60000);
+          const ev: ScheduleEvent & { startDate?: string } = {
+            id: String(c.id),
+            title: c.name || `Lớp ${c.id}`,
+            classId: String(c.id),
+            className: c.name || '',
+            type: 'class',
+            startTime: start.toTimeString().slice(0, 5),
+            endTime: end.toTimeString().slice(0, 5),
+            students: c.studentCount ?? 0,
+            color: COLORS[i % COLORS.length],
+          };
+          if (c.startDate) (ev as any).startDate = c.startDate;
+          return ev;
+        });
+        setAllEvents(events);
+      })
+      .catch(() => {
+        toast.error('Không tải được lịch lớp');
+        setAllEvents([]);
+      })
+      .finally(() => setLoading(false));
+  }, []);
+
+  const getEventsForDate = (date: Date): ScheduleEvent[] => {
+    const y = date.getFullYear();
+    const m = date.getMonth();
+    const d = date.getDate();
+    return allEvents.filter((ev) => {
+      const raw = (ev as any).startDate;
+      if (!raw) return false;
+      const startDate = new Date(raw);
+      return startDate.getFullYear() === y && startDate.getMonth() === m && startDate.getDate() === d;
+    });
+  };
+
   const getWeekDates = (date: Date): DaySchedule[] => {
     const week: DaySchedule[] = [];
     const startOfWeek = new Date(date);
     const day = startOfWeek.getDay();
-    const diff = startOfWeek.getDate() - day + (day === 0 ? -6 : 1); // Monday as first day
+    const diff = startOfWeek.getDate() - day + (day === 0 ? -6 : 1);
     startOfWeek.setDate(diff);
 
     for (let i = 0; i < 7; i++) {
@@ -52,95 +98,22 @@ export function Schedule() {
       currentDay.setDate(startOfWeek.getDate() + i);
       week.push({
         date: currentDay,
-        dayName: currentDay.toLocaleDateString('en-US', { weekday: 'short' }),
+        dayName: currentDay.toLocaleDateString('vi-VN', { weekday: 'short' }),
         events: getEventsForDate(currentDay),
       });
     }
     return week;
   };
 
-  // Mock events data
-  const allEvents: ScheduleEvent[] = [
-    {
-      id: '1',
-      title: 'Beginner A1 - Morning',
-      classId: 'c1',
-      className: 'Beginner A1',
-      type: 'class',
-      startTime: '08:00',
-      endTime: '09:30',
-      location: 'Room 101',
-      students: 25,
-      color: 'bg-blue-500',
-    },
-    {
-      id: '2',
-      title: 'Intermediate B1 - Evening',
-      classId: 'c2',
-      className: 'Intermediate B1',
-      type: 'class',
-      startTime: '18:00',
-      endTime: '19:30',
-      isOnline: true,
-      students: 20,
-      color: 'bg-green-500',
-    },
-    {
-      id: '3',
-      title: 'Advanced C1 - Weekend',
-      classId: 'c3',
-      className: 'Advanced C1',
-      type: 'class',
-      startTime: '10:00',
-      endTime: '12:00',
-      location: 'Room 203',
-      students: 15,
-      color: 'bg-purple-500',
-    },
-    {
-      id: '4',
-      title: 'Teacher Meeting',
-      classId: '',
-      className: '',
-      type: 'meeting',
-      startTime: '14:00',
-      endTime: '15:00',
-      location: 'Conference Room',
-      color: 'bg-orange-500',
-    },
-    {
-      id: '5',
-      title: 'Curriculum Review',
-      classId: '',
-      className: '',
-      type: 'event',
-      startTime: '16:00',
-      endTime: '17:00',
-      isOnline: true,
-      color: 'bg-pink-500',
-    },
-  ];
-
-  const getEventsForDate = (date: Date): ScheduleEvent[] => {
-    const dayOfWeek = date.getDay();
-    // Mock: Show events on certain days
-    if (dayOfWeek === 1) {
-      // Monday
-      return [allEvents[0], allEvents[3]];
-    } else if (dayOfWeek === 3) {
-      // Wednesday
-      return [allEvents[0], allEvents[1], allEvents[4]];
-    } else if (dayOfWeek === 5) {
-      // Friday
-      return [allEvents[0], allEvents[1]];
-    } else if (dayOfWeek === 6) {
-      // Saturday
-      return [allEvents[2]];
-    }
-    return [];
-  };
-
   const weekDates = getWeekDates(currentDate);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex items-center justify-center">
+        <Loader2 className="h-10 w-10 animate-spin text-blue-500" />
+      </div>
+    );
+  }
 
   const handlePreviousWeek = () => {
     const newDate = new Date(currentDate);

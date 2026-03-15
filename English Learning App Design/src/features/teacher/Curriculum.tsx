@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card } from '@/app/components/ui/card';
 import { Button } from '@/app/components/ui/button';
 import { Input } from '@/app/components/ui/input';
@@ -18,140 +19,89 @@ import {
   BookOpen,
   Clock,
   Target,
-  TrendingUp,
-  Calendar,
-  Edit,
-  Trash2,
   ChevronDown,
   ChevronUp,
+  Loader2,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import apiService from '@/services/apiService';
 
-interface Session {
-  id: string;
+interface SessionItem {
+  id: number | string;
   title: string;
-  level: string;
+  level?: string;
   lessons: number;
-  duration: number;
-  order: number;
-  description: string;
-  objectives: string[];
-  topics: string[];
+  duration?: number;
+  order?: number;
+  description?: string;
+  objectives?: string[];
+  topics?: string[];
 }
 
 interface CurriculumPath {
   id: string;
   name: string;
   level: string;
-  sessions: Session[];
+  sessions: SessionItem[];
   totalLessons: number;
   totalDuration: number;
   studentsEnrolled: number;
 }
 
 export function Curriculum() {
+  const navigate = useNavigate();
   const [selectedLevel, setSelectedLevel] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedSession, setExpandedSession] = useState<string | null>(null);
+  const [curriculumPaths, setCurriculumPaths] = useState<CurriculumPath[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  // Mock data
-  const curriculumPaths: CurriculumPath[] = [
-    {
-      id: '1',
-      name: 'Complete Beginner Course',
-      level: 'Beginner (A1-A2)',
-      totalLessons: 120,
-      totalDuration: 180,
-      studentsEnrolled: 45,
-      sessions: [
-        {
-          id: 's1',
-          title: 'Session 1: Introduction & Greetings',
-          level: 'A1',
-          lessons: 10,
-          duration: 15,
-          order: 1,
-          description: 'Learn basic greetings and introduce yourself',
-          objectives: [
-            'Greet people in different situations',
-            'Introduce yourself and others',
-            'Ask and answer simple questions',
-          ],
-          topics: ['Greetings', 'Self-introduction', 'Basic questions'],
-        },
-        {
-          id: 's2',
-          title: 'Session 2: Daily Routines',
-          level: 'A1',
-          lessons: 12,
-          duration: 18,
-          order: 2,
-          description: 'Describe your daily activities and routines',
-          objectives: [
-            'Talk about daily activities',
-            'Use present simple tense',
-            'Tell time in English',
-          ],
-          topics: ['Daily activities', 'Time expressions', 'Present simple'],
-        },
-        {
-          id: 's3',
-          title: 'Session 3: Food & Dining',
-          level: 'A1',
-          lessons: 10,
-          duration: 15,
-          order: 3,
-          description: 'Order food and discuss preferences',
-          objectives: [
-            'Order food at a restaurant',
-            'Express food preferences',
-            'Understand menu items',
-          ],
-          topics: ['Food vocabulary', 'Restaurant phrases', 'Preferences'],
-        },
-      ],
-    },
-    {
-      id: '2',
-      name: 'Intermediate Communication',
-      level: 'Intermediate (B1-B2)',
-      totalLessons: 96,
-      totalDuration: 144,
-      studentsEnrolled: 32,
-      sessions: [
-        {
-          id: 's4',
-          title: 'Session 1: Travel & Tourism',
-          level: 'B1',
-          lessons: 12,
-          duration: 18,
-          order: 1,
-          description: 'Navigate travel situations confidently',
-          objectives: [
-            'Book accommodation and transport',
-            'Ask for directions',
-            'Handle travel emergencies',
-          ],
-          topics: ['Travel vocabulary', 'Directions', 'Modal verbs'],
-        },
-        {
-          id: 's5',
-          title: 'Session 2: Work & Career',
-          level: 'B1',
-          lessons: 14,
-          duration: 21,
-          order: 2,
-          description: 'Discuss work-related topics professionally',
-          objectives: [
-            'Participate in job interviews',
-            'Describe work responsibilities',
-            'Write professional emails',
-          ],
-          topics: ['Business vocabulary', 'Conditionals', 'Formal writing'],
-        },
-      ],
-    },
-  ];
+  useEffect(() => {
+    Promise.all([
+      apiService.curriculum.getAll(),
+      apiService.session.getAll(),
+      apiService.lesson.getAll(),
+    ])
+      .then(([curRes, sessRes, lessonRes]) => {
+        const curricula = (curRes.data?.data ?? []) as any[];
+        const sessions = (sessRes.data?.data ?? []) as any[];
+        const lessons = (lessonRes.data?.data ?? []) as any[];
+        const paths: CurriculumPath[] = curricula.map((c: any) => {
+          const courseSessions = (sessions as any[]).filter((s: any) => s.courseId === c.id);
+          const sessionIds = courseSessions.map((s: any) => s.id);
+          const courseLessons = (lessons as any[]).filter((l: any) => l.sessionId && sessionIds.includes(l.sessionId));
+          const sessionItems: SessionItem[] = courseSessions.map((s: any) => {
+            const count = courseLessons.filter((l: any) => l.sessionId === s.id).length;
+            return {
+              id: s.id,
+              title: s.title || '',
+              level: s.level,
+              lessons: count,
+              duration: 0,
+              order: s.orderIndex ?? 0,
+              description: s.description,
+              objectives: [],
+              topics: [],
+            };
+          });
+          return {
+            id: String(c.id),
+            name: c.title || c.name || `Khóa ${c.id}`,
+            level: c.level || 'All',
+            sessions: sessionItems,
+            totalLessons: courseLessons.length,
+            totalDuration: 0,
+            studentsEnrolled: 0,
+          };
+        });
+        setCurriculumPaths(paths);
+      })
+      .catch(() => {
+        toast.error('Không tải được lộ trình');
+        setCurriculumPaths([]);
+      })
+      .finally(() => setLoading(false));
+  }, []);
 
   const filteredPaths = curriculumPaths.filter((path) => {
     const matchesLevel =
@@ -167,7 +117,7 @@ export function Curriculum() {
   };
 
   const handleCreateCurriculum = () => {
-    toast.info('Create Curriculum feature - Coming soon!');
+    navigate('/admin/curriculum');
   };
 
   const handleEditPath = (pathId: string) => {
@@ -182,9 +132,16 @@ export function Curriculum() {
     toast.info('Add Session to path - Coming soon!');
   };
 
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex items-center justify-center">
+        <Loader2 className="h-10 w-10 animate-spin text-indigo-500" />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950 pb-20 md:pb-6">
-      {/* Header */}
       <div className="bg-gradient-to-br from-indigo-500 to-indigo-700 text-white p-6 md:p-8">
         <div className="max-w-7xl mx-auto">
           <div className="flex items-center justify-between mb-6">

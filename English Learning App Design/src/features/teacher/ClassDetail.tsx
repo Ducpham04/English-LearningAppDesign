@@ -1,9 +1,13 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Card } from '@/app/components/ui/card';
 import { Button } from '@/app/components/ui/button';
 import { Badge } from '@/app/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/app/components/ui/tabs';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/app/components/ui/dialog';
+import { Label } from '@/app/components/ui/label';
+import { Input } from '@/app/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/app/components/ui/select';
 import { ArrowLeft, Users, BookOpen, ListTodo, LayoutDashboard, Loader2, Plus, Trash2 } from 'lucide-react';
 import apiService from '@/services/apiService';
 import { toast } from 'sonner';
@@ -14,14 +18,41 @@ export function ClassDetail() {
   const id = classId ? Number(classId) : NaN;
   const [detail, setDetail] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [assignModalOpen, setAssignModalOpen] = useState(false);
+  const [assignLessonId, setAssignLessonId] = useState<string>('');
+  const [assignTitle, setAssignTitle] = useState('');
+  const [assignDueAt, setAssignDueAt] = useState('');
+  const [assignSubmitting, setAssignSubmitting] = useState(false);
+  const [studentModalOpen, setStudentModalOpen] = useState(false);
+  const [studentIdInput, setStudentIdInput] = useState('');
+  const [studentSubmitting, setStudentSubmitting] = useState(false);
+  const [usersList, setUsersList] = useState<{ id: string; email?: string; fullName?: string; role?: string }[]>([]);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [deleteSubmitting, setDeleteSubmitting] = useState(false);
 
-  useEffect(() => {
+  const loadDetail = useCallback(() => {
     if (!id || isNaN(id)) return;
+    setLoading(true);
     apiService.teacherClasses.getById(id)
       .then((res) => setDetail(res.data?.data ?? null))
       .catch(() => toast.error('Không tải được thông tin lớp'))
       .finally(() => setLoading(false));
   }, [id]);
+
+  useEffect(() => {
+    loadDetail();
+  }, [loadDetail]);
+
+  useEffect(() => {
+    if (studentModalOpen) {
+      apiService.auth.getUsers()
+        .then((res) => {
+          const list = res.data?.data ?? [];
+          setUsersList(Array.isArray(list) ? list : []);
+        })
+        .catch(() => setUsersList([]));
+    }
+  }, [studentModalOpen]);
 
   if (loading || !detail) {
     return (
@@ -38,14 +69,39 @@ export function ClassDetail() {
   const students = detail.students ?? [];
   const assignments = detail.assignments ?? [];
 
+  const handleDeleteClass = () => {
+    if (!id || isNaN(id)) return;
+    setDeleteSubmitting(true);
+    apiService.teacherClasses.delete(id)
+      .then(() => {
+        toast.success('Đã xoá lớp.');
+        navigate('/teacher/classes');
+      })
+      .catch((e: any) => {
+        toast.error(e?.response?.data?.message || 'Không thể xoá lớp.');
+        setDeleteConfirmOpen(false);
+      })
+      .finally(() => setDeleteSubmitting(false));
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950 pb-20 md:pb-6">
       <div className="bg-gradient-to-br from-blue-400 to-blue-600 text-white p-4 md:p-6">
         <div className="max-w-7xl mx-auto">
-          <Button variant="ghost" className="text-white hover:bg-white/20 gap-2 mb-4" onClick={() => navigate('/teacher/classes')}>
-            <ArrowLeft className="h-4 w-4" />
-            Quay lại
-          </Button>
+          <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
+            <Button variant="ghost" className="text-white hover:bg-white/20 gap-2" onClick={() => navigate('/teacher/classes')}>
+              <ArrowLeft className="h-4 w-4" />
+              Quay lại
+            </Button>
+            <Button
+              variant="outline"
+              className="border-white/50 text-white hover:bg-red-500/20 hover:border-red-300 gap-2"
+              onClick={() => setDeleteConfirmOpen(true)}
+            >
+              <Trash2 className="h-4 w-4" />
+              Xoá lớp
+            </Button>
+          </div>
           <h1 className="text-2xl md:text-3xl font-bold">{classInfo.name}</h1>
           <p className="text-blue-50 mt-1">
             {course?.title && `${course.title} • `}
@@ -53,6 +109,26 @@ export function ClassDetail() {
           </p>
         </div>
       </div>
+
+      <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Xác nhận xoá lớp</DialogTitle>
+          </DialogHeader>
+          <p className="text-gray-600 dark:text-gray-400">
+            Bạn có chắc muốn xoá lớp &quot;{classInfo.name}&quot;? Hành động này không thể hoàn tác. Toàn bộ bài tập và danh sách học viên của lớp sẽ bị xoá.
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteConfirmOpen(false)} disabled={deleteSubmitting}>
+              Huỷ
+            </Button>
+            <Button variant="destructive" onClick={handleDeleteClass} disabled={deleteSubmitting}>
+              {deleteSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+              {deleteSubmitting ? 'Đang xoá...' : 'Xoá lớp'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <div className="max-w-7xl mx-auto p-4 md:p-6">
         <Tabs defaultValue="overview" className="space-y-4">
@@ -137,11 +213,26 @@ export function ClassDetail() {
 
           <TabsContent value="assignments" className="space-y-4">
             <Card className="p-6">
-              <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
                 <h3 className="font-semibold text-lg">Bài tập đã giao</h3>
+                <Button
+                  size="sm"
+                  className="gap-2"
+                  onClick={() => {
+                    setAssignLessonId('');
+                    setAssignTitle('');
+                    setAssignDueAt('');
+                    setAssignModalOpen(true);
+                  }}
+                  disabled={lessons.length === 0}
+                >
+                  <Plus className="h-4 w-4" /> Thêm bài tập
+                </Button>
               </div>
               {assignments.length === 0 ? (
-                <p className="text-gray-500 dark:text-gray-400 text-sm">Chưa giao bài nào.</p>
+                <p className="text-gray-500 dark:text-gray-400 text-sm">
+                  {lessons.length === 0 ? 'Chọn khóa học có bài học để giao bài tập.' : 'Chưa giao bài nào.'}
+                </p>
               ) : (
                 <ul className="space-y-3">
                   {assignments.map((a: any) => (
@@ -159,10 +250,7 @@ export function ClassDetail() {
                         onClick={() => {
                           if (confirm('Xóa bài tập này?')) {
                             apiService.teacherClasses.deleteAssignment(id, a.id)
-                              .then(() => {
-                                setDetail((d: any) => ({ ...d, assignments: (d.assignments ?? []).filter((x: any) => x.id !== a.id) }));
-                                toast.success('Đã xóa');
-                              })
+                              .then(() => { loadDetail(); toast.success('Đã xóa'); })
                               .catch(() => toast.error('Không xóa được'));
                           }
                         }}
@@ -178,7 +266,12 @@ export function ClassDetail() {
 
           <TabsContent value="students" className="space-y-4">
             <Card className="p-6">
-              <h3 className="font-semibold text-lg mb-4">Danh sách học viên</h3>
+              <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+                <h3 className="font-semibold text-lg">Danh sách học viên</h3>
+                <Button size="sm" className="gap-2" onClick={() => { setStudentIdInput(''); setStudentModalOpen(true); }}>
+                  <Plus className="h-4 w-4" /> Thêm học viên
+                </Button>
+              </div>
               {students.length === 0 ? (
                 <p className="text-gray-500 dark:text-gray-400 text-sm">Chưa có học viên trong lớp.</p>
               ) : (
@@ -196,10 +289,7 @@ export function ClassDetail() {
                         onClick={() => {
                           if (confirm(`Xóa ${s.fullName} khỏi lớp?`)) {
                             apiService.teacherClasses.removeStudent(id, s.studentId)
-                              .then(() => {
-                                setDetail((d: any) => ({ ...d, students: (d.students ?? []).filter((x: any) => x.studentId !== s.studentId) }));
-                                toast.success('Đã xóa');
-                              })
+                              .then(() => { loadDetail(); toast.success('Đã xóa'); })
                               .catch(() => toast.error('Không xóa được'));
                           }
                         }}
@@ -214,6 +304,113 @@ export function ClassDetail() {
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* Modal: Thêm bài tập */}
+      <Dialog open={assignModalOpen} onOpenChange={setAssignModalOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Giao bài tập</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div>
+              <Label>Bài học *</Label>
+              <Select value={assignLessonId} onValueChange={(v) => { setAssignLessonId(v); const l = lessons.find((x: any) => String(x.id) === v); if (l) setAssignTitle(l.title || ''); }}>
+                <SelectTrigger><SelectValue placeholder="Chọn bài học" /></SelectTrigger>
+                <SelectContent>
+                  {lessons.map((l: any) => (
+                    <SelectItem key={l.id} value={String(l.id)}>{l.title}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Tên bài tập (tùy chọn)</Label>
+              <Input value={assignTitle} onChange={(e) => setAssignTitle(e.target.value)} placeholder="Mặc định = tên bài học" />
+            </div>
+            <div>
+              <Label>Hạn nộp (tùy chọn)</Label>
+              <Input type="datetime-local" value={assignDueAt} onChange={(e) => setAssignDueAt(e.target.value)} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAssignModalOpen(false)}>Hủy</Button>
+            <Button
+              disabled={!assignLessonId || assignSubmitting}
+              onClick={async () => {
+                setAssignSubmitting(true);
+                try {
+                  await apiService.teacherClasses.createAssignment(id, {
+                    lessonId: Number(assignLessonId),
+                    title: assignTitle.trim() || undefined,
+                    dueAt: assignDueAt || undefined,
+                  });
+                  toast.success('Đã giao bài tập');
+                  setAssignModalOpen(false);
+                  loadDetail();
+                } catch (e: any) {
+                  toast.error(e?.response?.data?.message || 'Giao bài thất bại');
+                } finally {
+                  setAssignSubmitting(false);
+                }
+              }}
+            >
+              {assignSubmitting ? 'Đang giao...' : 'Giao bài'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal: Thêm học viên */}
+      <Dialog open={studentModalOpen} onOpenChange={setStudentModalOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Thêm học viên vào lớp</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div>
+              <Label>Chọn tài khoản (hoặc nhập ID)</Label>
+              <Select value={studentIdInput} onValueChange={setStudentIdInput}>
+                <SelectTrigger><SelectValue placeholder="Chọn học viên" /></SelectTrigger>
+                <SelectContent>
+                  {usersList
+                    .filter((u: any) => u.role === 'STUDENT' || !u.role)
+                    .map((u: any) => (
+                      <SelectItem key={u.id} value={u.id}>{u.fullName || u.email || u.id}</SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-gray-500 mt-1">Nếu không thấy, nhập ID tài khoản bên dưới.</p>
+            </div>
+            <div>
+              <Label>Hoặc nhập ID tài khoản (userId)</Label>
+              <Input value={studentIdInput} onChange={(e) => setStudentIdInput(e.target.value)} placeholder="VD: user-uuid" />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setStudentModalOpen(false)}>Hủy</Button>
+            <Button
+              disabled={!studentIdInput.trim() || studentSubmitting}
+              onClick={async () => {
+                const sid = studentIdInput.trim();
+                if (!sid) return;
+                setStudentSubmitting(true);
+                try {
+                  await apiService.teacherClasses.addStudent(id, sid);
+                  toast.success('Đã thêm học viên');
+                  setStudentModalOpen(false);
+                  loadDetail();
+                } catch (e: any) {
+                  toast.error(e?.response?.data?.message || 'Thêm học viên thất bại');
+                } finally {
+                  setStudentSubmitting(false);
+                }
+              }}
+            >
+              {studentSubmitting ? 'Đang thêm...' : 'Thêm'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

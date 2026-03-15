@@ -13,6 +13,7 @@ import {
   MoreVertical,
   Eye,
   Loader2,
+  Trash2,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -20,6 +21,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/app/components/ui/dropdown-menu';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/app/components/ui/dialog';
 import { CreateClassModal } from './CreateClassModal';
 import apiService from '@/services/apiService';
 import { toast } from 'sonner';
@@ -29,6 +31,8 @@ export function ClassesManagement() {
   const [classes, setClasses] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [createOpen, setCreateOpen] = useState(false);
+  const [deleteConfirmClassId, setDeleteConfirmClassId] = useState<number | null>(null);
+  const [deleteSubmitting, setDeleteSubmitting] = useState(false);
 
   const fetchClasses = async () => {
     try {
@@ -167,6 +171,13 @@ export function ClassesManagement() {
                             <Eye className="h-4 w-4" />
                             Xem chi tiết
                           </DropdownMenuItem>
+                          <DropdownMenuItem
+                            className="gap-2 text-red-600 dark:text-red-400 focus:text-red-600 dark:focus:text-red-400"
+                            onClick={() => setDeleteConfirmClassId(Number(classItem.id))}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                            Xoá lớp
+                          </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </div>
@@ -240,6 +251,43 @@ export function ClassesManagement() {
           setCreateOpen(false);
         }}
       />
+
+      <Dialog open={deleteConfirmClassId != null} onOpenChange={(open) => !open && setDeleteConfirmClassId(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Xác nhận xoá lớp</DialogTitle>
+          </DialogHeader>
+          <p className="text-gray-600 dark:text-gray-400">
+            Bạn có chắc muốn xoá lớp này? Hành động không thể hoàn tác. Toàn bộ bài tập và danh sách học viên của lớp sẽ bị xoá.
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteConfirmClassId(null)} disabled={deleteSubmitting}>
+              Huỷ
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={deleteSubmitting}
+              onClick={async () => {
+                if (deleteConfirmClassId == null) return;
+                setDeleteSubmitting(true);
+                try {
+                  await apiService.teacherClasses.delete(deleteConfirmClassId);
+                  toast.success('Đã xoá lớp.');
+                  setDeleteConfirmClassId(null);
+                  fetchClasses();
+                } catch (e: any) {
+                  toast.error(e?.response?.data?.message || 'Không thể xoá lớp.');
+                } finally {
+                  setDeleteSubmitting(false);
+                }
+              }}
+            >
+              {deleteSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+              {deleteSubmitting ? 'Đang xoá...' : 'Xoá lớp'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

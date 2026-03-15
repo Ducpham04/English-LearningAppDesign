@@ -1,4 +1,5 @@
 import { useParams, useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
 import { Card } from '@/app/components/ui/card';
 import { Button } from '@/app/components/ui/button';
 import { Badge } from '@/app/components/ui/badge';
@@ -17,6 +18,7 @@ import {
   TrendingUp,
   TrendingDown,
   MessageSquare,
+  Loader2,
 } from 'lucide-react';
 import {
   LineChart,
@@ -30,26 +32,89 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/app/components/ui/tabs';
+import apiService from '@/services/apiService';
+
+type StudentInfo = {
+  id: string;
+  name: string;
+  email: string;
+  class: string;
+  level: number;
+  xp: number;
+  progress: number;
+  streak: number;
+  accuracy: number;
+  lastActive: string;
+  enrolledAt: string;
+  status: string;
+};
 
 export function StudentDetail() {
   const { studentId } = useParams();
   const navigate = useNavigate();
+  const [student, setStudent] = useState<StudentInfo | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  // Mock data
-  const student = {
-    id: studentId,
-    name: 'Nguyễn Văn A',
-    email: 'nguyenvana@email.com',
-    class: 'Class 10A',
-    level: 8,
-    xp: 2450,
-    progress: 75,
-    streak: 12,
-    accuracy: 87,
-    lastActive: '2026-01-16',
-    enrolledAt: '2025-09-01',
-    status: 'active',
-  };
+  useEffect(() => {
+    if (!studentId) {
+      setLoading(false);
+      return;
+    }
+    apiService.auth.getUsers()
+      .then((res) => {
+        const list = (res.data?.data ?? []) as any[];
+        const arr = Array.isArray(list) ? list : [];
+        const user = arr.find((u: any) => String(u.id) === String(studentId));
+        if (user) {
+          setStudent({
+            id: String(user.id),
+            name: user.fullName || user.name || user.email || `User ${user.id}`,
+            email: user.email || '—',
+            class: user.className || '—',
+            level: user.level ?? 0,
+            xp: user.xp ?? 0,
+            progress: user.progress ?? 0,
+            streak: user.streak ?? 0,
+            accuracy: user.accuracy ?? 0,
+            lastActive: user.lastActive || '—',
+            enrolledAt: user.enrolledAt || '—',
+            status: user.status || 'active',
+          });
+        } else {
+          setStudent({
+            id: studentId,
+            name: `Học viên #${studentId}`,
+            email: '—',
+            class: '—',
+            level: 0,
+            xp: 0,
+            progress: 0,
+            streak: 0,
+            accuracy: 0,
+            lastActive: '—',
+            enrolledAt: '—',
+            status: 'active',
+          });
+        }
+      })
+      .catch(() => {
+        setStudent({
+          id: studentId,
+          name: `Học viên #${studentId}`,
+          email: '—',
+          class: '—',
+          level: 0,
+          xp: 0,
+          progress: 0,
+          streak: 0,
+          accuracy: 0,
+          lastActive: '—',
+          enrolledAt: '—',
+          status: 'active',
+        });
+      })
+      .finally(() => setLoading(false));
+  }, [studentId]);
 
   const progressData = [
     { week: 'W1', xp: 180, accuracy: 82 },
@@ -97,6 +162,25 @@ export function StudentDetail() {
     { skill: 'Pronunciation', score: 82 },
     { skill: 'Vocabulary', score: 90 },
   ];
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex items-center justify-center">
+        <Loader2 className="h-10 w-10 animate-spin text-purple-500" />
+      </div>
+    );
+  }
+
+  if (!student) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-gray-600 dark:text-gray-400 mb-4">Không tìm thấy học viên.</p>
+          <Button variant="outline" onClick={() => navigate(-1)}>Quay lại</Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950 pb-20 md:pb-6">

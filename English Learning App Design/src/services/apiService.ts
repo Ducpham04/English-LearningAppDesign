@@ -175,6 +175,8 @@ const apiService = {
       axiosInstance.put<BaseResponse<any>>(`/v1/teacher/classes/${classId}/assignments/${assignmentId}`, data),
     deleteAssignment: (classId: number, assignmentId: number) =>
       axiosInstance.delete<BaseResponse<void>>(`/v1/teacher/classes/${classId}/assignments/${assignmentId}`),
+    delete: (classId: number) =>
+      axiosInstance.delete<BaseResponse<void>>(`/v1/teacher/classes/${classId}`),
   },
 
   // --- CURRICULUM (COURSE) MODULE ---
