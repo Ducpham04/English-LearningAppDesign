@@ -7,6 +7,9 @@ import com.example.appenglish.modules.student.dto.StudentDashboardDto;
 import com.example.appenglish.modules.student.service.StudentService;
 import com.example.appenglish.modules.userDetail.dto.UserDataDto;
 import com.example.appenglish.modules.teacher.dto.AssignmentDto;
+import com.example.appenglish.modules.vocabulary.dto.AddToMyVocabularyRequest;
+import com.example.appenglish.modules.vocabulary.dto.AddToMyVocabularyResponseDto;
+import com.example.appenglish.modules.vocabulary.dto.MyVocabularyItemDto;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -101,6 +104,47 @@ public class StudentController {
                 return ResponseEntity.status(403).body(BaseResponse.error(e.getMessage(), "FORBIDDEN", req.getRequestURI()));
             }
             return ResponseEntity.status(404).body(BaseResponse.error(e.getMessage(), "NOT_FOUND", req.getRequestURI()));
+        }
+    }
+
+    @PostMapping("/my-vocabulary")
+    public ResponseEntity<BaseResponse<AddToMyVocabularyResponseDto>> addToMyVocabulary(
+            @RequestBody AddToMyVocabularyRequest body,
+            HttpServletRequest req) {
+        try {
+            AddToMyVocabularyResponseDto result = studentService.addToMyVocabulary(body);
+            return ResponseEntity.ok(BaseResponse.ok(result, "Đã lưu từ vựng", req.getRequestURI()));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(BaseResponse.error(e.getMessage(), "BAD_REQUEST", req.getRequestURI()));
+        } catch (Exception e) {
+            return ResponseEntity.status(401).body(BaseResponse.error(e.getMessage(), "UNAUTHORIZED", req.getRequestURI()));
+        }
+    }
+
+    @GetMapping("/my-vocabulary")
+    public ResponseEntity<BaseResponse<List<MyVocabularyItemDto>>> getMyVocabulary(
+            @RequestParam(required = false) Long lessonId,
+            @RequestParam(required = false) Long sessionId,
+            HttpServletRequest req) {
+        try {
+            List<MyVocabularyItemDto> list = studentService.getMyVocabulary(lessonId, sessionId);
+            return ResponseEntity.ok(BaseResponse.ok(list, "OK", req.getRequestURI()));
+        } catch (Exception e) {
+            return ResponseEntity.status(401).body(BaseResponse.error(e.getMessage(), "UNAUTHORIZED", req.getRequestURI()));
+        }
+    }
+
+    @DeleteMapping("/my-vocabulary/{vocabularyId}")
+    public ResponseEntity<BaseResponse<Void>> removeFromMyVocabulary(
+            @PathVariable Long vocabularyId,
+            HttpServletRequest req) {
+        try {
+            studentService.removeFromMyVocabulary(vocabularyId);
+            return ResponseEntity.ok(BaseResponse.ok(null, "Đã xóa từ khỏi danh sách", req.getRequestURI()));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(BaseResponse.error(e.getMessage(), "BAD_REQUEST", req.getRequestURI()));
+        } catch (Exception e) {
+            return ResponseEntity.status(401).body(BaseResponse.error(e.getMessage(), "UNAUTHORIZED", req.getRequestURI()));
         }
     }
 }

@@ -9,4 +9,5 @@ public interface ClassLessonAssignmentRepository extends JpaRepository<ClassLess
     List<ClassLessonAssignment> findByClassroom_IdOrderByOrderIndexAscIdAsc(Long classId);
     boolean existsByClassroom_IdAndLesson_Id(Long classId, Long lessonId);
     void deleteByClassroom_IdAndId(Long classId, Long assignmentId);
+    void deleteByClassroom_Id(Long classId);
 }

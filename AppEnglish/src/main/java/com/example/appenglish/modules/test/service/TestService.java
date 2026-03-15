@@ -26,6 +26,7 @@ public class TestService {
     private final TestAnswerRepository testAnswerRepository;
     private final com.example.appenglish.repository.CurriculumRepository curriculumRepository;
     private final com.example.appenglish.repository.LessonRepository lessonRepository;
+    private final com.example.appenglish.repository.UserRepository userRepository;
 
     // ---------- Student: list tests với thống kê attempt ----------
     public List<TestDto> listForStudent(String userId) {
@@ -205,6 +206,7 @@ public class TestService {
             if (pct >= t.getPassScore()) status = "completed";
         }
 
+        User creator = t.getCreatedBy();
         return TestDto.builder()
                 .id(t.getId())
                 .title(t.getTitle())
@@ -218,11 +220,26 @@ public class TestService {
                 .lessonId(t.getLesson() != null ? t.getLesson().getId() : null)
                 .questionCount(questionCount)
                 .totalPoints(totalPoints)
+                .createdById(creator != null ? creator.getId() : null)
+                .createdByName(creator != null ? creator.getFullName() : null)
                 .attemptCount(attemptCount)
                 .bestScore(bestScore)
                 .lastAttemptAt(lastAttemptAt)
                 .status(status)
                 .build();
+    }
+
+    private User getCurrentUserOrNull() {
+        try {
+            org.springframework.security.core.Authentication auth =
+                    org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+            if (auth == null || !auth.isAuthenticated() || "anonymousUser".equals(auth.getPrincipal())) {
+                return null;
+            }
+            return userRepository.findByEmail(auth.getName()).orElse(null);
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     // ---------- Admin/Teacher: CRUD Test ----------
@@ -252,6 +269,7 @@ public class TestService {
         if (req.getLessonId() != null) {
             lessonRepository.findById(req.getLessonId()).ifPresent(test::setLesson);
         }
+        test.setCreatedBy(getCurrentUserOrNull());
         test = testRepository.save(test);
         return toDtoWithAttempts(test, null);
     }
@@ -282,6 +300,11 @@ public class TestService {
     @Transactional
     public void delete(Long id) {
         if (!testRepository.existsById(id)) throw new RuntimeException("Test not found: " + id);
+        // Xóa theo thứ tự phụ thuộc: answers -> attempts, options -> questions -> test
+        testAnswerRepository.deleteByAttempt_Test_Id(id);
+        testAttemptRepository.deleteByTest_Id(id);
+        testOptionRepository.deleteByQuestion_Test_Id(id);
+        testQuestionRepository.deleteByTest_Id(id);
         testRepository.deleteById(id);
     }
 

@@ -10,4 +10,7 @@ public interface UserSessionProgressRepository extends JpaRepository<UserSession
     Optional<UserSessionProgress> findByUser_IdAndSession_Id(String userId, Long sessionId);
     List<UserSessionProgress> findByUser_Id(String userId);
     boolean existsByUser_IdAndSession_Id(String userId, Long sessionId);
+    void deleteByUser_IdAndSession_Id(String userId, Long sessionId);
+    void deleteBySession_Id(Long sessionId);
+    long countBySession_Id(Long sessionId);
 }

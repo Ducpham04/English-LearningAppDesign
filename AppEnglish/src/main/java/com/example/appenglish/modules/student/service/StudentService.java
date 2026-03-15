@@ -11,6 +11,10 @@ import com.example.appenglish.modules.lesson.service.LessonService;
 import com.example.appenglish.modules.student.dto.SessionProgressDto;
 import com.example.appenglish.modules.student.dto.StudentDashboardDto;
 import com.example.appenglish.modules.userDetail.dto.UserDataDto;
+import com.example.appenglish.modules.vocabulary.dto.AddToMyVocabularyRequest;
+import com.example.appenglish.modules.vocabulary.dto.AddToMyVocabularyResponseDto;
+import com.example.appenglish.modules.vocabulary.dto.MyVocabularyItemDto;
+import com.example.appenglish.modules.vocabulary.service.VocabularyService;
 import com.example.appenglish.repository.ClassLessonAssignmentRepository;
 import com.example.appenglish.repository.ClassroomRepository;
 import com.example.appenglish.repository.ClassStudentRepository;
@@ -45,6 +49,7 @@ public class StudentService {
     private final ClassroomRepository classroomRepository;
     private final ClassLessonAssignmentRepository classLessonAssignmentRepository;
     private final LessonService lessonService;
+    private final VocabularyService vocabularyService;
 
     public StudentDashboardDto getDashboard() {
         User user = getCurrentUser();
@@ -218,6 +223,21 @@ public class StudentService {
                             .build();
                 })
                 .collect(Collectors.toList());
+    }
+
+    public AddToMyVocabularyResponseDto addToMyVocabulary(AddToMyVocabularyRequest request) {
+        User user = getCurrentUser();
+        return vocabularyService.addToMyVocabulary(user.getId(), request);
+    }
+
+    public List<MyVocabularyItemDto> getMyVocabulary(Long lessonId, Long sessionId) {
+        User user = getCurrentUser();
+        return vocabularyService.getMyVocabulary(user.getId(), lessonId, sessionId);
+    }
+
+    public void removeFromMyVocabulary(Long vocabularyId) {
+        User user = getCurrentUser();
+        vocabularyService.removeFromMyVocabulary(user.getId(), vocabularyId);
     }
 
     private User getCurrentUser() {

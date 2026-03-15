@@ -141,6 +141,15 @@ public class TeacherClassService {
         classStudentRepository.deleteByClassroom_IdAndStudent_Id(classId, studentId);
     }
 
+    /** Xóa lớp học: xóa toàn bộ sinh viên và bài tập trong lớp rồi xóa lớp. */
+    @Transactional
+    public void deleteClass(Long classId) {
+        ensureTeacherOwnsClass(classId);
+        classStudentRepository.deleteByClassroom_Id(classId);
+        assignmentRepository.deleteByClassroom_Id(classId);
+        classroomRepository.deleteById(classId);
+    }
+
     public List<AssignmentDto> getAssignments(Long classId) {
         ensureTeacherOwnsClass(classId);
         return assignmentRepository.findByClassroom_IdOrderByOrderIndexAscIdAsc(classId).stream()

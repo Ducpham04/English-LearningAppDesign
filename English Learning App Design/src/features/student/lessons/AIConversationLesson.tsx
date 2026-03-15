@@ -206,7 +206,7 @@ export function AIConversationLesson() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50 dark:from-gray-900 dark:to-gray-800">
-      <div className="max-w-3xl mx-auto p-4 lg:p-6 flex flex-col h-screen">
+      <div className="w-full max-w-5xl mx-auto px-4 lg:px-8 py-4 lg:py-6 flex flex-col h-screen">
 
         {/* Header */}
         <div className="flex items-center justify-between mb-3 flex-shrink-0">

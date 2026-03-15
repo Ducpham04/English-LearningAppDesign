@@ -219,7 +219,7 @@ export function AIConversation() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-pink-50 to-blue-50 dark:from-gray-900 dark:via-gray-900 dark:to-gray-900">
-      <div className="container mx-auto px-4 py-6 max-w-4xl">
+      <div className="w-full max-w-5xl mx-auto px-4 lg:px-8 py-6">
         {/* Header */}
         <div className="mb-6 flex items-center justify-between">
           <Button

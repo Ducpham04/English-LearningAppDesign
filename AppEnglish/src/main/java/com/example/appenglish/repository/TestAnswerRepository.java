@@ -7,4 +7,5 @@ import java.util.List;
 
 public interface TestAnswerRepository extends JpaRepository<TestAnswer, Long> {
     List<TestAnswer> findByAttempt_IdOrderByIdAsc(Long attemptId);
+    void deleteByAttempt_Test_Id(Long testId);
 }

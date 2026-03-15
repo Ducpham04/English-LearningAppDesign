@@ -34,4 +34,9 @@ public class Test extends BaseEntity {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "lesson_id")
     private Lesson lesson;
+
+    /** Người tạo bài test (Admin/Teacher). Null nếu tạo trước khi có trường này. */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "created_by_id")
+    private User createdBy;
 }

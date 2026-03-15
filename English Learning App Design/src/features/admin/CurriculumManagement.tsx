@@ -19,6 +19,7 @@ import {
   Trash2,
   ListOrdered,
   Loader2,
+  Users,
 } from 'lucide-react';
 import apiService from '@/services/apiService';
 import { toast } from 'sonner';
@@ -59,6 +60,11 @@ export function AdminCurriculumManagement() {
   const [formSessionTitle, setFormSessionTitle] = useState('');
   const [formOrderIndex, setFormOrderIndex] = useState(0);
   const [submitting, setSubmitting] = useState(false);
+
+  const [participantsModalOpen, setParticipantsModalOpen] = useState(false);
+  const [participantsLoading, setParticipantsLoading] = useState(false);
+  const [participantsCourse, setParticipantsCourse] = useState<Curriculum | null>(null);
+  const [participants, setParticipants] = useState<any[]>([]);
 
   const loadCurriculums = async () => {
     try {
@@ -197,6 +203,33 @@ export function AdminCurriculumManagement() {
     }
   };
 
+  const openCourseParticipants = async (course: Curriculum) => {
+    setParticipantsCourse(course);
+    setParticipantsModalOpen(true);
+    setParticipantsLoading(true);
+    try {
+      const res = await apiService.curriculum.getParticipants(course.id);
+      setParticipants(res.data?.data ?? []);
+    } catch {
+      toast.error('Không tải được danh sách người tham gia khóa học');
+    } finally {
+      setParticipantsLoading(false);
+    }
+  };
+
+  const handleRemoveCourseParticipant = async (user: any) => {
+    if (!participantsCourse) return;
+    if (!window.confirm(`Xóa ${user.fullName || user.email} khỏi khóa "${participantsCourse.title}"? Tiến trình học trong khóa sẽ bị reset.`)) return;
+    try {
+      await apiService.curriculum.removeParticipant(participantsCourse.id, user.email);
+      toast.success('Đã xóa người dùng khỏi khóa học');
+      setParticipants(prev => prev.filter((x: any) => x.email !== user.email));
+    } catch (e: any) {
+      const msg = e?.response?.data?.message ?? e?.message ?? 'Không thể xóa người dùng khỏi khóa học';
+      toast.error(msg);
+    }
+  };
+
   return (
     <>
     <AdminPageLayout
@@ -265,6 +298,15 @@ export function AdminCurriculumManagement() {
                         </Button>
                         <Button
                           size="sm"
+                          variant="outline"
+                          className="gap-1"
+                          onClick={() => openCourseParticipants(course)}
+                        >
+                          <Users className="h-4 w-4" />
+                          Người tham gia
+                        </Button>
+                        <Button
+                          size="sm"
                           variant="ghost"
                           className="text-destructive hover:text-destructive"
                           onClick={() => handleDeleteCurriculum(course.id)}
@@ -311,6 +353,87 @@ export function AdminCurriculumManagement() {
           </div>
         )}
       </AdminPageLayout>
+
+      {/* Course participants modal */}
+      <Dialog open={participantsModalOpen} onOpenChange={setParticipantsModalOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>
+              Người tham gia khóa học
+              {participantsCourse && (
+                <span className="block text-sm font-normal text-muted-foreground mt-1">
+                  {participantsCourse.title}
+                </span>
+              )}
+            </DialogTitle>
+          </DialogHeader>
+          {participantsLoading ? (
+            <div className="flex items-center justify-center py-8 gap-2 text-muted-foreground">
+              <Loader2 className="h-5 w-5 animate-spin" />
+              <span>Đang tải danh sách người tham gia...</span>
+            </div>
+          ) : participants.length === 0 ? (
+            <div className="py-6 text-sm text-muted-foreground">
+              Chưa có học viên nào có tiến trình trong khóa học này.
+            </div>
+          ) : (
+            <div className="max-h-80 overflow-y-auto mt-2 space-y-2">
+              {participants.map((p: any) => {
+                const percent = p.totalLessons > 0 ? Math.round((p.completedLessons / p.totalLessons) * 100) : 0;
+                const completed = p.courseCompleted || percent === 100;
+                return (
+                  <div
+                    key={`${p.email}-${p.courseId}`}
+                    className="flex items-start gap-3 rounded-lg border border-border/70 bg-muted/40 px-3 py-2"
+                  >
+                    <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center text-xs font-semibold text-primary">
+                      {p.fullName?.charAt(0)?.toUpperCase() || '?'}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-2">
+                        <div>
+                          <p className="text-sm font-medium text-foreground truncate">{p.fullName}</p>
+                          <p className="text-xs text-muted-foreground truncate">{p.email}</p>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <span className="text-[11px] text-muted-foreground">
+                            {p.completedLessons}/{p.totalLessons} bài
+                          </span>
+                          <span
+                            className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                              completed
+                                ? 'bg-emerald-100 text-emerald-700'
+                                : percent > 0
+                                  ? 'bg-amber-100 text-amber-700'
+                                  : 'bg-slate-100 text-slate-600'
+                            }`}
+                          >
+                            {completed ? 'Hoàn thành' : percent > 0 ? 'Đang học' : 'Mới bắt đầu'}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="mt-1 h-1.5 w-full rounded-full bg-slate-200 overflow-hidden">
+                        <div
+                          className="h-full rounded-full bg-gradient-to-r from-sky-500 via-violet-500 to-fuchsia-500"
+                          style={{ width: `${percent}%` }}
+                        />
+                      </div>
+                    </div>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="mt-1 text-destructive hover:text-destructive"
+                      onClick={() => handleRemoveCourseParticipant(p)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Modal: Thêm lộ trình */}
       <Dialog open={modalOpen === 'curriculum'} onOpenChange={(open) => !open && setModalOpen(null)}>

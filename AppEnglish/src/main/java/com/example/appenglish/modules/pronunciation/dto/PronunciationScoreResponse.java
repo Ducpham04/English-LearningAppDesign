@@ -26,4 +26,7 @@ public class PronunciationScoreResponse {
     S3UploadStatus s3Status;
 
     Map<String, Object> feedback;
+
+    /** Có giá trị khi status = FAILED (ví dụ: Azure timeout, không nhận diện được giọng nói). */
+    String errorMessage;
 }

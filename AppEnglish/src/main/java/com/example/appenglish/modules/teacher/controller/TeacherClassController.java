@@ -88,6 +88,19 @@ public class TeacherClassController {
         }
     }
 
+    @DeleteMapping("/{classId}")
+    public ResponseEntity<BaseResponse<Void>> deleteClass(@PathVariable Long classId, HttpServletRequest req) {
+        try {
+            teacherClassService.deleteClass(classId);
+            return ResponseEntity.ok(BaseResponse.ok(null, "Class deleted", req.getRequestURI()));
+        } catch (RuntimeException e) {
+            if (e.getMessage().contains("not found")) {
+                return ResponseEntity.status(404).body(BaseResponse.error(e.getMessage(), "NOT_FOUND", req.getRequestURI()));
+            }
+            return ResponseEntity.status(403).body(BaseResponse.error(e.getMessage(), "FORBIDDEN", req.getRequestURI()));
+        }
+    }
+
     @GetMapping("/{classId}/assignments")
     public ResponseEntity<BaseResponse<List<AssignmentDto>>> getAssignments(@PathVariable Long classId, HttpServletRequest req) {
         try {

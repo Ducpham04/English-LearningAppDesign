@@ -129,16 +129,15 @@ export function Sidebar() {
               <Link key={item.href} to={item.href} className="block mx-1">
                 <Button
                   variant="ghost"
-                  className={`w-full justify-start gap-3 h-11 px-4 rounded-full font-medium transition-all duration-200 border-l-4 ${
+                  className={`w-full justify-start gap-3 h-11 px-4 rounded-r-xl font-medium transition-all duration-200 border-l-2 ${
                     isActive
-                      ? 'bg-primary/10 text-primary border-l-primary shadow-sm hover:bg-primary/15'
+                      ? 'bg-primary/8 text-primary border-l-primary hover:bg-primary/12'
                       : 'border-l-transparent text-slate-600 dark:text-slate-400 hover:bg-slate-200/80 dark:hover:bg-slate-800/80 hover:text-slate-900 dark:hover:text-white'
                   }`}
                 >
                   <item.icon
-                    className={`h-5 w-5 flex-shrink-0 ${
-                      isActive ? 'text-primary' : ''
-                    }`}
+                    className={`h-5 w-5 flex-shrink-0 ${isActive ? 'text-primary' : ''}`}
+                    strokeWidth={isActive ? 2.25 : 1.5}
                   />
                   <span className="truncate text-sm">{item.title}</span>
                   {item.badge && (

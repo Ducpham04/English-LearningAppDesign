@@ -1,7 +1,6 @@
 package com.example.appenglish.modules.transcribe.controller;
 
 import com.example.appenglish.common.dto.BaseResponse;
-import com.example.appenglish.common.exception.ApiException;
 import com.example.appenglish.entity.LessonVideo;
 import com.example.appenglish.modules.transcribe.dto.request.YoutubeTranscribeRequest;
 import com.example.appenglish.modules.transcribe.service.kafka.producer.YoutubeTranscribeProducer;
@@ -42,12 +41,14 @@ public class YoutubeTranscribeController {
     @Operation(summary = "Get transcript JSON by lessonId")
     public ResponseEntity<BaseResponse<Object>> getTranscriptByLessonId(@PathVariable Long lessonId,
                                                                         HttpServletRequest request) {
-        LessonVideo lv = lessonVideoRepository.findById(lessonId)
-                .orElseThrow(() -> new ApiException("Lesson video not found", "LESSON_VIDEO_NOT_FOUND"));
-
         Map<String, Object> response = new HashMap<>();
-        response.put("transcript", lv.getTranscriptJson());
-        response.put("s3Url", lv.getVideoUrl());
+        lessonVideoRepository.findById(lessonId).ifPresentOrElse(lv -> {
+            response.put("transcript", lv.getTranscriptJson());
+            response.put("s3Url", lv.getVideoUrl());
+        }, () -> {
+            response.put("transcript", null);
+            response.put("s3Url", null);
+        });
 
         return ResponseEntity.ok(BaseResponse.ok(response, "OK", request.getRequestURI()));
     }

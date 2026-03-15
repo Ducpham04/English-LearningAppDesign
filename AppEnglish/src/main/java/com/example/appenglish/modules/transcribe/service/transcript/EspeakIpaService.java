@@ -44,10 +44,12 @@ public class EspeakIpaService {
 
             if (command.contains(java.io.File.separator)) {
                 if (!exeFile.exists()) {
-                    log.error("eSpeak-ng binary NOT FOUND at: {}. Please check your tools folder.", exeFile.getAbsolutePath());
-                    return "";
+                    log.warn("eSpeak-ng binary NOT FOUND at: {}. Falling back to 'espeak-ng' from PATH.", exeFile.getAbsolutePath());
+                    command = "espeak-ng";
+                    // exeFile stays non-existing so below we do not set pb.directory → process uses PATH
+                } else {
+                    command = exeFile.getAbsolutePath();
                 }
-                command = exeFile.getAbsolutePath();
             }
 
             // If portable bundle is used, make sure eSpeak can locate its data.

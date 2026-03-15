@@ -48,7 +48,15 @@ public class AzureStreamingPronunciationService {
     @Value("${app.pronunciation.ffmpeg-file-fallback:true}")
     private boolean ffmpegFileFallback;
 
+    /** Tối thiểu ~0.5s webm/opus để FFmpeg không báo "Invalid data". File rỗng/quá ngắn = thu chưa kịp hoặc blob lỗi. */
+    private static final int MIN_AUDIO_BYTES = 1024;
+
     public AzureAssessmentResult assess(byte[] audioBytes, String referenceText, String fileSuffix) {
+        if (audioBytes == null || audioBytes.length < MIN_AUDIO_BYTES) {
+            throw new IllegalArgumentException(
+                "File âm thanh quá ngắn hoặc rỗng. Vui lòng thu lại (giữ mic ít nhất 1–2 giây, không dừng quá nhanh)."
+            );
+        }
         try (SpeechConfig speechConfig = SpeechConfig.fromSubscription(speechKey, speechRegion)) {
 
             speechConfig.setSpeechRecognitionLanguage(locale);
@@ -134,6 +142,11 @@ public class AzureStreamingPronunciationService {
                                                             String referenceText,
                                                             String fileSuffix) throws Exception {
 
+        if (audioBytes.length < MIN_AUDIO_BYTES) {
+            throw new IllegalArgumentException(
+                "File âm thanh quá ngắn hoặc rỗng. Vui lòng thu lại (giữ mic ít nhất 1–2 giây)."
+            );
+        }
         Path dir = Path.of(tempDir, "pronunciation");
         Files.createDirectories(dir);
         String suffix = (fileSuffix == null || fileSuffix.isBlank()) ? ".dat" : fileSuffix;
@@ -161,13 +174,22 @@ public class AzureStreamingPronunciationService {
         CompletableFuture<SpeechRecognitionResult> resultFuture = startRecognition(speechConfig, audioConfig, pushStream, referenceText);
 
         AudioFfmpegFileTranscoder.FileTranscodeResult tr = ffmpegFileTranscoder.transcodeFileToPcm16kMono(inputFile);
-        long pcmBytes;
+        long pcmBytes = 0;
+        int ffmpegExit = 0;
+        String ffmpegErr = null;
         try {
             pcmBytes = pipePcmToAzure(tr.pcmStream(), pushStream);
         } finally {
-            int exit = tr.waitForExitCode(20000);
-            String err = tr.stderr();
-            log.info("ffmpeg(file) exit={} err={}", exit, err == null ? "" : err);
+            ffmpegExit = tr.waitForExitCode(20000);
+            ffmpegErr = tr.stderr();
+            log.info("ffmpeg(file) exit={} pcmBytes={} err={}", ffmpegExit, pcmBytes, ffmpegErr == null ? "" : ffmpegErr);
+        }
+
+        if (ffmpegExit != 0 && ffmpegErr != null
+                && (ffmpegErr.contains("Invalid data") || ffmpegErr.contains("Error opening input"))) {
+            throw new IllegalArgumentException(
+                "File âm thanh không hợp lệ hoặc bị lỗi (thu quá ngắn / dừng đột ngột). Vui lòng thu lại, giữ mic 1–2 giây trở lên."
+            );
         }
 
         SpeechRecognitionResult result = resultFuture.get(timeoutSeconds, TimeUnit.SECONDS);
@@ -176,8 +198,8 @@ public class AzureStreamingPronunciationService {
         Map<String, Object> fb = parsed.getRawFeedback() == null ? new HashMap<>() : new HashMap<>(parsed.getRawFeedback());
         fb.put("ffmpegMode", "file");
         fb.put("pcmBytes", pcmBytes);
-        fb.put("ffmpegExit", tr.waitForExitCode(1));
-        fb.put("ffmpegErr", tr.stderr());
+        fb.put("ffmpegExit", ffmpegExit);
+        fb.put("ffmpegErr", ffmpegErr);
 
         return AzureAssessmentResult.builder()
                 .reason(parsed.getReason())

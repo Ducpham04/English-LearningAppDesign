@@ -1,105 +1,85 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card } from '@/app/components/ui/card';
 import { Button } from '@/app/components/ui/button';
 import { Input } from '@/app/components/ui/input';
 import { Badge } from '@/app/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/app/components/ui/tabs';
 import {
-  BookOpen, Search, Video, Mic, MessageSquare, FileText, MoreVertical,
-  Edit, Eye, CheckCircle, XCircle, Trash2, Star, Users, Loader2,
-  Brain, TrendingUp, Clock, AlertTriangle,
+  BookOpen, Search, Video, Mic, MessageSquare, FileText, Users, Loader2,
+  Brain, TrendingUp, AlertTriangle, Eye,
 } from 'lucide-react';
-import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
-} from '@/app/components/ui/dropdown-menu';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/app/components/ui/select';
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle,
+} from '@/app/components/ui/dialog';
+import { ScrollArea } from '@/app/components/ui/scroll-area';
 import { toast } from 'sonner';
 import apiService from '@/services/apiService';
 
-// ─── Types ─────────────────────────────────────────────────────────────────
-interface Content {
-  id: string;
-  title: string;
-  type: 'video' | 'pronunciation' | 'conversation' | 'vocabulary';
-  level: 'beginner' | 'intermediate' | 'advanced';
-  author: string;
-  createdAt: string;
-  status: 'approved' | 'pending' | 'rejected';
-  rating: number;
-  uses: number;
-  reports: number;
+function getYoutubeEmbedUrl(url: string | null | undefined): string | null {
+  if (!url || !url.trim()) return null;
+  const u = url.trim();
+  const m = u.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+  return m ? `https://www.youtube.com/embed/${m[1]}` : null;
 }
 
+// ─── Types ─────────────────────────────────────────────────────────────────
 interface PronunciationAttempt {
   id: number;
   userId: string;
-  userName?: string;
+  userEmail?: string;
+  userFullName?: string;
+  lessonId?: number;
+  lessonTitle?: string;
+  sessionTitle?: string;
   expectedText: string;
   recognizedText: string;
-  pronunciationScore: number;
-  accuracyScore: number;
-  fluencyScore: number;
+  pronunciationScore?: number;
+  accuracyScore?: number;
+  fluencyScore?: number;
+  prosodyScore?: number;
+  completenessScore?: number;
   status: string;
   createdAt: string;
+  errorMessage?: string;
+  feedback?: Record<string, unknown>;
 }
-
-interface AIConversation {
-  id: number;
-  userId: string;
-  userName?: string;
-  messageCount: number;
-  topic?: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
-// ─── Static demo content (will be replaced by real data from BE) ─────────────
-const staticContents: Content[] = [
-  { id: '1', title: 'Everyday Conversations - At Restaurant', type: 'video', level: 'beginner', author: 'Teacher Trần Thị B', createdAt: '2026-01-10', status: 'approved', rating: 4.8, uses: 145, reports: 0 },
-  { id: '2', title: 'Pronunciation Practice - TH Sounds', type: 'pronunciation', level: 'intermediate', author: 'Teacher Nguyễn Văn C', createdAt: '2026-01-12', status: 'approved', rating: 4.9, uses: 267, reports: 0 },
-  { id: '3', title: 'AI Conversation - Job Interview', type: 'conversation', level: 'advanced', author: 'Teacher Lê Thị D', createdAt: '2026-01-14', status: 'pending', rating: 0, uses: 0, reports: 0 },
-  { id: '4', title: 'Business Vocabulary Set 1', type: 'vocabulary', level: 'intermediate', author: 'Teacher Phạm Văn E', createdAt: '2026-01-15', status: 'approved', rating: 4.6, uses: 152, reports: 2 },
-  { id: '5', title: 'Controversial Topic Discussion', type: 'conversation', level: 'advanced', author: 'Teacher Hoàng Thị F', createdAt: '2026-01-16', status: 'rejected', rating: 0, uses: 0, reports: 5 },
-];
 
 // ─── Sub-components ─────────────────────────────────────────────────────────
 
 function ContentTab() {
   const [searchQuery, setSearchQuery] = useState('');
-  const [typeFilter, setTypeFilter] = useState<'all' | Content['type']>('all');
-  const [statusFilter, setStatusFilter] = useState<'all' | Content['status']>('all');
-  const [contents, setContents] = useState<Content[]>(staticContents);
+  const [typeFilter, setTypeFilter] = useState<string>('all');
+  const [lessons, setLessons] = useState<Array<{ id: number; title: string; type?: string; sessionId?: number; durationMinutes?: number }>>([]);
+  const [loading, setLoading] = useState(true);
 
-  const filteredContents = contents.filter((c) => {
-    const matchSearch = c.title.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchType = typeFilter === 'all' || c.type === typeFilter;
-    const matchStatus = statusFilter === 'all' || c.status === statusFilter;
-    return matchSearch && matchType && matchStatus;
-  });
+  useEffect(() => {
+    apiService.lesson.getAll()
+      .then(res => {
+        const list = (res.data?.data ?? []) as Array<{ id: number; title: string; type?: string; sessionId?: number; durationMinutes?: number }>;
+        setLessons(list);
+      })
+      .catch(() => toast.error('Không tải được danh sách bài học'))
+      .finally(() => setLoading(false));
+  }, []);
 
   const typeColors: Record<string, string> = {
-    video: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
-    pronunciation: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400',
-    conversation: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
-    vocabulary: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400',
+    VIDEO: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
+    SPEAKING: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400',
+    QUIZ: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
+    VOCAB: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400',
   };
-  const statusColors: Record<string, string> = {
-    approved: 'bg-green-100 text-green-700',
-    pending: 'bg-yellow-100 text-yellow-700',
-    rejected: 'bg-red-100 text-red-700',
-  };
-  const typeIcons: Record<string, any> = { video: Video, pronunciation: Mic, conversation: MessageSquare, vocabulary: FileText };
+  const typeIcons: Record<string, React.ComponentType<{ className?: string }>> = { VIDEO: Video, SPEAKING: Mic, QUIZ: MessageSquare, VOCAB: FileText };
 
-  const handleApprove = (id: string) => {
-    setContents(prev => prev.map(c => c.id === id ? { ...c, status: 'approved' as const } : c));
-    toast.success('Content approved');
-  };
-  const handleReject = (id: string) => {
-    setContents(prev => prev.map(c => c.id === id ? { ...c, status: 'rejected' as const } : c));
-    toast.success('Content rejected');
-  };
+  const filtered = lessons.filter((l) => {
+    const matchSearch = l.title.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchType = typeFilter === 'all' || l.type === typeFilter;
+    return matchSearch && matchType;
+  });
+
+  if (loading) return <div className="flex justify-center py-20"><Loader2 className="h-8 w-8 animate-spin text-indigo-500" /></div>;
 
   return (
     <div className="space-y-4">
@@ -107,106 +87,132 @@ function ContentTab() {
         <div className="flex flex-col md:flex-row gap-4">
           <div className="flex-1 relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
-            <Input placeholder="Search content..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="pl-10" />
+            <Input placeholder="Tìm bài học..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="pl-10" />
           </div>
-          <Select value={typeFilter} onValueChange={(v: any) => setTypeFilter(v)}>
-            <SelectTrigger className="w-[150px]"><SelectValue placeholder="Type" /></SelectTrigger>
+          <Select value={typeFilter} onValueChange={setTypeFilter}>
+            <SelectTrigger className="w-[180px]"><SelectValue placeholder="Loại bài học" /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All Types</SelectItem>
-              <SelectItem value="video">Video</SelectItem>
-              <SelectItem value="pronunciation">Pronunciation</SelectItem>
-              <SelectItem value="conversation">Conversation</SelectItem>
-              <SelectItem value="vocabulary">Vocabulary</SelectItem>
-            </SelectContent>
-          </Select>
-          <Select value={statusFilter} onValueChange={(v: any) => setStatusFilter(v)}>
-            <SelectTrigger className="w-[150px]"><SelectValue placeholder="Status" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Status</SelectItem>
-              <SelectItem value="approved">Approved</SelectItem>
-              <SelectItem value="pending">Pending</SelectItem>
-              <SelectItem value="rejected">Rejected</SelectItem>
+              <SelectItem value="all">Tất cả</SelectItem>
+              <SelectItem value="VIDEO">Video</SelectItem>
+              <SelectItem value="SPEAKING">Phát âm</SelectItem>
+              <SelectItem value="QUIZ">Quiz</SelectItem>
+              <SelectItem value="VOCAB">Từ vựng</SelectItem>
             </SelectContent>
           </Select>
         </div>
       </Card>
 
-      <div className="grid gap-4">
-        {filteredContents.map((content) => {
-          const TypeIcon = typeIcons[content.type];
-          return (
-            <Card key={content.id} className="p-6 hover:shadow-lg transition-all">
-              <div className="flex flex-col md:flex-row gap-6">
-                <div className="flex items-center gap-4 flex-1">
-                  <div className="bg-gradient-to-br from-indigo-100 to-indigo-200 dark:from-indigo-900/30 dark:to-indigo-800/30 p-4 rounded-2xl">
-                    <TypeIcon className="h-8 w-8 text-indigo-600 dark:text-indigo-400" />
-                  </div>
-                  <div className="flex-1">
-                    <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">{content.title}</h3>
-                    <div className="flex flex-wrap gap-2 mb-2">
-                      <Badge className={typeColors[content.type]}>{content.type}</Badge>
-                      <Badge className={statusColors[content.status]}>{content.status}</Badge>
-                      <Badge variant="outline">{content.level}</Badge>
-                      {content.reports > 0 && <Badge className="bg-red-100 text-red-700">{content.reports} Reports</Badge>}
+      {filtered.length === 0 ? (
+        <Card className="p-12 text-center text-gray-500">
+          <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
+          <p className="font-medium">Chưa có bài học nào.</p>
+          <p className="text-sm mt-1">Dữ liệu từ hệ thống — tạo bài học qua Topic / Session.</p>
+        </Card>
+      ) : (
+        <div className="grid gap-4">
+          {filtered.map((lesson) => {
+            const TypeIcon = (lesson.type && typeIcons[lesson.type]) ? typeIcons[lesson.type] : FileText;
+            const typeColor = (lesson.type && typeColors[lesson.type]) ? typeColors[lesson.type] : 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300';
+            return (
+              <Card key={lesson.id} className="p-6 hover:shadow-lg transition-all">
+                <div className="flex flex-col md:flex-row gap-6">
+                  <div className="flex items-center gap-4 flex-1">
+                    <div className="bg-gradient-to-br from-indigo-100 to-indigo-200 dark:from-indigo-900/30 dark:to-indigo-800/30 p-4 rounded-2xl">
+                      <TypeIcon className="h-8 w-8 text-indigo-600 dark:text-indigo-400" />
                     </div>
-                    <div className="flex flex-wrap gap-4 text-sm text-gray-500">
-                      <span>by {content.author}</span>
-                      <span>{new Date(content.createdAt).toLocaleDateString()}</span>
-                      {content.rating > 0 && <span className="flex items-center gap-1"><Star className="h-4 w-4 text-yellow-500 fill-yellow-500" />{content.rating.toFixed(1)}</span>}
-                      <span className="flex items-center gap-1"><Users className="h-4 w-4" />{content.uses} uses</span>
+                    <div className="flex-1">
+                      <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">{lesson.title}</h3>
+                      <div className="flex flex-wrap gap-2">
+                        <Badge className={typeColor}>{lesson.type ?? 'N/A'}</Badge>
+                        <Badge variant="outline">Lesson #{lesson.id}</Badge>
+                        {lesson.sessionId != null && <Badge variant="outline">Session {lesson.sessionId}</Badge>}
+                        {lesson.durationMinutes != null && <span className="text-sm text-gray-500">{lesson.durationMinutes} phút</span>}
+                      </div>
                     </div>
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  {content.status === 'pending' && (
-                    <>
-                      <Button onClick={() => handleApprove(content.id)} className="bg-green-500 hover:bg-green-600 gap-2"><CheckCircle className="h-4 w-4" />Approve</Button>
-                      <Button onClick={() => handleReject(content.id)} variant="outline" className="text-red-600 gap-2"><XCircle className="h-4 w-4" />Reject</Button>
-                    </>
-                  )}
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild><Button variant="outline" size="sm"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem className="gap-2"><Eye className="h-4 w-4" />View Details</DropdownMenuItem>
-                      <DropdownMenuItem className="gap-2"><Edit className="h-4 w-4" />Edit Content</DropdownMenuItem>
-                      <DropdownMenuItem className="gap-2 text-red-600"><Trash2 className="h-4 w-4" />Delete</DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
-              </div>
-            </Card>
-          );
-        })}
-      </div>
+              </Card>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
 
 function PronunciationReviewTab() {
   const [attempts, setAttempts] = useState<PronunciationAttempt[]>([]);
+  const [userSummaries, setUserSummaries] = useState<Array<{ userId: string; userEmail: string; userFullName: string; attemptCount: number; avgPronunciationScore: number | null; lastAttemptAt: string | null }>>([]);
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
+  const [totalElements, setTotalElements] = useState(0);
+  const size = 10;
+
+  const loadRecords = (p: number) => {
+    setLoading(true);
+    apiService.admin.content.getPronunciationRecords({ page: p, size })
+      .then(res => {
+        const data = res.data?.data as { content?: PronunciationAttempt[]; totalPages?: number; totalElements?: number } | undefined;
+        if (data && data.content) {
+          setAttempts(data.content);
+          setTotalPages(data.totalPages ?? 0);
+          setTotalElements(data.totalElements ?? 0);
+        }
+      })
+      .catch(() => toast.error('Không tải được bản ghi phát âm'))
+      .finally(() => setLoading(false));
+  };
 
   useEffect(() => {
-    setLoading(false);
-    setAttempts([
-      { id: 1, userId: 'u1', userName: 'Nguyễn Văn A', expectedText: 'The weather is nice today', recognizedText: 'The weather is nice today', pronunciationScore: 92, accuracyScore: 95, fluencyScore: 88, status: 'SCORED', createdAt: '2026-03-05T08:00:00' },
-      { id: 2, userId: 'u2', userName: 'Trần Thị B', expectedText: 'She sells seashells by the seashore', recognizedText: 'She sales seashalls by the seashore', pronunciationScore: 71, accuracyScore: 68, fluencyScore: 74, status: 'SCORED', createdAt: '2026-03-05T09:00:00' },
-      { id: 3, userId: 'u3', userName: 'Lê Văn C', expectedText: 'How much wood would a woodchuck chuck', recognizedText: '', pronunciationScore: 0, accuracyScore: 0, fluencyScore: 0, status: 'FAILED', createdAt: '2026-03-05T09:30:00' },
-    ]);
+    apiService.admin.content.getPronunciationUserSummaries()
+      .then(res => {
+        const list = (res.data?.data ?? []) as Array<{ userId: string; userEmail: string; userFullName: string; attemptCount: number; avgPronunciationScore: number | null; lastAttemptAt: string | null }>;
+        setUserSummaries(list);
+      })
+      .catch(() => {});
+    loadRecords(0);
   }, []);
+
+  useEffect(() => { if (page > 0) loadRecords(page); }, [page]);
 
   const scoreColor = (score: number) => score >= 85 ? 'text-green-600' : score >= 65 ? 'text-yellow-600' : 'text-red-600';
   const scoreBg = (score: number) => score >= 85 ? 'bg-green-50' : score >= 65 ? 'bg-yellow-50' : 'bg-red-50';
+  const avgScore = attempts.filter(a => (a.pronunciationScore ?? 0) > 0).length
+    ? Math.round(attempts.filter(a => (a.pronunciationScore ?? 0) > 0).reduce((acc, a) => acc + (a.pronunciationScore ?? 0), 0) / attempts.filter(a => (a.pronunciationScore ?? 0) > 0).length)
+    : 0;
 
-  if (loading) return <div className="flex justify-center py-20"><Loader2 className="h-8 w-8 animate-spin text-purple-500" /></div>;
+  if (loading && attempts.length === 0) return <div className="flex justify-center py-20"><Loader2 className="h-8 w-8 animate-spin text-purple-500" /></div>;
 
   return (
     <div className="space-y-4">
+      {userSummaries.length > 0 && (
+        <Card className="p-4">
+          <h4 className="font-semibold text-gray-900 dark:text-white mb-3 flex items-center gap-2"><Users className="h-4 w-4" />Người dùng có bản ghi âm</h4>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead><tr className="border-b"><th className="text-left py-2">Người dùng</th><th className="text-left py-2">Email</th><th className="text-right py-2">Số lượt</th><th className="text-right py-2">Điểm TB</th><th className="text-right py-2">Lần cuối</th></tr></thead>
+              <tbody>
+                {userSummaries.slice(0, 10).map(u => (
+                  <tr key={u.userId} className="border-b border-gray-100 dark:border-gray-800">
+                    <td className="py-2">{u.userFullName || u.userId}</td>
+                    <td className="py-2 text-gray-500">{u.userEmail}</td>
+                    <td className="py-2 text-right">{u.attemptCount}</td>
+                    <td className="py-2 text-right">{u.avgPronunciationScore != null ? Math.round(u.avgPronunciationScore) + '%' : '-'}</td>
+                    <td className="py-2 text-right text-gray-500">{u.lastAttemptAt ? new Date(u.lastAttemptAt).toLocaleString('vi-VN') : '-'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      )}
+
       <div className="grid grid-cols-3 gap-4 mb-4">
         {[
-          { label: 'Tổng lượt chấm', value: attempts.length, icon: Mic, color: 'text-purple-600', bg: 'bg-purple-50' },
-          { label: 'Điểm trung bình', value: Math.round(attempts.filter(a => a.pronunciationScore > 0).reduce((acc, a) => acc + a.pronunciationScore, 0) / (attempts.filter(a => a.pronunciationScore > 0).length || 1)) + '%', icon: TrendingUp, color: 'text-green-600', bg: 'bg-green-50' },
-          { label: 'Thất bại', value: attempts.filter(a => a.status === 'FAILED').length, icon: AlertTriangle, color: 'text-red-600', bg: 'bg-red-50' },
+          { label: 'Tổng lượt chấm', value: totalElements, icon: Mic, color: 'text-purple-600', bg: 'bg-purple-50' },
+          { label: 'Điểm trung bình (trang)', value: avgScore + '%', icon: TrendingUp, color: 'text-green-600', bg: 'bg-green-50' },
+          { label: 'Thất bại (trang)', value: attempts.filter(a => a.status === 'FAILED').length, icon: AlertTriangle, color: 'text-red-600', bg: 'bg-red-50' },
         ].map(stat => (
           <Card key={stat.label} className="p-4">
             <div className="flex items-center gap-3">
@@ -217,30 +223,40 @@ function PronunciationReviewTab() {
         ))}
       </div>
 
+      {attempts.length === 0 && !loading && (
+        <Card className="p-8 text-center text-gray-500">
+          <Mic className="h-10 w-10 mx-auto mb-2 opacity-50" />
+          Chưa có bản ghi phát âm nào.
+        </Card>
+      )}
       {attempts.map(attempt => (
-        <Card key={attempt.id} className={`p-5 ${scoreBg(attempt.pronunciationScore)}`}>
+        <Card key={attempt.id} className={`p-5 ${scoreBg(attempt.pronunciationScore ?? 0)}`}>
           <div className="flex items-start justify-between mb-3">
             <div>
-              <div className="font-semibold text-gray-900">{attempt.userName || attempt.userId}</div>
-              <div className="text-xs text-gray-500">{new Date(attempt.createdAt).toLocaleString('vi-VN')}</div>
+              <div className="font-semibold text-gray-900 dark:text-white">{attempt.userFullName || attempt.userEmail || attempt.userId}</div>
+              <div className="text-xs text-gray-500">{attempt.lessonTitle && `Bài: ${attempt.lessonTitle}`} {attempt.sessionTitle && ` · ${attempt.sessionTitle}`}</div>
+              <div className="text-xs text-gray-500 mt-0.5">{new Date(attempt.createdAt).toLocaleString('vi-VN')}</div>
             </div>
-            <Badge className={attempt.status === 'SCORED' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}>
+            <Badge className={attempt.status === 'SCORED' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'}>
               {attempt.status}
             </Badge>
           </div>
           <div className="space-y-1 mb-3">
-            <div className="text-sm"><span className="font-medium text-gray-600">Câu gốc: </span><span className="text-gray-800">"{attempt.expectedText}"</span></div>
-            {attempt.recognizedText && <div className="text-sm"><span className="font-medium text-gray-600">Nhận diện: </span><span className="text-gray-800">"{attempt.recognizedText}"</span></div>}
+            <div className="text-sm"><span className="font-medium text-gray-600 dark:text-gray-400">Câu gốc: </span><span className="text-gray-800 dark:text-gray-200">"{attempt.expectedText || '-'}"</span></div>
+            {(attempt.recognizedText != null && attempt.recognizedText !== '') && <div className="text-sm"><span className="font-medium text-gray-600 dark:text-gray-400">Nhận diện: </span><span className="text-gray-800 dark:text-gray-200">"{attempt.recognizedText}"</span></div>}
+            {attempt.errorMessage && <div className="text-sm text-red-600 dark:text-red-400">{attempt.errorMessage}</div>}
           </div>
-          {attempt.pronunciationScore > 0 && (
-            <div className="grid grid-cols-3 gap-2">
+          {(attempt.pronunciationScore ?? 0) > 0 && (
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
               {[
-                { label: 'Phát âm', value: attempt.pronunciationScore },
-                { label: 'Chính xác', value: attempt.accuracyScore },
-                { label: 'Lưu loát', value: attempt.fluencyScore },
-              ].map(s => (
+                { label: 'Phát âm', value: attempt.pronunciationScore ?? 0 },
+                { label: 'Chính xác', value: attempt.accuracyScore ?? 0 },
+                { label: 'Lưu loát', value: attempt.fluencyScore ?? 0 },
+                { label: 'Ngữ điệu', value: attempt.prosodyScore ?? 0 },
+                { label: 'Hoàn chỉnh', value: attempt.completenessScore ?? 0 },
+              ].filter(s => s.value > 0).map(s => (
                 <div key={s.label} className="text-center">
-                  <div className={`text-xl font-bold ${scoreColor(s.value)}`}>{s.value}%</div>
+                  <div className={`text-lg font-bold ${scoreColor(s.value)}`}>{Math.round(s.value)}%</div>
                   <div className="text-xs text-gray-500">{s.label}</div>
                 </div>
               ))}
@@ -248,23 +264,84 @@ function PronunciationReviewTab() {
           )}
         </Card>
       ))}
+
+      {totalPages > 1 && (
+        <div className="flex justify-center gap-2 pt-4">
+          <Button variant="outline" size="sm" disabled={page <= 0} onClick={() => setPage(p => Math.max(0, p - 1))}>Trước</Button>
+          <span className="flex items-center px-3 text-sm text-gray-500">Trang {page + 1} / {totalPages}</span>
+          <Button variant="outline" size="sm" disabled={page >= totalPages - 1} onClick={() => setPage(p => p + 1)}>Sau</Button>
+        </div>
+      )}
     </div>
   );
 }
 
+interface VideoLessonRow {
+  lessonId: number;
+  lessonTitle: string;
+  lessonType: string;
+  sessionTitle: string;
+  topicName: string;
+  videoUrl: string;
+  youtubeUrl: string;
+  transcriptSegmentCount: number;
+  hasTranscript: boolean;
+}
+
+interface LessonDetailForVideo {
+  id: number;
+  title: string;
+  videoUrl?: string | null;
+  youtubeUrl?: string | null;
+  transcriptJson?: Array<{ text?: string; viText?: string; ipa?: string; start?: number; end?: number }> | null;
+}
+
 function VideoReviewTab() {
-  const [videos, setVideos] = useState<any[]>([]);
+  const [videos, setVideos] = useState<VideoLessonRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [detailLessonId, setDetailLessonId] = useState<number | null>(null);
+  const [detailLesson, setDetailLesson] = useState<LessonDetailForVideo | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
 
   useEffect(() => {
-    apiService.lesson.getAll()
+    apiService.admin.content.getVideoLessonsDetail()
       .then(res => {
-        const lessons = (res.data?.data ?? []) as any[];
-        setVideos(lessons.filter((l: any) => l.type === 'VIDEO'));
+        const list = (res.data?.data ?? []) as VideoLessonRow[];
+        setVideos(list);
       })
-      .catch(() => {})
+      .catch(() => toast.error('Không tải được danh sách video lesson'))
       .finally(() => setLoading(false));
   }, []);
+
+  const openDetail = (v: VideoLessonRow) => {
+    setDetailLessonId(v.lessonId);
+    setDetailLesson(null);
+    setDetailOpen(true);
+  };
+
+  useEffect(() => {
+    if (!detailOpen || detailLessonId == null) return;
+    setDetailLoading(true);
+    apiService.lesson.getById(detailLessonId)
+      .then(res => {
+        const raw = res.data?.data ?? res.data;
+        if (raw && typeof raw === 'object') {
+          setDetailLesson({
+            id: raw.id ?? detailLessonId,
+            title: raw.title ?? '',
+            videoUrl: raw.videoUrl,
+            youtubeUrl: raw.youtubeUrl,
+            transcriptJson: Array.isArray(raw.transcriptJson) ? raw.transcriptJson : null,
+          });
+        }
+      })
+      .catch(() => {
+        toast.error('Không tải được chi tiết bài học');
+        setDetailLesson(null);
+      })
+      .finally(() => setDetailLoading(false));
+  }, [detailOpen, detailLessonId]);
 
   if (loading) return <div className="flex justify-center py-20"><Loader2 className="h-8 w-8 animate-spin text-blue-500" /></div>;
 
@@ -272,103 +349,167 @@ function VideoReviewTab() {
     return (
       <Card className="p-12 text-center">
         <Video className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-        <p className="text-gray-500 font-medium">Không có video nào cần duyệt.</p>
-        <p className="text-gray-400 text-sm mt-1">Video lessons sẽ xuất hiện ở đây sau khi được tạo.</p>
+        <p className="text-gray-500 font-medium">Chưa có bài học nào có video.</p>
+        <p className="text-gray-400 text-sm mt-1">Các lesson có video (đã lưu transcript) sẽ hiển thị tại đây.</p>
       </Card>
     );
   }
 
   return (
-    <div className="grid gap-4 md:grid-cols-2">
-      {videos.map((video: any) => (
-        <Card key={video.id} className="p-5 hover:shadow-md transition-all">
-          <div className="flex items-start gap-3 mb-3">
-            <div className="bg-blue-50 p-2 rounded-xl"><Video className="h-6 w-6 text-blue-600" /></div>
-            <div className="flex-1">
-              <h4 className="font-semibold text-gray-900">{video.title}</h4>
-              <div className="flex gap-2 mt-1">
-                <Badge variant="outline" className="text-xs">Lesson #{video.id}</Badge>
-                {video.type && <Badge className="bg-blue-100 text-blue-700 text-xs">{video.type}</Badge>}
+    <div className="space-y-4">
+      <Card className="p-4 overflow-x-auto">
+        <table className="w-full text-sm table-fixed">
+          <thead>
+            <tr className="border-b text-left">
+              <th className="py-2 pr-2 w-[40%]">Bài học</th>
+              <th className="py-2 pr-2">Session / Topic</th>
+              <th className="py-2 pr-2">Transcript</th>
+              <th className="py-2 pr-2">Video / YouTube</th>
+              <th className="py-2 pr-2 w-[130px] shrink-0">Thao tác</th>
+            </tr>
+          </thead>
+          <tbody>
+            {videos.map((v) => (
+              <tr key={v.lessonId} className="border-b border-gray-100 dark:border-gray-800">
+                <td className="py-3 pr-2">
+                  <div className="font-medium text-gray-900 dark:text-white">{v.lessonTitle}</div>
+                  <div className="flex flex-wrap items-center gap-2 mt-1">
+                    <Badge variant="outline" className="text-xs">#{v.lessonId}</Badge>
+                    {v.lessonType && <Badge className="bg-blue-100 text-blue-700 text-xs dark:bg-blue-900/30 dark:text-blue-400">{v.lessonType}</Badge>}
+                    <Button variant="outline" size="sm" className="gap-1 h-7 text-xs shrink-0" onClick={() => openDetail(v)}>
+                      <Eye className="h-3.5 w-3.5" /> Xem chi tiết
+                    </Button>
+                  </div>
+                </td>
+                <td className="py-3 pr-2 text-gray-600 dark:text-gray-400">
+                  <div>{v.sessionTitle ?? '-'}</div>
+                  <div className="text-xs text-gray-500">{v.topicName ?? '-'}</div>
+                </td>
+                <td className="py-3 pr-2">
+                  {v.hasTranscript ? <span className="text-green-600">{v.transcriptSegmentCount} đoạn</span> : <span className="text-gray-400">Chưa có</span>}
+                </td>
+                <td className="py-3 pr-2">
+                  <div className="flex flex-col gap-1">
+                    {v.videoUrl && <a href={v.videoUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline text-xs">Video</a>}
+                    {v.youtubeUrl && <a href={v.youtubeUrl} target="_blank" rel="noopener noreferrer" className="text-red-600 hover:underline text-xs">YouTube</a>}
+                    {!v.videoUrl && !v.youtubeUrl && <span className="text-gray-400 text-xs">-</span>}
+                  </div>
+                </td>
+                <td className="py-3 pr-2 shrink-0">
+                  <Button variant="outline" size="sm" className="gap-1 w-full sm:w-auto" onClick={() => openDetail(v)}>
+                    <Eye className="h-4 w-4" /> Xem chi tiết
+                  </Button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </Card>
+
+      <Dialog open={detailOpen} onOpenChange={setDetailOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="pr-8">
+              {detailLesson ? detailLesson.title : 'Chi tiết nội dung video'}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 min-h-0 flex flex-col gap-4">
+            {detailLoading ? (
+              <div className="flex justify-center py-12">
+                <Loader2 className="h-10 w-10 animate-spin text-blue-500" />
               </div>
-            </div>
+            ) : detailLesson ? (
+              <>
+                <div className="rounded-lg overflow-hidden bg-black/5 dark:bg-black/20 aspect-video max-h-[340px]">
+                  {getYoutubeEmbedUrl(detailLesson.youtubeUrl) ? (
+                    <iframe
+                      title="Video"
+                      src={getYoutubeEmbedUrl(detailLesson.youtubeUrl)!}
+                      className="w-full h-full"
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                      allowFullScreen
+                    />
+                  ) : detailLesson.videoUrl ? (
+                    <video
+                      src={detailLesson.videoUrl}
+                      controls
+                      className="w-full h-full"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-gray-500">
+                      <Video className="h-12 w-12 opacity-50" />
+                      <span className="ml-2">Chưa có video</span>
+                    </div>
+                  )}
+                </div>
+                {detailLesson.transcriptJson && detailLesson.transcriptJson.length > 0 ? (
+                  <div>
+                    <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Transcript ({detailLesson.transcriptJson.length} câu)</h4>
+                    <ScrollArea className="h-[240px] rounded-md border border-gray-200 dark:border-gray-700 p-3">
+                      <div className="space-y-3 pr-4">
+                        {detailLesson.transcriptJson.map((seg: any, idx: number) => (
+                          <div key={idx} className="text-sm border-b border-gray-100 dark:border-gray-800 pb-2 last:border-0">
+                            <p className="font-medium text-gray-900 dark:text-white">{seg.text ?? '-'}</p>
+                            {seg.viText && <p className="text-gray-600 dark:text-gray-400 mt-0.5">{seg.viText}</p>}
+                            {seg.ipa && <p className="text-indigo-600 dark:text-indigo-400 text-xs mt-0.5 font-mono">/{seg.ipa}/</p>}
+                          </div>
+                        ))}
+                      </div>
+                    </ScrollArea>
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-500">Chưa có transcript.</p>
+                )}
+              </>
+            ) : null}
           </div>
-          <div className="flex gap-2">
-            <Button size="sm" className="bg-green-500 hover:bg-green-600 text-white gap-1 flex-1">
-              <Eye className="h-4 w-4" />Xem
-            </Button>
-            <Button size="sm" variant="outline" className="flex-1 gap-1">
-              <CheckCircle className="h-4 w-4" />Duyệt
-            </Button>
-          </div>
-        </Card>
-      ))}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
 
 function AIAnalysisTab() {
-  const [conversations, setConversations] = useState<AIConversation[]>([
-    { id: 1, userId: 'u1', userName: 'Nguyễn Văn A', messageCount: 24, topic: 'Job Interview Practice', createdAt: '2026-03-04T10:00:00', updatedAt: '2026-03-04T10:45:00' },
-    { id: 2, userId: 'u2', userName: 'Trần Thị B', messageCount: 12, topic: 'Travel Conversation', createdAt: '2026-03-05T08:30:00', updatedAt: '2026-03-05T09:00:00' },
-    { id: 3, userId: 'u3', userName: 'Lê Văn C', messageCount: 6, topic: 'Restaurant Ordering', createdAt: '2026-03-05T09:00:00', updatedAt: '2026-03-05T09:15:00' },
-  ]);
-
-  const totalMessages = conversations.reduce((acc, c) => acc + c.messageCount, 0);
-  const avgMessages = Math.round(totalMessages / (conversations.length || 1));
-
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-3 gap-4 mb-4">
-        {[
-          { label: 'Tổng hội thoại', value: conversations.length, icon: MessageSquare, color: 'text-green-600', bg: 'bg-green-50' },
-          { label: 'Tổng tin nhắn', value: totalMessages, icon: Brain, color: 'text-blue-600', bg: 'bg-blue-50' },
-          { label: 'TB tin nhắn/buổi', value: avgMessages, icon: TrendingUp, color: 'text-purple-600', bg: 'bg-purple-50' },
-        ].map(stat => (
-          <Card key={stat.label} className="p-4">
-            <div className="flex items-center gap-3">
-              <div className={`${stat.bg} p-2 rounded-xl`}><stat.icon className={`h-6 w-6 ${stat.color}`} /></div>
-              <div><div className={`text-2xl font-bold ${stat.color}`}>{stat.value}</div><div className="text-sm text-gray-500">{stat.label}</div></div>
-            </div>
-          </Card>
-        ))}
-      </div>
-
-      {conversations.map(conv => (
-        <Card key={conv.id} className="p-5 hover:shadow-md transition-all">
-          <div className="flex items-start justify-between mb-3">
-            <div>
-              <div className="font-semibold text-gray-900">{conv.userName || conv.userId}</div>
-              <div className="text-sm text-gray-500">{conv.topic}</div>
-            </div>
-            <div className="text-right">
-              <div className="text-lg font-bold text-blue-600">{conv.messageCount}</div>
-              <div className="text-xs text-gray-400">tin nhắn</div>
-            </div>
-          </div>
-          <div className="flex items-center justify-between text-xs text-gray-400">
-            <span className="flex items-center gap-1"><Clock className="h-3 w-3" />Bắt đầu: {new Date(conv.createdAt).toLocaleString('vi-VN')}</span>
-            <span>Kết thúc: {new Date(conv.updatedAt).toLocaleString('vi-VN')}</span>
-          </div>
-          <div className="mt-3 flex gap-2">
-            <Button size="sm" variant="outline" className="gap-1 text-xs">
-              <Eye className="h-3 w-3" />Xem hội thoại
-            </Button>
-            <Button size="sm" variant="outline" className="gap-1 text-xs">
-              <Brain className="h-3 w-3" />Phân tích AI
-            </Button>
-          </div>
-        </Card>
-      ))}
+      <Card className="p-12 text-center">
+        <Brain className="h-14 w-14 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
+        <p className="text-gray-600 dark:text-gray-400 font-medium">Phân tích hội thoại AI</p>
+        <p className="text-sm text-gray-500 dark:text-gray-500 mt-2 max-w-md mx-auto">
+          Báo cáo hội thoại AI (số cuộc hội thoại, tin nhắn theo người dùng) sẽ hiển thị tại đây khi backend có API tương ứng.
+        </p>
+        <p className="text-xs text-gray-400 mt-4">Hiện chưa có dữ liệu mock — toàn bộ dữ liệu dùng từ hệ thống.</p>
+      </Card>
     </div>
   );
 }
 
 // ─── Main Component ──────────────────────────────────────────────────────────
 export function ContentManagement() {
-  const totalContent = staticContents.length;
-  const approved = staticContents.filter(c => c.status === 'approved').length;
-  const pending = staticContents.filter(c => c.status === 'pending').length;
-  const reported = staticContents.filter(c => c.reports > 0).length;
+  const [report, setReport] = useState<{
+    totalLessons: number;
+    lessonsWithVideo: number;
+    lessonsWithoutVideo: number;
+    totalPronunciationAttempts: number;
+    totalUsersWithAttempts: number;
+  } | null>(null);
+  const [reportLoading, setReportLoading] = useState(true);
+
+  useEffect(() => {
+    apiService.admin.content.getReport()
+      .then(res => {
+        const data = res.data?.data;
+        if (data) setReport(data);
+      })
+      .catch(() => toast.error('Không tải được báo cáo'))
+      .finally(() => setReportLoading(false));
+  }, []);
+
+  const totalLessons = report?.totalLessons ?? 0;
+  const lessonsWithVideo = report?.lessonsWithVideo ?? 0;
+  const lessonsWithoutVideo = report?.lessonsWithoutVideo ?? 0;
+  const totalPronunciationAttempts = report?.totalPronunciationAttempts ?? 0;
+  const totalUsersWithAttempts = report?.totalUsersWithAttempts ?? 0;
 
   return (
     <div className="min-h-screen bg-[var(--page-bg)] pb-20 md:pb-6">
@@ -381,28 +522,33 @@ export function ContentManagement() {
             </div>
             <div>
               <h1 className="text-3xl font-bold">Nội dung & Bài học</h1>
-              <p className="text-slate-200 text-sm">Quản lý loại nội dung, chấm phát âm, video và phân tích AI</p>
+              <p className="text-slate-200 text-sm">Quản lý bài học, video, chấm phát âm và phân tích AI (dữ liệu từ hệ thống)</p>
             </div>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {[
-              { label: 'Total Content', value: totalContent, icon: BookOpen },
-              { label: 'Approved', value: approved, icon: CheckCircle },
-              { label: 'Pending', value: pending, icon: Clock },
-              { label: 'Reported', value: reported, icon: AlertTriangle },
-            ].map(stat => (
-              <Card key={stat.label} className="bg-white/10 backdrop-blur-sm border-white/20 p-4">
-                <div className="flex items-center gap-3">
-                  <stat.icon className="h-8 w-8 text-white" />
-                  <div>
-                    <div className="text-2xl font-bold">{stat.value}</div>
-                    <div className="text-sm text-indigo-100">{stat.label}</div>
+          {reportLoading ? (
+            <div className="flex items-center justify-center py-8 gap-2"><Loader2 className="h-6 w-6 animate-spin" /> Đang tải báo cáo...</div>
+          ) : (
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+              {[
+                { label: 'Tổng bài học', value: totalLessons, icon: BookOpen },
+                { label: 'Có video', value: lessonsWithVideo, icon: Video },
+                { label: 'Chưa có video', value: lessonsWithoutVideo, icon: FileText },
+                { label: 'Bản ghi phát âm', value: totalPronunciationAttempts, icon: Mic },
+                { label: 'Người dùng có thu âm', value: totalUsersWithAttempts, icon: Users },
+              ].map(stat => (
+                <Card key={stat.label} className="bg-white/10 backdrop-blur-sm border-white/20 p-4">
+                  <div className="flex items-center gap-3">
+                    <stat.icon className="h-8 w-8 text-white" />
+                    <div>
+                      <div className="text-2xl font-bold">{stat.value}</div>
+                      <div className="text-sm text-indigo-100">{stat.label}</div>
+                    </div>
                   </div>
-                </div>
-              </Card>
-            ))}
-          </div>
+                </Card>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 

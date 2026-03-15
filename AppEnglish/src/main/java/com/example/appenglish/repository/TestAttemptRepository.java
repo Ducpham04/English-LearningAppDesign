@@ -10,4 +10,5 @@ public interface TestAttemptRepository extends JpaRepository<TestAttempt, Long> 
     List<TestAttempt> findByTest_IdAndUser_IdOrderBySubmittedAtDesc(Long testId, String userId);
     int countByTest_IdAndUser_Id(Long testId, String userId);
     Optional<TestAttempt> findFirstByTest_IdAndUser_IdOrderByTotalScoreDesc(Long testId, String userId);
+    void deleteByTest_Id(Long testId);
 }

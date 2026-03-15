@@ -39,6 +39,8 @@ export interface PronunciationScoreResponse {
   status?: string;
   s3Status?: string;
   feedback?: Record<string, unknown>;
+  /** Có khi status = FAILED (Azure timeout, không nhận diện được giọng nói). */
+  errorMessage?: string;
 }
 
 /**
@@ -114,9 +116,9 @@ const apiService = {
     youtube: (data: YoutubeTranscribeRequest) =>
       axiosInstance.post<BaseResponse<string>>('/v1/youtube/transcribe', data),
 
-    // Poll status: GET transcript JSON (null/empty = still processing)
+    // Poll status: GET transcript JSON. BE trả { transcript: [...] | null, s3Url: string | null }; null/empty = đang xử lý
     getTranscript: (lessonId: number) =>
-      axiosInstance.get<BaseResponse<any[]>>(`/v1/youtube/${lessonId}/transcript`),
+      axiosInstance.get<BaseResponse<{ transcript: any[] | null; s3Url: string | null }>>(`/v1/youtube/${lessonId}/transcript`),
 
     upload: (lessonId: number, file: File, languageCode: string = 'en-US') => {
       const formData = new FormData();
@@ -192,8 +194,15 @@ const apiService = {
     update: (id: number, data: any) => 
       axiosInstance.put<BaseResponse<any>>(`/v1/curriculums/${id}`, data),
     
-    delete: (id: number) => 
+    delete: (id: number) =>
       axiosInstance.delete<BaseResponse<any>>(`/v1/curriculums/${id}`),
+
+    // Admin: participants of a course
+    getParticipants: (courseId: number) =>
+      axiosInstance.get<BaseResponse<any[]>>(`/v1/admin/courses/${courseId}/participants`),
+
+    removeParticipant: (courseId: number, userId: string) =>
+      axiosInstance.delete<BaseResponse<any>>(`/v1/admin/courses/${courseId}/participants/${encodeURIComponent(userId)}`),
   },
 
   // --- SESSION MODULE ---
@@ -215,6 +224,13 @@ const apiService = {
     
     delete: (id: number) => 
       axiosInstance.delete<BaseResponse<any>>(`/v1/sessions/${id}`),
+
+    // Admin: participants of a session
+    getParticipants: (sessionId: number) =>
+      axiosInstance.get<BaseResponse<any[]>>(`/v1/admin/sessions/${sessionId}/participants`),
+
+    removeParticipant: (sessionId: number, userId: string) =>
+      axiosInstance.delete<BaseResponse<any>>(`/v1/admin/sessions/${sessionId}/participants/${encodeURIComponent(userId)}`),
   },
 
   // --- LESSON MODULE ---
@@ -344,6 +360,28 @@ const apiService = {
   admin: {
     getStats: () =>
       axiosInstance.get<any>('/v1/admin/stats'),
+
+    /** Quản lý nội dung: báo cáo tổng quan (bài học, video, bản ghi phát âm). */
+    content: {
+      getReport: () =>
+        axiosInstance.get('/v1/admin/content/report'),
+
+      getVideoLessonsDetail: () =>
+        axiosInstance.get('/v1/admin/content/video-lessons'),
+
+      getPronunciationRecords: (params?: { lessonId?: number; userId?: string; page?: number; size?: number }) => {
+        const sp = new URLSearchParams();
+        if (params?.lessonId != null) sp.set('lessonId', String(params.lessonId));
+        if (params?.userId != null) sp.set('userId', params.userId);
+        if (params?.page != null) sp.set('page', String(params.page));
+        if (params?.size != null) sp.set('size', String(params.size));
+        const qs = sp.toString();
+        return axiosInstance.get(`/v1/admin/content/pronunciation-records${qs ? `?${qs}` : ''}`);
+      },
+
+      getPronunciationUserSummaries: () =>
+        axiosInstance.get('/v1/admin/content/pronunciation-users'),
+    },
   },
 
   // --- AI CHAT (Chatbot) ---
@@ -377,6 +415,13 @@ const apiService = {
 
     addSession: (topicId: number, data: any) =>
       axiosInstance.post<BaseResponse<any>>(`/v1/topics/${topicId}/sessions`, data),
+
+    // Admin: participants of a topic
+    getParticipants: (topicId: number) =>
+      axiosInstance.get<BaseResponse<any[]>>(`/v1/admin/topics/${topicId}/participants`),
+
+    removeParticipant: (topicId: number, userId: string) =>
+      axiosInstance.delete<BaseResponse<any>>(`/v1/admin/topics/${topicId}/participants/${encodeURIComponent(userId)}`),
   },
 
   // --- STUDENT MODULE ---
@@ -413,6 +458,31 @@ const apiService = {
     /** Bài tập giao trong lớp (chỉ lớp đã ghi danh). */
     getClassAssignments: (classId: number) =>
       axiosInstance.get<BaseResponse<any[]>>(`/v1/student/classes/${classId}/assignments`),
+
+    /** Từ vựng của tôi: lưu từ và lấy danh sách (có thể lọc theo lesson/session). */
+    myVocabulary: {
+      add: (payload: { word: string; phonetic?: string; meaning?: string; example?: string; lessonId?: number }) =>
+        axiosInstance.post<BaseResponse<{ vocabularyId: number; word: string; alreadySaved: boolean }>>(
+          '/v1/student/my-vocabulary',
+          payload
+        ),
+      getList: (params?: { lessonId?: number; sessionId?: number }) => {
+        const searchParams = new URLSearchParams();
+        if (params?.lessonId != null) searchParams.set('lessonId', String(params.lessonId));
+        if (params?.sessionId != null) searchParams.set('sessionId', String(params.sessionId));
+        const qs = searchParams.toString();
+        return axiosInstance.get<BaseResponse<Array<{
+          id: number;
+          word: string;
+          phonetic?: string;
+          meanings?: Array<Record<string, string>>;
+          example?: string;
+        }>>>(`/v1/student/my-vocabulary${qs ? `?${qs}` : ''}`);
+      },
+      /** Xóa từ khỏi danh sách của tôi (chỉ bỏ liên kết, không xóa từ trong kho). */
+      remove: (vocabularyId: number) =>
+        axiosInstance.delete<BaseResponse<null>>(`/v1/student/my-vocabulary/${vocabularyId}`),
+    },
   },
 };
 

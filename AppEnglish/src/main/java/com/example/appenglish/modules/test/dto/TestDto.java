@@ -30,6 +30,10 @@ public class TestDto {
     private Integer questionCount;
     private Integer totalPoints;
 
+    /** Người tạo bài test (quản lý). */
+    private String createdById;
+    private String createdByName;
+
     // Cho học sinh: thống kê attempt
     private Integer attemptCount;
     private Integer bestScore;

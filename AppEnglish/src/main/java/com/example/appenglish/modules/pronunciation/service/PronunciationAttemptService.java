@@ -178,8 +178,25 @@ public class PronunciationAttemptService {
         }
         attempt.setErrorMessage(msg);
         attemptRepository.save(attempt);
+        log.warn("Pronunciation attempt {} failed (Azure): {}", attempt.getId(), msg);
 
-        throw new RuntimeException(msg);
+        // Trả về response FAILED thay vì throw — tránh 500 khi timeout/không nhận diện (đặc biệt Karaoke batch)
+        return PronunciationScoreResponse.builder()
+                .attemptId(attempt.getId())
+                .lessonId(lessonId)
+                .sentenceIndex(sentenceIndex)
+                .expectedText(expectedText)
+                .recognizedText(azure.getRecognizedText())
+                .pronunciationScore(azure.getPronunciationScore())
+                .accuracyScore(azure.getAccuracyScore())
+                .fluencyScore(azure.getFluencyScore())
+                .prosodyScore(azure.getProsodyScore())
+                .completenessScore(azure.getCompletenessScore())
+                .status(PronunciationAttemptStatus.FAILED)
+                .s3Status(attempt.getS3Status())
+                .feedback(azure.getRawFeedback())
+                .errorMessage(msg)
+                .build();
     }
 
     private String extFromContentTypeOrName(String contentType, String originalFilename) {

@@ -39,12 +39,3 @@ public class UserVocabularyProgress {
     @Column(name = "next_review_at")
     private LocalDateTime nextReviewAt; // Ngày giờ chính xác phải ôn tập
 }
-
-@Embeddable
-@Getter @Setter @EqualsAndHashCode
-class UserVocabId implements Serializable {
-    private String userId;
-    private Long vocabId;
-}
-
-enum LearningStatus { NEW, LEARNING, REVIEW, MASTERED }

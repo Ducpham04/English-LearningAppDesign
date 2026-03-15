@@ -2,6 +2,7 @@ package com.example.appenglish.modules.session.controller;
 
 import com.example.appenglish.common.dto.BaseResponse;
 import com.example.appenglish.modules.session.dto.SessionCreateRequest;
+import com.example.appenglish.modules.session.dto.SessionDetailDto;
 import com.example.appenglish.modules.session.dto.SessionDto;
 import com.example.appenglish.modules.session.service.SessionService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -32,6 +33,16 @@ public class SessionController {
         }
     }
 
+    /** Chi tiết session kèm thông tin liên quan: bài học, số bản ghi phát âm, tiến độ học viên. */
+    @GetMapping("/{id}/detail")
+    public ResponseEntity<BaseResponse<SessionDetailDto>> getDetail(@PathVariable Long id, HttpServletRequest req) {
+        try {
+            return ResponseEntity.ok(BaseResponse.ok(sessionService.getDetail(id), "OK", req.getRequestURI()));
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(404).body(BaseResponse.error(e.getMessage(), "NOT_FOUND", req.getRequestURI()));
+        }
+    }
+
     @GetMapping("/course/{courseId}")
     public ResponseEntity<BaseResponse<List<SessionDto>>> getByCourse(@PathVariable Long courseId, HttpServletRequest req) {
         return ResponseEntity.ok(BaseResponse.ok(sessionService.getByCourse(courseId), "OK", req.getRequestURI()));
@@ -57,7 +68,14 @@ public class SessionController {
 
     @DeleteMapping("/{id}")
     public ResponseEntity<BaseResponse<Void>> delete(@PathVariable Long id, HttpServletRequest req) {
-        sessionService.delete(id);
-        return ResponseEntity.ok(BaseResponse.ok(null, "Session deleted", req.getRequestURI()));
+        try {
+            sessionService.delete(id);
+            return ResponseEntity.ok(BaseResponse.ok(null, "Session deleted", req.getRequestURI()));
+        } catch (RuntimeException e) {
+            if (e.getMessage() != null && e.getMessage().contains("not found")) {
+                return ResponseEntity.status(404).body(BaseResponse.error(e.getMessage(), "NOT_FOUND", req.getRequestURI()));
+            }
+            return ResponseEntity.status(400).body(BaseResponse.error(e.getMessage(), "BAD_REQUEST", req.getRequestURI()));
+        }
     }
 }

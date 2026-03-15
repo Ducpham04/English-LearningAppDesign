@@ -118,7 +118,18 @@ public class GlobalExceptionHandler {
                 .body(BaseResponse.error("I/O error", "IO_ERROR", request.getRequestURI()));
     }
 
-    // 6. Xử lý lỗi chung (Luôn để cuối cùng)
+    // 6. RuntimeException (e.g. Azure/timeout từ service khác) — trả JSON thay vì crash
+    @ExceptionHandler(RuntimeException.class)
+    public ResponseEntity<BaseResponse<Void>> handleRuntimeException(RuntimeException ex, HttpServletRequest request) {
+        log.warn("RuntimeException: {}", ex.getMessage());
+        String message = ex.getMessage() != null && !ex.getMessage().isBlank()
+                ? ex.getMessage()
+                : "Service temporarily unavailable. Please try again.";
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                .body(BaseResponse.error(message, "SERVICE_ERROR", request.getRequestURI()));
+    }
+
+    // 7. Xử lý lỗi chung (Luôn để cuối cùng)
     @ExceptionHandler(Exception.class)
     public ResponseEntity<BaseResponse<Void>> handleGeneric(Exception ex, HttpServletRequest request) {
         log.error("Unhandled exception", ex);
