@@ -60,7 +60,7 @@ export function StudentDetail() {
       setLoading(false);
       return;
     }
-    apiService.auth.getUsers()
+    apiService.user.getAllUsers()
       .then((res) => {
         const list = (res.data?.data ?? []) as any[];
         const arr = Array.isArray(list) ? list : [];

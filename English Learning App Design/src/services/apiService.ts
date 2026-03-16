@@ -47,8 +47,9 @@ export interface PronunciationScoreResponse {
  * Transcribe Types
  */
 export interface YoutubeTranscribeRequest {
-  url: string;
   lessonId: number;
+  youtubeUrl: string;
+  url?: string;
   languageCode?: string;
 }
 
@@ -169,14 +170,28 @@ const apiService = {
       axiosInstance.delete<BaseResponse<void>>(`/v1/teacher/classes/${classId}/students/${studentId}`),
     getAssignments: (classId: number) =>
       axiosInstance.get<BaseResponse<any[]>>(`/v1/teacher/classes/${classId}/assignments`),
+    getAssignmentStats: (classId: number) =>
+      axiosInstance.get<BaseResponse<any[]>>(`/v1/teacher/classes/${classId}/assignment-stats`),
     createAssignment: (classId: number, data: { lessonId: number; title?: string; description?: string; dueAt?: string; maxScore?: number; isRequired?: boolean; orderIndex?: number }) =>
       axiosInstance.post<BaseResponse<any>>(`/v1/teacher/classes/${classId}/assignments`, data),
     updateAssignment: (classId: number, assignmentId: number, data: { title?: string; description?: string; dueAt?: string; maxScore?: number; isRequired?: boolean; orderIndex?: number }) =>
       axiosInstance.put<BaseResponse<any>>(`/v1/teacher/classes/${classId}/assignments/${assignmentId}`, data),
     deleteAssignment: (classId: number, assignmentId: number) =>
       axiosInstance.delete<BaseResponse<void>>(`/v1/teacher/classes/${classId}/assignments/${assignmentId}`),
+    getJoinRequests: (classId: number) =>
+      axiosInstance.get<BaseResponse<any[]>>(`/v1/teacher/classes/${classId}/join-requests`),
+    approveJoinRequest: (classId: number, requestId: number) =>
+      axiosInstance.post<BaseResponse<void>>(`/v1/teacher/classes/${classId}/join-requests/${requestId}/approve`),
+    rejectJoinRequest: (classId: number, requestId: number) =>
+      axiosInstance.post<BaseResponse<void>>(`/v1/teacher/classes/${classId}/join-requests/${requestId}/reject`),
     delete: (classId: number) =>
       axiosInstance.delete<BaseResponse<void>>(`/v1/teacher/classes/${classId}`),
+  },
+
+  /** Lessons from teacher's own curricula (for assigning in class). */
+  teacher: {
+    getLessons: () =>
+      axiosInstance.get<BaseResponse<any[]>>('/v1/teacher/lessons'),
   },
 
   // --- CURRICULUM (COURSE) MODULE ---
@@ -187,7 +202,7 @@ const apiService = {
     getById: (id: number) => 
       axiosInstance.get<BaseResponse<any>>(`/v1/curriculums/${id}`),
     
-    getByTeacher: (teacherId: number) => 
+    getByTeacher: (teacherId: string | number) =>
       axiosInstance.get<BaseResponse<any[]>>(`/v1/curriculums/teacher/${teacherId}`),
     
     create: (data: any) => 
@@ -460,6 +475,10 @@ const apiService = {
     /** Bài tập giao trong lớp (chỉ lớp đã ghi danh). */
     getClassAssignments: (classId: number) =>
       axiosInstance.get<BaseResponse<any[]>>(`/v1/student/classes/${classId}/assignments`),
+
+    /** Gửi yêu cầu tham gia lớp bằng mã (GV cung cấp). Chờ GV duyệt. */
+    requestJoinClass: (joinCode: string) =>
+      axiosInstance.post<BaseResponse<{ message?: string }>>('/v1/student/classes/join-request', { joinCode: joinCode?.trim()?.toUpperCase() || '' }),
 
     /** Từ vựng của tôi: lưu từ và lấy danh sách (có thể lọc theo lesson/session). */
     myVocabulary: {

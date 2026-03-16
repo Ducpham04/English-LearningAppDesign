@@ -384,14 +384,14 @@ export function AdminTestManagement() {
             <div>
               <Label>Thuộc khóa học (tùy chọn)</Label>
               <Select
-                value={String(testForm.courseId || '')}
-                onValueChange={(v) => setTestForm((p) => ({ ...p, courseId: v ? Number(v) : '' }))}
+                value={testForm.courseId != null && testForm.courseId !== '' ? String(testForm.courseId) : '_none'}
+                onValueChange={(v) => setTestForm((p) => ({ ...p, courseId: v === '_none' ? '' : Number(v) }))}
               >
                 <SelectTrigger className="mt-1">
                   <SelectValue placeholder="Chọn khóa" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">— Không —</SelectItem>
+                  <SelectItem value="_none">— Không —</SelectItem>
                   {curriculums.map((c) => (
                     <SelectItem key={c.id} value={String(c.id)}>
                       {c.title}

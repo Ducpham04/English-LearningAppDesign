@@ -1,5 +1,6 @@
 package com.example.appenglish.modules.student.service;
 
+import com.example.appenglish.entity.ClassJoinRequest;
 import com.example.appenglish.entity.Lesson;
 import com.example.appenglish.entity.User;
 import com.example.appenglish.entity.UserLessonProgress;
@@ -9,12 +10,14 @@ import com.example.appenglish.modules.curriculum.dto.CurriculumDto;
 import com.example.appenglish.modules.curriculum.service.CurriculumService;
 import com.example.appenglish.modules.lesson.service.LessonService;
 import com.example.appenglish.modules.student.dto.SessionProgressDto;
+import com.example.appenglish.modules.student.dto.StudentAssignmentDto;
 import com.example.appenglish.modules.student.dto.StudentDashboardDto;
 import com.example.appenglish.modules.userDetail.dto.UserDataDto;
 import com.example.appenglish.modules.vocabulary.dto.AddToMyVocabularyRequest;
 import com.example.appenglish.modules.vocabulary.dto.AddToMyVocabularyResponseDto;
 import com.example.appenglish.modules.vocabulary.dto.MyVocabularyItemDto;
 import com.example.appenglish.modules.vocabulary.service.VocabularyService;
+import com.example.appenglish.repository.ClassJoinRequestRepository;
 import com.example.appenglish.repository.ClassLessonAssignmentRepository;
 import com.example.appenglish.repository.ClassroomRepository;
 import com.example.appenglish.repository.ClassStudentRepository;
@@ -32,6 +35,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
@@ -46,6 +50,7 @@ public class StudentService {
     private final LessonRepository lessonRepository;
     private final SessionRepository sessionRepository;
     private final ClassStudentRepository classStudentRepository;
+    private final ClassJoinRequestRepository classJoinRequestRepository;
     private final ClassroomRepository classroomRepository;
     private final ClassLessonAssignmentRepository classLessonAssignmentRepository;
     private final LessonService lessonService;
@@ -107,25 +112,77 @@ public class StudentService {
         return out;
     }
 
-    /** Bài tập giao trong lớp (chỉ cho lớp mà học sinh đã ghi danh). */
-    public List<com.example.appenglish.modules.teacher.dto.AssignmentDto> getClassAssignments(Long classId) {
+    /** Học viên gửi yêu cầu vào lớp bằng mã lớp. Tạo ClassJoinRequest PENDING, giáo viên sẽ duyệt. */
+    @Transactional
+    public String requestToJoinByCode(String joinCode) {
+        User user = getCurrentUser();
+        if (joinCode == null || joinCode.isBlank()) {
+            throw new RuntimeException("Mã lớp không được để trống");
+        }
+        String code = joinCode.trim().toUpperCase();
+        com.example.appenglish.entity.Classroom classroom = classroomRepository.findByJoinCode(code)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy lớp với mã: " + code));
+        Long classId = classroom.getId();
+        if (classStudentRepository.existsByClassroom_IdAndStudent_Id(classId, user.getId())) {
+            throw new RuntimeException("Bạn đã ở trong lớp này rồi");
+        }
+        if (classJoinRequestRepository.existsByClassroom_IdAndStudent_IdAndStatus(classId, user.getId(), "PENDING")) {
+            throw new RuntimeException("Bạn đã gửi yêu cầu, vui lòng chờ giáo viên duyệt");
+        }
+        Optional<ClassJoinRequest> existing = classJoinRequestRepository.findByClassroom_IdAndStudent_Id(classId, user.getId());
+        if (existing.isPresent()) {
+            ClassJoinRequest req = existing.get();
+            if ("APPROVED".equals(req.getStatus())) {
+                throw new RuntimeException("Bạn đã ở trong lớp này rồi");
+            }
+            if ("REJECTED".equals(req.getStatus())) {
+                req.setStatus("PENDING");
+                req.setRequestedAt(LocalDateTime.now());
+                req.setRespondedAt(null);
+                req.setRespondedBy(null);
+                classJoinRequestRepository.save(req);
+                return "Đã gửi lại yêu cầu tham gia lớp. Chờ giáo viên duyệt.";
+            }
+        }
+        ClassJoinRequest req = new ClassJoinRequest();
+        req.setClassroom(classroom);
+        req.setStudent(user);
+        req.setStatus("PENDING");
+        req.setRequestedAt(LocalDateTime.now());
+        classJoinRequestRepository.save(req);
+        return "Đã gửi yêu cầu tham gia lớp. Giáo viên sẽ duyệt trong thời gian sớm nhất.";
+    }
+
+    /** Bài tập giao trong lớp (chỉ cho lớp mà học sinh đã ghi danh), kèm trạng thái hoàn thành và điểm. */
+    public List<StudentAssignmentDto> getClassAssignments(Long classId) {
         User user = getCurrentUser();
         if (!classStudentRepository.existsByClassroom_IdAndStudent_Id(classId, user.getId())) {
             throw new RuntimeException("Not enrolled in this class");
         }
         return classLessonAssignmentRepository.findByClassroom_IdOrderByOrderIndexAscIdAsc(classId).stream()
-                .map(a -> com.example.appenglish.modules.teacher.dto.AssignmentDto.builder()
-                        .id(a.getId())
-                        .classId(a.getClassroom().getId())
-                        .lessonId(a.getLesson().getId())
-                        .title(a.getTitle())
-                        .description(a.getDescription())
-                        .dueAt(a.getDueAt())
-                        .maxScore(a.getMaxScore())
-                        .isRequired(a.getIsRequired() != null ? a.getIsRequired() : false)
-                        .orderIndex(a.getOrderIndex())
-                        .lesson(lessonService.getById(a.getLesson().getId()))
-                        .build())
+                .map(a -> {
+                    Lesson lesson = a.getLesson();
+                    com.example.appenglish.modules.lesson.dto.LessonDto lessonDto = lessonService.getById(lesson.getId());
+                    var progressOpt = userLessonProgressRepository.findByUser_IdAndLesson_Id(user.getId(), lesson.getId());
+                    boolean completed = progressOpt.isPresent();
+                    Integer score = progressOpt.map(UserLessonProgress::getScore).orElse(null);
+                    String lessonType = lesson.getType() != null ? lesson.getType().name() : "VIDEO";
+                    return StudentAssignmentDto.builder()
+                            .id(a.getId())
+                            .classId(a.getClassroom().getId())
+                            .lessonId(lesson.getId())
+                            .title(a.getTitle())
+                            .description(a.getDescription())
+                            .dueAt(a.getDueAt())
+                            .maxScore(a.getMaxScore())
+                            .isRequired(a.getIsRequired() != null ? a.getIsRequired() : false)
+                            .orderIndex(a.getOrderIndex())
+                            .lesson(lessonDto)
+                            .completed(completed)
+                            .score(score)
+                            .lessonType(lessonType)
+                            .build();
+                })
                 .collect(Collectors.toList());
     }
 

@@ -10,6 +10,10 @@ import {
   Clock,
   Users,
   Loader2,
+  Plus,
+  BookOpen,
+  Video,
+  MapPin,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import apiService from '@/services/apiService';

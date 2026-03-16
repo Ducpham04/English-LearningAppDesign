@@ -190,6 +190,8 @@ export function VideoConversationLesson() {
   const [sentenceScores, setSentenceScores] = useState<Record<number, PronunciationScoreResponse>>({});
   const [autoCompleted, setAutoCompleted] = useState(false);
   const [lastResponse, setLastResponse] = useState<any>(null);
+  const [lastRecordedAudioUrl, setLastRecordedAudioUrl] = useState<string | null>(null);
+  const [lastScoredSentenceIndex, setLastScoredSentenceIndex] = useState<number | null>(null);
   const [recordingForSentenceIndex, setRecordingForSentenceIndex] = useState<number | null>(null);
   const [scoringSentenceIndex, setScoringSentenceIndex] = useState<number | null>(null);
   const [isRecording, setIsRecording] = useState(false);
@@ -214,6 +216,14 @@ export function VideoConversationLesson() {
   const karaokeRecordedBlobsRef = useRef<Record<number, Blob>>({});
 
   // (Đã bỏ countdown 3-2-1: vào shadowing và bắt đầu karaoke ngay khi nhấn nút)
+
+  const lastRecordedAudioUrlRef = useRef<string | null>(null);
+  useEffect(() => {
+    lastRecordedAudioUrlRef.current = lastRecordedAudioUrl;
+    return () => {
+      if (lastRecordedAudioUrlRef.current) URL.revokeObjectURL(lastRecordedAudioUrlRef.current);
+    };
+  }, [lastRecordedAudioUrl]);
 
   const isYoutube = !!(lesson?.youtubeUrl && extractYoutubeId(lesson.youtubeUrl));
   const ytVideoId = isYoutube ? extractYoutubeId(lesson?.youtubeUrl) : null;
@@ -368,11 +378,20 @@ export function VideoConversationLesson() {
   }, [ytVideoId]);
 
   const handleComplete = async () => {
+    const scoresFromNormal = Object.values(sentenceScores);
+    const scoresFromKaraoke = Object.values(karaokeResults).filter((d) => d.status !== 'FAILED' && overallFromResponse(d) > 0);
+    const allScores = scoresFromNormal.length > 0 ? scoresFromNormal : scoresFromKaraoke;
+    const avgScore = allScores.length > 0
+      ? Math.round(allScores.reduce((s, d) => s + overallFromResponse(d), 0) / allScores.length)
+      : undefined;
     try {
-      await apiService.student.completeLesson(lessonId!, 100);
+      await apiService.student.completeLesson(lessonId!, avgScore ?? 100);
       useAppStore.getState().invalidateProgress();
-    } catch { /* ignore */ }
-    toast.success('Hoàn thành bài học!');
+      toast.success('Đã lưu thành tích và hoàn thành bài học!');
+    } catch (e: any) {
+      toast.error(e?.response?.data?.message || 'Lưu thành tích thất bại. Thử lại sau.');
+      return;
+    }
     navigate(-1);
   };
 
@@ -480,6 +499,11 @@ export function VideoConversationLesson() {
           return;
         }
         const idx = sentenceIndex;
+        setLastRecordedAudioUrl((prev) => {
+          if (prev) URL.revokeObjectURL(prev);
+          return URL.createObjectURL(blob);
+        });
+        setLastScoredSentenceIndex(idx);
         setScoringSentenceIndex(idx);
         const expectedText = transcript[idx]?.text?.trim();
         setLastResponse(null);
@@ -502,6 +526,13 @@ export function VideoConversationLesson() {
               if (!autoCompleted && avg >= 80) {
                 setAutoCompleted(true);
                 toast.success(`Điểm trung bình ${avg}%. Hệ thống tự động hoàn thành bài học!`);
+                // Lưu tiến độ lên server ngay khi đạt ngưỡng
+                apiService.student.completeLesson(lessonId!, avg).then(() => {
+                  useAppStore.getState().invalidateProgress();
+                  toast.success('Đã lưu thành tích!');
+                }).catch(() => {
+                  toast.error('Lưu thành tích thất bại. Bạn có thể bấm "Hoàn thành bài học" để thử lại.');
+                });
               }
               return next;
             });
@@ -664,6 +695,15 @@ export function VideoConversationLesson() {
         successResults.reduce((s, d) => s + overallFromResponse(d), 0) / successResults.length
       );
       toast.success(`Đã xử lý ${indices.length} câu. Điểm trung bình (câu thành công): ${avg}%`);
+      if (lessonId && avg >= 80) {
+        setAutoCompleted(true);
+        apiService.student.completeLesson(lessonId, avg).then(() => {
+          useAppStore.getState().invalidateProgress();
+          toast.success('Đã lưu thành tích!');
+        }).catch(() => {
+          toast.error('Lưu thành tích thất bại. Bạn có thể bấm "Hoàn thành bài học" để thử lại.');
+        });
+      }
     }
   }, [transcript, lessonId]);
 
@@ -850,22 +890,112 @@ export function VideoConversationLesson() {
           </div>
         )}
 
+        {/* Tiến độ từng câu: đánh giá thay đổi qua mỗi đoạn */}
+        {mode === 'shadowing' && shadowingSubMode === 'normal' && transcript.length > 0 && Object.keys(sentenceScores).length > 0 && (
+          <Card className="p-3 border border-emerald-200 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-900/20">
+            <p className="text-xs font-semibold text-emerald-800 dark:text-emerald-200 mb-2">Tiến độ từng câu</p>
+            <div className="flex flex-wrap gap-2">
+              {transcript.map((_, idx) => {
+                const scoreData = sentenceScores[idx];
+                const score = scoreData ? overallFromResponse(scoreData) : null;
+                return (
+                  <div
+                    key={idx}
+                    className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium ${
+                      score == null
+                        ? 'bg-gray-200 dark:bg-gray-700 text-gray-500'
+                        : score >= 80
+                          ? 'bg-emerald-200 dark:bg-emerald-800 text-emerald-800 dark:text-emerald-200'
+                          : score >= 60
+                            ? 'bg-amber-200 dark:bg-amber-800 text-amber-800 dark:text-amber-200'
+                            : 'bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300'
+                    }`}
+                    title={score != null ? `Câu ${idx + 1}: ${score} điểm` : `Câu ${idx + 1}: Chưa chấm`}
+                  >
+                    <span>Câu {idx + 1}</span>
+                    {score != null && <span>{score}%</span>}
+                  </div>
+                );
+              })}
+            </div>
+          </Card>
+        )}
+
         {lastResponse && (
           <Card className="p-4 border border-purple-100 dark:border-gray-700 text-left">
             <div className="flex items-center justify-between mb-3">
               <div>
                 <h4 className="font-semibold text-sm">Kết quả chấm phát âm</h4>
-                <p className="text-xs text-muted-foreground">Hiển thị chi tiết từ Azure</p>
+                <p className="text-xs text-muted-foreground">Nghe lại và xem đánh giá</p>
               </div>
               <Button
                 type="button"
                 variant="ghost"
                 size="sm"
-                onClick={() => setLastResponse(null)}
+                onClick={() => {
+                  if (lastRecordedAudioUrl) URL.revokeObjectURL(lastRecordedAudioUrl);
+                  setLastRecordedAudioUrl(null);
+                  setLastScoredSentenceIndex(null);
+                  setLastResponse(null);
+                }}
               >
                 Đóng
               </Button>
             </div>
+
+            {/* Nghe lại bản ghi vừa thu */}
+            {lastRecordedAudioUrl && (
+              <div className="mb-4 p-3 rounded-xl bg-muted/50">
+                <p className="text-xs font-medium text-muted-foreground mb-2">Nghe lại bản ghi của bạn</p>
+                <audio controls src={lastRecordedAudioUrl} className="w-full h-9" />
+              </div>
+            )}
+
+            {/* Đánh giá tổng quan + Lưu ý */}
+            {(() => {
+              const d = lastResponse?.data;
+              const overall = d ? overallFromResponse(d) : 0;
+              const tips: string[] = [];
+              if ((d?.pronunciationScore ?? 100) < 70) tips.push('Phát âm: chú ý âm cuối và trọng âm từ.');
+              if ((d?.fluencyScore ?? 100) < 70) tips.push('Độ trôi chảy: nói liền mạch hơn, tránh ngắt quãng dài.');
+              if ((d?.accuracyScore ?? 100) < 70) tips.push('Độ chính xác: nghe lại câu mẫu và bắt chước từng từ.');
+              if (overall >= 80) tips.push('Bạn đọc rất tốt! Giữ phong độ.');
+              return (
+                <div className="mb-4 space-y-2">
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <span className="text-lg font-bold text-[#4F46E5]">Điểm tổng quan: {overall}/100</span>
+                    {lastScoredSentenceIndex != null && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="gap-1"
+                        onClick={() => {
+                          if (lastRecordedAudioUrl) URL.revokeObjectURL(lastRecordedAudioUrl);
+                          setLastRecordedAudioUrl(null);
+                          setLastResponse(null);
+                          setLastScoredSentenceIndex(null);
+                          startRecordingForSentence(lastScoredSentenceIndex);
+                        }}
+                      >
+                        <RotateCcw className="h-3.5 w-3.5" />
+                        Thu lại câu này
+                      </Button>
+                    )}
+                  </div>
+                  {tips.length > 0 && (
+                    <div className="rounded-lg border bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800 p-2">
+                      <p className="text-xs font-semibold text-amber-800 dark:text-amber-200 mb-1">Lưu ý</p>
+                      <ul className="text-xs text-amber-700 dark:text-amber-300 list-disc list-inside space-y-0.5">
+                        {tips.map((t, i) => (
+                          <li key={i}>{t}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
 
             <div className="grid gap-3 md:grid-cols-2">
               <div className="space-y-1">

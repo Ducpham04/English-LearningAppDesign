@@ -1,5 +1,6 @@
 import { Button } from '@/app/components/ui/button';
 import { Card } from '@/app/components/ui/card';
+import { Input } from '@/app/components/ui/input';
 import { SessionCard } from '@/features/session/SessionCard';
 import { AnimatedMascot } from '@/shared/ui/AnimatedMascot';
 import { useAppStore } from '@/store/appStore';
@@ -19,19 +20,23 @@ import {
   Trophy,
   Flame,
   Star,
+  KeyRound,
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
 import apiService from '@/services/apiService';
 import type { Session } from '@/types';
 
 export function Dashboard() {
   const { user, sessions, userProgress, setSelectedSession, setSessions, hydrateFromDashboard } = useAppStore();
   const navigate = useNavigate();
-  const { data, loading } = useStudentDashboard();
+  const { data, loading, refetch } = useStudentDashboard();
   const hydratedRef = useRef(false);
   const [showMascot, setShowMascot] = useState(true);
+  const [joinCodeInput, setJoinCodeInput] = useState('');
+  const [joinSubmitting, setJoinSubmitting] = useState(false);
 
   useEffect(() => {
     if (!data || hydratedRef.current) return;
@@ -307,6 +312,58 @@ export function Dashboard() {
                   </motion.div>
                 ))}
               </div>
+            </motion.section>
+
+            {/* Tham gia lớp bằng mã */}
+            <motion.section
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4, delay: 0.14 }}
+            >
+              <h2 className="text-base font-semibold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
+                <div className="flex h-8 w-8 items-center justify-center rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800">
+                  <KeyRound className="h-4 w-4 text-blue-600 dark:text-blue-400" strokeWidth={1.5} />
+                </div>
+                Tham gia lớp bằng mã
+              </h2>
+              <Card className="p-4 rounded-2xl border border-slate-200 dark:border-slate-700/80 bg-white dark:bg-slate-800/80">
+                <p className="text-sm text-slate-600 dark:text-slate-400 mb-3">
+                  Nhập mã lớp do giáo viên cung cấp. Sau khi gửi, giáo viên sẽ duyệt và bạn sẽ thấy lớp trong danh sách.
+                </p>
+                <div className="flex gap-2 flex-wrap">
+                  <Input
+                    placeholder="VD: ABC123"
+                    value={joinCodeInput}
+                    onChange={(e) => setJoinCodeInput(e.target.value.toUpperCase().slice(0, 12))}
+                    className="max-w-[140px] font-mono uppercase"
+                    maxLength={12}
+                  />
+                  <Button
+                    onClick={async () => {
+                      const code = joinCodeInput.trim();
+                      if (!code) {
+                        toast.error('Vui lòng nhập mã lớp');
+                        return;
+                      }
+                      setJoinSubmitting(true);
+                      try {
+                        const res = await apiService.student.requestJoinClass(code);
+                        const msg = res.data?.data?.message || res.data?.message || 'Đã gửi yêu cầu. Chờ giáo viên duyệt.';
+                        toast.success(msg);
+                        setJoinCodeInput('');
+                        refetch();
+                      } catch (e: any) {
+                        toast.error(e?.response?.data?.message || e?.message || 'Gửi yêu cầu thất bại');
+                      } finally {
+                        setJoinSubmitting(false);
+                      }
+                    }}
+                    disabled={joinSubmitting || !joinCodeInput.trim()}
+                  >
+                    {joinSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Gửi yêu cầu'}
+                  </Button>
+                </div>
+              </Card>
             </motion.section>
 
             {/* My Classes */}

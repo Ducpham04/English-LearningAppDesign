@@ -246,9 +246,12 @@ export function ClassesManagement() {
       <CreateClassModal
         open={createOpen}
         onOpenChange={setCreateOpen}
-        onSuccess={() => {
+        onSuccess={(newClassId) => {
           fetchClasses();
           setCreateOpen(false);
+          if (newClassId != null) {
+            navigate(`/teacher/classes/${newClassId}?addContent=1`);
+          }
         }}
       />
 

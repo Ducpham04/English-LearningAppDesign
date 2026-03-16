@@ -6,10 +6,14 @@ import lombok.*;
 import java.time.LocalDate;
 
 @Entity
-@Table(name = "classrooms")
+@Table(name = "classrooms", indexes = @Index(name = "idx_classroom_join_code", columnList = "join_code", unique = true))
 @Getter @Setter
 public class Classroom extends BaseEntity {
     private String name;
+
+    /** Mã lớp (6 ký tự), học viên nhập mã này để xin vào lớp. */
+    @Column(name = "join_code", unique = true, length = 20)
+    private String joinCode;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "teacher_id")

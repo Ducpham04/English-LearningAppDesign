@@ -8,6 +8,7 @@ import java.util.Optional;
 
 public interface UserLessonProgressRepository extends JpaRepository<UserLessonProgress, Long> {
     Optional<UserLessonProgress> findByUser_IdAndLesson_Id(String userId, Long lessonId);
+    List<UserLessonProgress> findByLesson_Id(Long lessonId);
     List<UserLessonProgress> findByUser_Id(String userId);
     boolean existsByUser_IdAndLesson_Id(String userId, Long lessonId);
     long countByUser_IdAndLesson_Session_Id(String userId, Long sessionId);

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card } from '@/app/components/ui/card';
 import { Button } from '@/app/components/ui/button';
 import { Input } from '@/app/components/ui/input';
@@ -6,7 +6,6 @@ import { Badge } from '@/app/components/ui/badge';
 import {
   BookOpen,
   Search,
-  Filter,
   Video,
   Mic,
   MessageSquare,
@@ -19,6 +18,7 @@ import {
   MoreVertical,
   Star,
   Users,
+  Loader2,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -28,6 +28,8 @@ import {
 } from '@/app/components/ui/dropdown-menu';
 import { CreateLessonModal } from './CreateLessonModal';
 import { AssignContentModal } from './AssignContentModal';
+import apiService from '@/services/apiService';
+import { toast } from 'sonner';
 
 interface Content {
   id: string;
@@ -42,6 +44,15 @@ interface Content {
   thumbnail?: string;
 }
 
+function mapLessonTypeToContentType(backendType: string): Content['type'] {
+  const t = (backendType || '').toUpperCase();
+  if (t === 'VIDEO') return 'video';
+  if (t === 'SPEAKING') return 'pronunciation';
+  if (t === 'VOCAB') return 'vocabulary';
+  if (t === 'QUIZ') return 'conversation';
+  return 'video';
+}
+
 export function ContentLibrary() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedType, setSelectedType] = useState<'all' | Content['type']>('all');
@@ -49,64 +60,41 @@ export function ContentLibrary() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [selectedContent, setSelectedContent] = useState<string | null>(null);
+  const [contents, setContents] = useState<Content[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const contents: Content[] = [
-    {
-      id: '1',
-      title: 'Everyday Conversations - At Restaurant',
-      type: 'video',
-      level: 'beginner',
-      duration: 15,
-      rating: 4.8,
-      uses: 45,
-      createdAt: '2026-01-10',
-      status: 'published',
-    },
-    {
-      id: '2',
-      title: 'Pronunciation Practice - TH Sounds',
-      type: 'pronunciation',
-      level: 'intermediate',
-      duration: 10,
-      rating: 4.9,
-      uses: 67,
-      createdAt: '2026-01-12',
-      status: 'published',
-    },
-    {
-      id: '3',
-      title: 'AI Conversation - Job Interview',
-      type: 'conversation',
-      level: 'advanced',
-      duration: 20,
-      rating: 4.7,
-      uses: 34,
-      createdAt: '2026-01-14',
-      status: 'published',
-    },
-    {
-      id: '4',
-      title: 'Business Vocabulary Set 1',
-      type: 'vocabulary',
-      level: 'intermediate',
-      duration: 12,
-      rating: 4.6,
-      uses: 52,
-      createdAt: '2026-01-15',
-      status: 'published',
-    },
-    {
-      id: '5',
-      title: 'Daily Routines Conversations',
-      type: 'video',
-      level: 'beginner',
-      duration: 18,
-      rating: 0,
-      uses: 0,
-      createdAt: '2026-01-16',
-      status: 'draft',
-    },
-  ];
+  const fetchLessons = () => {
+    setLoading(true);
+    apiService.lesson
+      .getAll()
+      .then((res) => {
+        const list = (res.data?.data ?? []) as any[];
+        const arr = Array.isArray(list) ? list : [];
+        setContents(
+          arr.map((l: any) => ({
+            id: String(l.id),
+            title: l.title || `Bài học ${l.id}`,
+            type: mapLessonTypeToContentType(l.type),
+            level: (l.level as Content['level']) || 'beginner',
+            duration: l.durationMinutes ?? 0,
+            rating: 0,
+            uses: 0,
+            createdAt: l.createdAt ? new Date(l.createdAt).toISOString().slice(0, 10) : '',
+            status: 'published',
+            thumbnail: l.thumbnailUrl,
+          }))
+        );
+      })
+      .catch(() => {
+        toast.error('Không tải được danh sách bài học');
+        setContents([]);
+      })
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    fetchLessons();
+  }, []);
 
   const types = [
     { id: 'all' as const, label: 'All', icon: BookOpen },
@@ -161,6 +149,14 @@ export function ContentLibrary() {
       (contents.filter((c) => c.rating > 0).length || 1),
     totalUses: contents.reduce((sum, c) => sum + c.uses, 0),
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex items-center justify-center">
+        <Loader2 className="h-10 w-10 animate-spin text-indigo-500" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950 pb-20 md:pb-6">
@@ -386,6 +382,7 @@ export function ContentLibrary() {
       <CreateLessonModal
         open={showCreateModal}
         onOpenChange={setShowCreateModal}
+        onSuccess={fetchLessons}
       />
       <AssignContentModal
         open={showAssignModal}

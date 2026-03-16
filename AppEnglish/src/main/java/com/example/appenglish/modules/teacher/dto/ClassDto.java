@@ -11,6 +11,8 @@ import java.time.LocalDate;
 public class ClassDto {
     private Long id;
     private String name;
+    /** Mã lớp để học viên nhập khi xin vào lớp. */
+    private String joinCode;
     private String teacherId;
     private String teacherName;
     private Long courseId;

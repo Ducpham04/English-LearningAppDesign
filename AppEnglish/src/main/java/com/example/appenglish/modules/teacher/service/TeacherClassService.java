@@ -14,9 +14,11 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.security.SecureRandom;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -25,7 +27,9 @@ public class TeacherClassService {
 
     private final ClassroomRepository classroomRepository;
     private final ClassStudentRepository classStudentRepository;
+    private final ClassJoinRequestRepository classJoinRequestRepository;
     private final ClassLessonAssignmentRepository assignmentRepository;
+    private final UserLessonProgressRepository userLessonProgressRepository;
     private final UserRepository userRepository;
     private final CurriculumRepository curriculumRepository;
     private final LessonRepository lessonRepository;
@@ -62,6 +66,7 @@ public class TeacherClassService {
         }
         Classroom c = new Classroom();
         c.setName(req.getName().trim());
+        c.setJoinCode(generateUniqueJoinCode());
         c.setTeacher(teacher);
         c.setStartDate(req.getStartDate());
         c.setEndDate(req.getEndDate());
@@ -78,6 +83,10 @@ public class TeacherClassService {
                 .orElseThrow(() -> new RuntimeException("Class not found: " + classId));
         if (!c.getTeacher().getId().equals(teacher.getId())) {
             throw new RuntimeException("Not authorized to view this class");
+        }
+        if (c.getJoinCode() == null || c.getJoinCode().isBlank()) {
+            c.setJoinCode(generateUniqueJoinCode());
+            classroomRepository.save(c);
         }
         ClassDto classDto = toClassDto(c);
         CurriculumDto course = c.getCourse() != null ? curriculumService.getById(c.getCourse().getId()) : null;
@@ -141,10 +150,71 @@ public class TeacherClassService {
         classStudentRepository.deleteByClassroom_IdAndStudent_Id(classId, studentId);
     }
 
+    public List<ClassJoinRequestDto> getJoinRequests(Long classId) {
+        ensureTeacherOwnsClass(classId);
+        return classJoinRequestRepository.findByClassroom_IdAndStatusOrderByRequestedAtDesc(classId, "PENDING").stream()
+                .map(this::toJoinRequestDto)
+                .collect(Collectors.toList());
+    }
+
+    @Transactional
+    public void approveJoinRequest(Long classId, Long requestId) {
+        ensureTeacherOwnsClass(classId);
+        ClassJoinRequest req = classJoinRequestRepository.findById(requestId)
+                .orElseThrow(() -> new RuntimeException("Join request not found: " + requestId));
+        if (!req.getClassroom().getId().equals(classId)) {
+            throw new RuntimeException("Request does not belong to this class");
+        }
+        if (!"PENDING".equals(req.getStatus())) {
+            throw new RuntimeException("Request already processed");
+        }
+        User teacher = getCurrentTeacher();
+        String studentId = req.getStudent().getId();
+        if (classStudentRepository.existsByClassroom_IdAndStudent_Id(classId, studentId)) {
+            req.setStatus("APPROVED");
+            req.setRespondedAt(LocalDateTime.now());
+            req.setRespondedBy(teacher);
+            classJoinRequestRepository.save(req);
+            return;
+        }
+        ClassStudent cs = new ClassStudent();
+        cs.setId(new ClassStudentId());
+        cs.getId().setClassId(classId);
+        cs.getId().setStudentId(studentId);
+        cs.setClassroom(req.getClassroom());
+        cs.setStudent(req.getStudent());
+        cs.setJoinedAt(LocalDateTime.now());
+        cs.setIsFaceVerified(false);
+        classStudentRepository.save(cs);
+        req.setStatus("APPROVED");
+        req.setRespondedAt(LocalDateTime.now());
+        req.setRespondedBy(teacher);
+        classJoinRequestRepository.save(req);
+    }
+
+    @Transactional
+    public void rejectJoinRequest(Long classId, Long requestId) {
+        ensureTeacherOwnsClass(classId);
+        ClassJoinRequest req = classJoinRequestRepository.findById(requestId)
+                .orElseThrow(() -> new RuntimeException("Join request not found: " + requestId));
+        if (!req.getClassroom().getId().equals(classId)) {
+            throw new RuntimeException("Request does not belong to this class");
+        }
+        if (!"PENDING".equals(req.getStatus())) {
+            throw new RuntimeException("Request already processed");
+        }
+        User teacher = getCurrentTeacher();
+        req.setStatus("REJECTED");
+        req.setRespondedAt(LocalDateTime.now());
+        req.setRespondedBy(teacher);
+        classJoinRequestRepository.save(req);
+    }
+
     /** Xóa lớp học: xóa toàn bộ sinh viên và bài tập trong lớp rồi xóa lớp. */
     @Transactional
     public void deleteClass(Long classId) {
         ensureTeacherOwnsClass(classId);
+        classJoinRequestRepository.deleteByClassroom_Id(classId);
         classStudentRepository.deleteByClassroom_Id(classId);
         assignmentRepository.deleteByClassroom_Id(classId);
         classroomRepository.deleteById(classId);
@@ -208,6 +278,59 @@ public class TeacherClassService {
         assignmentRepository.deleteById(assignmentId);
     }
 
+    public List<AssignmentStatsDto> getAssignmentStats(Long classId) {
+        ensureTeacherOwnsClass(classId);
+        List<ClassStudent> classStudents = classStudentRepository.findByClassroom_Id(classId);
+        Set<String> studentIds = classStudents.stream().map(cs -> cs.getStudent().getId()).collect(Collectors.toSet());
+        List<ClassLessonAssignment> assignments = assignmentRepository.findByClassroom_IdOrderByOrderIndexAscIdAsc(classId);
+        List<AssignmentStatsDto> result = new ArrayList<>();
+        for (ClassLessonAssignment a : assignments) {
+            List<UserLessonProgress> progressList = userLessonProgressRepository.findByLesson_Id(a.getLesson().getId());
+            List<AssignmentStatsDto.StudentProgressItemDto> students = new ArrayList<>();
+            for (ClassStudent cs : classStudents) {
+                String sid = cs.getStudent().getId();
+                UserLessonProgress prog = progressList.stream()
+                        .filter(p -> p.getUser().getId().equals(sid))
+                        .findFirst()
+                        .orElse(null);
+                students.add(AssignmentStatsDto.StudentProgressItemDto.builder()
+                        .studentId(sid)
+                        .studentName(cs.getStudent().getFullName())
+                        .email(cs.getStudent().getEmail())
+                        .completed(prog != null)
+                        .score(prog != null ? prog.getScore() : null)
+                        .completedAt(prog != null ? prog.getCompletedAt() : null)
+                        .build());
+            }
+            long completedCount = students.stream().filter(s -> Boolean.TRUE.equals(s.getCompleted())).count();
+            result.add(AssignmentStatsDto.builder()
+                    .assignmentId(a.getId())
+                    .title(a.getTitle())
+                    .lessonId(a.getLesson().getId())
+                    .dueAt(a.getDueAt())
+                    .totalStudents(classStudents.size())
+                    .completedCount((int) completedCount)
+                    .students(students)
+                    .build());
+        }
+        return result;
+    }
+
+    private static final String JOIN_CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+    private static final SecureRandom RAND = new SecureRandom();
+
+    private String generateUniqueJoinCode() {
+        for (int i = 0; i < 50; i++) {
+            StringBuilder sb = new StringBuilder(6);
+            for (int j = 0; j < 6; j++) {
+                sb.append(JOIN_CODE_CHARS.charAt(RAND.nextInt(JOIN_CODE_CHARS.length())));
+            }
+            String code = sb.toString();
+            if (!classroomRepository.existsByJoinCode(code)) return code;
+        }
+        throw new RuntimeException("Unable to generate unique join code");
+    }
+
     private void ensureTeacherOwnsClass(Long classId) {
         User teacher = getCurrentTeacher();
         Classroom c = classroomRepository.findById(classId)
@@ -223,6 +346,7 @@ public class TeacherClassService {
         return ClassDto.builder()
                 .id(c.getId())
                 .name(c.getName())
+                .joinCode(c.getJoinCode())
                 .teacherId(c.getTeacher() != null ? c.getTeacher().getId() : null)
                 .teacherName(c.getTeacher() != null ? c.getTeacher().getFullName() : null)
                 .courseId(c.getCourse() != null ? c.getCourse().getId() : null)
@@ -244,6 +368,19 @@ public class TeacherClassService {
                 .avatarUrl(u.getAvatarUrl())
                 .joinedAt(cs.getJoinedAt())
                 .isFaceVerified(cs.getIsFaceVerified() != null ? cs.getIsFaceVerified() : false)
+                .build();
+    }
+
+    private ClassJoinRequestDto toJoinRequestDto(ClassJoinRequest r) {
+        User u = r.getStudent();
+        return ClassJoinRequestDto.builder()
+                .id(r.getId())
+                .studentId(u.getId())
+                .studentName(u.getFullName())
+                .studentEmail(u.getEmail())
+                .status(r.getStatus())
+                .requestedAt(r.getRequestedAt())
+                .respondedAt(r.getRespondedAt())
                 .build();
     }
 

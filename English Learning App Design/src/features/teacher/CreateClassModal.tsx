@@ -10,7 +10,8 @@ import apiService from '@/services/apiService';
 interface CreateClassModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSuccess?: () => void;
+  /** Gọi với classId của lớp vừa tạo (để có thể chuyển sang trang lớp và mở thêm nội dung bài học). */
+  onSuccess?: (classId?: number) => void;
 }
 
 export function CreateClassModal({ open, onOpenChange, onSuccess }: CreateClassModalProps) {
@@ -41,16 +42,18 @@ export function CreateClassModal({ open, onOpenChange, onSuccess }: CreateClassM
     }
     setSubmitting(true);
     try {
-      await apiService.teacherClasses.create({
+      const res = await apiService.teacherClasses.create({
         name: formData.name.trim(),
         courseId: formData.courseId ? Number(formData.courseId) : undefined,
         startDate: formData.startDate || undefined,
         endDate: formData.endDate || undefined,
         status: formData.status,
       });
-      toast.success('Tạo lớp thành công!');
+      const newClass = res.data?.data as { id?: number } | undefined;
+      const newClassId = newClass?.id != null ? Number(newClass.id) : undefined;
+      toast.success('Tạo lớp thành công! Bạn có thể thêm nội dung bài học cho lớp.');
       onOpenChange(false);
-      onSuccess?.();
+      onSuccess?.(newClassId);
       setFormData({ name: '', courseId: '', startDate: '', endDate: '', status: 'UPCOMING' });
     } catch (err: any) {
       toast.error(err?.response?.data?.message || 'Tạo lớp thất bại');

@@ -54,6 +54,12 @@ public class LessonService {
                 .map(this::toDto).collect(Collectors.toList());
     }
 
+    /** Lessons from curricula (sessions) owned by this teacher — for assigning video lessons in class. */
+    public List<LessonDto> getByTeacher(String teacherId) {
+        return lessonRepository.findBySession_Course_Teacher_IdOrderByOrderIndexAsc(teacherId).stream()
+                .map(this::toDto).collect(Collectors.toList());
+    }
+
     public LessonDto create(LessonCreateRequest req) {
         Lesson lesson = new Lesson();
         lesson.setTitle(req.getTitle());

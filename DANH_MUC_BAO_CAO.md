@@ -1,6 +1,6 @@
 # Danh mục báo cáo dự án – English Learning App
 
-**Cập nhật:** 09/03/2026
+**Cập nhật:** 13/03/2026
 
 Tài liệu này liệt kê toàn bộ file báo cáo của dự án và cách tạo/cập nhật report mới.
 
@@ -8,20 +8,26 @@ Tài liệu này liệt kê toàn bộ file báo cáo của dự án và cách t
 
 ## 1. Báo cáo hiện có
 
-### 1.1. Báo cáo tổng quan dự án (Frontend + Backend)
+### 1.1. Báo cáo tổng hợp dự án (khuyến nghị dùng)
+
+| File | Mô tả |
+|------|--------|
+| [BAO_CAO_TONG_HOP_DU_AN.md](BAO_CAO_TONG_HOP_DU_AN.md) | **Báo cáo tổng hợp:** Tổng quan dự án, chức năng hiện tại (Student / Teacher / Admin), Technical (Backend + Frontend + hạ tầng). Cập nhật 13/03/2026. |
+
+### 1.2. Báo cáo tổng quan dự án (Frontend + Backend)
 
 | File | Mô tả |
 |------|--------|
 | [English Learning App Design/report/PROJECT_REPORT_2026-03-09.md](English%20Learning%20App%20Design/report/PROJECT_REPORT_2026-03-09.md) | Báo cáo scope, module Backend/Frontend, API, luồng upload/transcript, rủi ro và bước tiếp theo. |
 
-### 1.2. Báo cáo kỹ thuật Backend (AppEnglish)
+### 1.3. Báo cáo kỹ thuật Backend (AppEnglish)
 
 | File | Mô tả |
 |------|--------|
 | [AppEnglish/README.md](AppEnglish/README.md) | Giới thiệu nền tảng, tính năng, tech stack, hướng dẫn chạy (Docker, Maven). |
 | [AppEnglish/docs/BAO_CAO_ENTITY_VA_QUAN_HE.md](AppEnglish/docs/BAO_CAO_ENTITY_VA_QUAN_HE.md) | Báo cáo Entity JPA, bảng DB, quan hệ, sơ đồ, JSONB, Enum. |
 
-### 1.3. Tài liệu Frontend
+### 1.4. Tài liệu Frontend
 
 | File | Mô tả |
 |------|--------|
@@ -66,13 +72,14 @@ cd AppEnglish
 
 ```
 English-LearningAppDesign/
-├── DANH_MUC_BAO_CAO.md          ← File này (mục lục)
+├── DANH_MUC_BAO_CAO.md              ← File này (mục lục)
+├── BAO_CAO_TONG_HOP_DU_AN.md        ← Báo cáo tổng hợp (tổng quan + chức năng + technical)
 ├── AppEnglish/
-│   ├── README.md                 ← Báo cáo/giới thiệu Backend
+│   ├── README.md                     ← Báo cáo/giới thiệu Backend
 │   ├── docs/
 │   │   └── BAO_CAO_ENTITY_VA_QUAN_HE.md
 │   └── target/
-│       └── surefire-reports/     ← Report test (sinh khi chạy mvn test)
+│       └── surefire-reports/        ← Report test (sinh khi chạy mvn test)
 └── English Learning App Design/
     ├── report/
     │   └── PROJECT_REPORT_2026-03-09.md

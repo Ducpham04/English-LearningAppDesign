@@ -6,7 +6,6 @@ import com.example.appenglish.modules.student.dto.SessionProgressDto;
 import com.example.appenglish.modules.student.dto.StudentDashboardDto;
 import com.example.appenglish.modules.student.service.StudentService;
 import com.example.appenglish.modules.userDetail.dto.UserDataDto;
-import com.example.appenglish.modules.teacher.dto.AssignmentDto;
 import com.example.appenglish.modules.vocabulary.dto.AddToMyVocabularyRequest;
 import com.example.appenglish.modules.vocabulary.dto.AddToMyVocabularyResponseDto;
 import com.example.appenglish.modules.vocabulary.dto.MyVocabularyItemDto;
@@ -17,6 +16,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Map;
+import java.util.HashMap;
 
 @RestController
 @RequestMapping("/v1/student")
@@ -93,8 +93,23 @@ public class StudentController {
         }
     }
 
+    @PostMapping("/classes/join-request")
+    public ResponseEntity<BaseResponse<Map<String, String>>> requestToJoinClass(
+            @RequestBody Map<String, String> body,
+            HttpServletRequest req) {
+        try {
+            String joinCode = body != null ? body.get("joinCode") : null;
+            String message = studentService.requestToJoinByCode(joinCode);
+            return ResponseEntity.ok(BaseResponse.ok(new HashMap<>(Map.of("message", message)), message, req.getRequestURI()));
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(400).body(BaseResponse.error(e.getMessage(), "BAD_REQUEST", req.getRequestURI()));
+        } catch (Exception e) {
+            return ResponseEntity.status(401).body(BaseResponse.error(e.getMessage(), "UNAUTHORIZED", req.getRequestURI()));
+        }
+    }
+
     @GetMapping("/classes/{classId}/assignments")
-    public ResponseEntity<BaseResponse<List<AssignmentDto>>> getClassAssignments(
+    public ResponseEntity<BaseResponse<List<com.example.appenglish.modules.student.dto.StudentAssignmentDto>>> getClassAssignments(
             @PathVariable Long classId,
             HttpServletRequest req) {
         try {

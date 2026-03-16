@@ -1,13 +1,13 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/app/components/ui/dialog';
 import { Button } from '@/app/components/ui/button';
 import { Input } from '@/app/components/ui/input';
 import { Label } from '@/app/components/ui/label';
-import { Textarea } from '@/app/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/app/components/ui/select';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/app/components/ui/tabs';
-import { Video, Mic, Bot, BookOpen, Plus, X, Upload } from 'lucide-react';
+import { Video } from 'lucide-react';
 import { toast } from 'sonner';
+import apiService from '@/services/apiService';
+import { useAuthStore } from '@/store/authStore';
 
 interface CreateLessonModalProps {
   open: boolean;
@@ -15,403 +15,574 @@ interface CreateLessonModalProps {
   onSuccess?: () => void;
 }
 
-interface Question {
-  id: string;
-  question: string;
-  options: string[];
-  correct: number;
-}
-
 export function CreateLessonModal({ open, onOpenChange, onSuccess }: CreateLessonModalProps) {
-  const [lessonType, setLessonType] = useState<'video' | 'pronunciation' | 'conversation' | 'flashcard'>('video');
-  const [formData, setFormData] = useState({
+  const [courses, setCourses] = useState<{ id: number; title?: string; name?: string }[]>([]);
+  const [sessions, setSessions] = useState<{ id: number; title?: string }[]>([]);
+  const [selectedCourseId, setSelectedCourseId] = useState<string>('');
+  const [selectedSessionId, setSelectedSessionId] = useState<string>('');
+
+  const [lessonForm, setLessonForm] = useState({
     title: '',
     description: '',
-    level: '',
-    duration: '10',
-    xp: '50',
+    durationMinutes: 5,
+    orderIndex: 1,
   });
 
-  // Video lesson specific
+  const [createdLessonId, setCreatedLessonId] = useState<number | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [savingVideo, setSavingVideo] = useState(false);
+
+  const [youtubeInputUrl, setYoutubeInputUrl] = useState('');
+  const [scriptText, setScriptText] = useState('');
   const [videoUrl, setVideoUrl] = useState('');
-  const [subtitles, setSubtitles] = useState<Array<{ time: string; speaker: string; text: string }>>([]);
-  const [questions, setQuestions] = useState<Question[]>([]);
+  const [videoTab, setVideoTab] = useState<'youtube' | 'upload'>('youtube');
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [uploadStatus, setUploadStatus] = useState<'idle' | 'uploading' | 'processing' | 'done' | 'error'>('idle');
+  const [uploadMessage, setUploadMessage] = useState('');
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [analyzeStatus, setAnalyzeStatus] = useState<'idle' | 'submitting' | 'processing' | 'done' | 'error'>('idle');
+  const [analyzeMessage, setAnalyzeMessage] = useState('');
+  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Pronunciation lesson specific
-  const [words, setWords] = useState<Array<{ word: string; phonetic: string; difficulty: string }>>([]);
+  useEffect(() => {
+    if (open) {
+      setCreatedLessonId(null);
+      setSelectedCourseId('');
+      setSelectedSessionId('');
+      setSessions([]);
+      setLessonForm({ title: '', description: '', durationMinutes: 5, orderIndex: 1 });
+      setYoutubeInputUrl('');
+      setScriptText('');
+      setVideoUrl('');
+      setVideoTab('youtube');
+      setUploadFile(null);
+      setUploadStatus('idle');
+      setAnalyzeStatus('idle');
+      const teacherId = useAuthStore.getState().user?.id;
+      Promise.all([
+        teacherId ? apiService.curriculum.getByTeacher(String(teacherId)) : Promise.resolve({ data: { data: [] } }),
+        apiService.curriculum.getAll(),
+      ]).then(([teacherRes, allRes]) => {
+        const teacherList = (teacherRes.data?.data ?? []) as any[];
+        const allList = (allRes.data?.data ?? []) as any[];
+        const teacherArr = Array.isArray(teacherList) ? teacherList : [];
+        const allArr = Array.isArray(allList) ? allList : [];
+        const teacherIds = new Set(teacherArr.map((c: any) => String(c.id)));
+        const merged = [...teacherArr, ...allArr.filter((c: any) => !teacherIds.has(String(c.id)))];
+        setCourses(merged);
+        if (teacherArr.length === 0 && teacherId) {
+          apiService.curriculum.create({ title: 'Nội dung của tôi', teacherId: String(teacherId) })
+            .then((curRes) => {
+              const cur = curRes.data?.data ?? curRes.data;
+              const cid = cur?.id;
+              if (cid) {
+                return apiService.session.create({ title: 'Bài học Video', courseId: cid, orderIndex: 1 })
+                  .then((sessRes) => {
+                    const sess = sessRes.data?.data ?? sessRes.data;
+                    const sid = sess?.id;
+                    setCourses((prev) => [{ ...cur, id: cid }, ...prev.filter((x: any) => x.id !== cid)]);
+                    setSessions(sid ? [{ ...sess, id: sid }] : []);
+                    if (cid) setSelectedCourseId(String(cid));
+                    if (sid) setSelectedSessionId(String(sid));
+                  });
+              }
+            })
+            .catch(() => toast.error('Không tạo được khóa học của tôi'));
+        }
+      }).catch(() => setCourses([]));
+    }
+  }, [open]);
 
-  // AI Conversation specific
-  const [scenario, setScenario] = useState('');
-  const [targetTurns, setTargetTurns] = useState('10');
+  useEffect(() => {
+    if (!open) return;
+    const id = pollingRef.current;
+    if (id) clearInterval(id);
+    pollingRef.current = null;
+    setAnalyzeStatus('idle');
+    setUploadStatus('idle');
+  }, [open]);
 
-  // Flashcard specific
-  const [flashcards, setFlashcards] = useState<Array<{ word: string; translation: string; example: string }>>([]);
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!formData.title || !formData.level) {
-      toast.error('Please fill in all required fields');
+  useEffect(() => {
+    if (!selectedCourseId) {
+      setSessions([]);
+      setSelectedSessionId('');
       return;
     }
+    apiService.session.getByCourse(Number(selectedCourseId))
+      .then((res) => {
+        const list = res.data?.data ?? [];
+        setSessions(Array.isArray(list) ? list : []);
+        setSelectedSessionId('');
+      })
+      .catch(() => setSessions([]));
+  }, [selectedCourseId]);
 
-    toast.success(`${lessonType.charAt(0).toUpperCase() + lessonType.slice(1)} lesson created successfully! 🎉`);
-    onOpenChange(false);
+  const stopPolling = () => {
+    if (pollingRef.current) {
+      clearInterval(pollingRef.current);
+      pollingRef.current = null;
+    }
+  };
+
+  const saveVideoContent = async (lessonId: number) => {
+    if (!videoUrl.trim() && !scriptText.trim()) return;
+    setSavingVideo(true);
+    try {
+      let transcriptJson: any[] | undefined;
+      if (scriptText.trim()) {
+        try {
+          transcriptJson = JSON.parse(scriptText);
+        } catch {
+          toast.error('Script JSON không hợp lệ.');
+          return;
+        }
+      }
+      await apiService.lesson.saveVideo(lessonId, {
+        videoUrl: videoUrl.trim() || undefined,
+        transcriptJson,
+      });
+      toast.success('Đã lưu video và script');
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Lưu video thất bại');
+    } finally {
+      setSavingVideo(false);
+    }
+  };
+
+  const handleCreateLesson = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const sessionId = selectedSessionId ? Number(selectedSessionId) : null;
+    if (!sessionId || !lessonForm.title.trim()) {
+      toast.error('Chọn khóa học, session và nhập tên bài học.');
+      return;
+    }
+    setSaving(true);
+    try {
+      const res = await apiService.lesson.create({
+        ...lessonForm,
+        type: 'VIDEO',
+        sessionId,
+      });
+      const created = res.data?.data ?? res.data;
+      const id = created?.id != null ? Number(created.id) : null;
+      if (id) {
+        setCreatedLessonId(id);
+        toast.success('Đã tạo bài học. Bạn có thể thêm link YouTube hoặc upload video.');
+      } else {
+        toast.error('Tạo bài học xong nhưng không lấy được ID.');
+      }
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Không thể tạo bài học');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const analyzeYoutube = async () => {
+    if (!createdLessonId || !youtubeInputUrl.trim()) {
+      toast.error('Nhập URL YouTube trước');
+      return;
+    }
+    try {
+      setAnalyzeStatus('submitting');
+      setAnalyzeMessage('Đang gửi yêu cầu phân tích...');
+      await apiService.transcribe.youtube({ lessonId: createdLessonId, youtubeUrl: youtubeInputUrl.trim() });
+      setAnalyzeStatus('processing');
+      setAnalyzeMessage('Đang xử lý... (có thể mất 1-3 phút)');
+      toast.success('Đã gửi yêu cầu phân tích video YouTube');
+      stopPolling();
+      const id = setInterval(async () => {
+        try {
+          const res = await apiService.transcribe.getTranscript(createdLessonId);
+          const data = res.data?.data ?? res.data;
+          const transcript = Array.isArray(data) ? data : (data?.transcript ?? null);
+          if (Array.isArray(transcript) && transcript.length > 0) {
+            if (pollingRef.current) clearInterval(pollingRef.current);
+            pollingRef.current = null;
+            setAnalyzeStatus('done');
+            setAnalyzeMessage(`✅ Hoàn thành! ${transcript.length} câu đã được phân tích và dịch.`);
+            toast.success(`Phân tích xong! ${transcript.length} câu`);
+            const lessonRes = await apiService.lesson.getById(createdLessonId);
+            const l = lessonRes.data?.data ?? lessonRes.data;
+            if (l?.transcriptJson) {
+              try {
+                setScriptText(JSON.stringify(l.transcriptJson, null, 2));
+              } catch { /* ignore */ }
+            }
+            if (l?.youtubeUrl) setYoutubeInputUrl(l.youtubeUrl);
+          }
+        } catch { /* keep polling */ }
+      }, 8000);
+      pollingRef.current = id;
+    } catch (err: any) {
+      setAnalyzeStatus('error');
+      setAnalyzeMessage('Lỗi: ' + (err?.response?.data?.message ?? err?.message ?? 'Không kết nối được'));
+      toast.error('Gửi yêu cầu thất bại');
+    }
+  };
+
+  const uploadAndTranscribe = async () => {
+    if (!createdLessonId || !uploadFile) {
+      toast.error('Chọn file video trước');
+      return;
+    }
+    try {
+      stopPolling();
+      setUploadStatus('uploading');
+      setUploadMessage('Đang upload lên server...');
+      setUploadProgress(10);
+      await apiService.transcribe.upload(createdLessonId, uploadFile, 'en-US');
+      setUploadStatus('processing');
+      setUploadProgress(50);
+      setUploadMessage('Upload xong! Đang phân tích âm thanh, dịch tiếng Việt, tạo IPA...');
+      toast.success('Upload thành công! Đang xử lý transcript...');
+      const id = setInterval(async () => {
+        try {
+          const res = await apiService.transcribe.getTranscript(createdLessonId);
+          const data = res.data?.data ?? res.data;
+          const transcript = Array.isArray(data) ? data : (data?.transcript ?? null);
+          if (Array.isArray(transcript) && transcript.length > 0) {
+            if (pollingRef.current) clearInterval(pollingRef.current);
+            pollingRef.current = null;
+            setUploadStatus('done');
+            setUploadProgress(100);
+            setUploadMessage(`✅ Hoàn thành! ${transcript.length} câu đã được phân tích và dịch.`);
+            toast.success(`Xử lý xong! ${transcript.length} câu`);
+            const lessonRes = await apiService.lesson.getById(createdLessonId);
+            const l = lessonRes.data?.data ?? lessonRes.data;
+            if (l?.transcriptJson) {
+              try {
+                setScriptText(JSON.stringify(l.transcriptJson, null, 2));
+              } catch { /* ignore */ }
+            }
+          }
+        } catch { /* keep polling */ }
+      }, 8000);
+      pollingRef.current = id;
+    } catch (err: any) {
+      setUploadStatus('error');
+      setUploadProgress(0);
+      setUploadMessage('Lỗi: ' + (err?.response?.data?.message ?? err?.message ?? 'Upload thất bại'));
+      toast.error('Upload thất bại');
+    }
+  };
+
+  const handleClose = (openState: boolean) => {
+    if (!openState) {
+      stopPolling();
+      setAnalyzeStatus('idle');
+      setUploadStatus('idle');
+      setUploadFile(null);
+    }
+    onOpenChange(openState);
+  };
+
+  const handleFinish = async () => {
+    if (createdLessonId && (videoUrl.trim() || scriptText.trim())) {
+      await saveVideoContent(createdLessonId);
+    }
     onSuccess?.();
-    resetForm();
-  };
-
-  const resetForm = () => {
-    setFormData({
-      title: '',
-      description: '',
-      level: '',
-      duration: '10',
-      xp: '50',
-    });
-    setVideoUrl('');
-    setSubtitles([]);
-    setQuestions([]);
-    setWords([]);
-    setScenario('');
-    setFlashcards([]);
-  };
-
-  const addQuestion = () => {
-    setQuestions([...questions, {
-      id: Date.now().toString(),
-      question: '',
-      options: ['', '', '', ''],
-      correct: 0,
-    }]);
-  };
-
-  const addWord = () => {
-    setWords([...words, { word: '', phonetic: '', difficulty: 'medium' }]);
-  };
-
-  const addFlashcard = () => {
-    setFlashcards([...flashcards, { word: '', translation: '', example: '' }]);
+    handleClose(false);
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+    <Dialog open={open} onOpenChange={handleClose}>
+      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto" aria-describedby={undefined}>
         <DialogHeader>
-          <DialogTitle>Create New Lesson</DialogTitle>
+          <DialogTitle>
+            {createdLessonId ? 'Thêm nội dung Video' : 'Tạo bài học Video'}
+          </DialogTitle>
           <DialogDescription>
-            Create a new lesson with content and exercises for your students.
+            {createdLessonId
+              ? 'Thêm link YouTube hoặc upload file video để tự động phân tích transcript.'
+              : 'Chọn khóa học và session, sau đó tạo bài học. Chỉ hỗ trợ loại Video (giống quản trị).'}
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Lesson Type Selection */}
-          <Tabs value={lessonType} onValueChange={(v) => setLessonType(v as any)} className="w-full">
-            <TabsList className="grid grid-cols-4 w-full">
-              <TabsTrigger value="video" className="gap-2">
-                <Video className="w-4 h-4" />
-                Video
-              </TabsTrigger>
-              <TabsTrigger value="pronunciation" className="gap-2">
-                <Mic className="w-4 h-4" />
-                Pronunciation
-              </TabsTrigger>
-              <TabsTrigger value="conversation" className="gap-2">
-                <Bot className="w-4 h-4" />
-                AI Chat
-              </TabsTrigger>
-              <TabsTrigger value="flashcard" className="gap-2">
-                <BookOpen className="w-4 h-4" />
-                Flashcard
-              </TabsTrigger>
-            </TabsList>
-
-            {/* Basic Info (Common for all types) */}
-            <div className="mt-6 space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="title">Lesson Title *</Label>
-                  <Input
-                    id="title"
-                    value={formData.title}
-                    onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                    placeholder="e.g., Restaurant Conversation"
-                    required
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="level">Level *</Label>
-                  <Select value={formData.level} onValueChange={(value) => setFormData({ ...formData, level: value })}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select level" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="beginner">Beginner</SelectItem>
-                      <SelectItem value="intermediate">Intermediate</SelectItem>
-                      <SelectItem value="advanced">Advanced</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="description">Description</Label>
-                <Textarea
-                  id="description"
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  placeholder="Brief description of the lesson..."
-                  rows={2}
+        {!createdLessonId ? (
+          <form onSubmit={handleCreateLesson} className="space-y-4 mt-2">
+            <div>
+              <Label>Khóa học *</Label>
+              <Select value={selectedCourseId} onValueChange={setSelectedCourseId}>
+                <SelectTrigger className="mt-1">
+                  <SelectValue placeholder="Chọn khóa học" />
+                </SelectTrigger>
+                <SelectContent>
+                  {courses.map((c) => (
+                    <SelectItem key={c.id} value={String(c.id)}>
+                      {c.title || c.name || `Khóa ${c.id}`}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Session *</Label>
+              <Select value={selectedSessionId} onValueChange={setSelectedSessionId} disabled={!selectedCourseId}>
+                <SelectTrigger className="mt-1">
+                  <SelectValue placeholder="Chọn session" />
+                </SelectTrigger>
+                <SelectContent>
+                  {sessions.map((s) => (
+                    <SelectItem key={s.id} value={String(s.id)}>{s.title || `Session ${s.id}`}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Tên bài học *</Label>
+              <Input
+                value={lessonForm.title}
+                onChange={(e) => setLessonForm({ ...lessonForm, title: e.target.value })}
+                placeholder="VD: Từ vựng gọi món..."
+                className="mt-1"
+              />
+            </div>
+            <div>
+              <Label>Mô tả</Label>
+              <Input
+                value={lessonForm.description}
+                onChange={(e) => setLessonForm({ ...lessonForm, description: e.target.value })}
+                placeholder="Mô tả ngắn..."
+                className="mt-1"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>Thời gian (phút)</Label>
+                <Input
+                  type="number"
+                  value={lessonForm.durationMinutes}
+                  onChange={(e) => setLessonForm({ ...lessonForm, durationMinutes: Number(e.target.value) })}
+                  className="mt-1"
+                  min={1}
                 />
               </div>
+              <div>
+                <Label>Thứ tự</Label>
+                <Input
+                  type="number"
+                  value={lessonForm.orderIndex}
+                  onChange={(e) => setLessonForm({ ...lessonForm, orderIndex: Number(e.target.value) })}
+                  className="mt-1"
+                  min={1}
+                />
+              </div>
+            </div>
+            <DialogFooter className="pt-4">
+              <Button type="button" variant="outline" onClick={() => handleClose(false)}>
+                Hủy
+              </Button>
+              <Button type="submit" disabled={!lessonForm.title.trim() || !selectedSessionId || saving}>
+                {saving ? 'Đang tạo...' : 'Tạo bài học'}
+              </Button>
+            </DialogFooter>
+          </form>
+        ) : (
+          <div className="space-y-4 mt-2">
+            <div className="border rounded-lg overflow-hidden bg-blue-50 dark:bg-blue-950/30">
+              <div className="px-3 py-2 flex items-center gap-2 border-b border-blue-100 dark:border-blue-900">
+                <Video className="w-4 h-4 text-blue-600" />
+                <span className="text-sm font-semibold text-blue-700 dark:text-blue-300">Nội dung Video</span>
+              </div>
+              <div className="flex border-b border-blue-100 dark:border-blue-900">
+                <button
+                  type="button"
+                  onClick={() => setVideoTab('youtube')}
+                  className={`flex-1 py-2 text-xs font-medium flex items-center justify-center gap-1.5 transition-colors ${
+                    videoTab === 'youtube'
+                      ? 'bg-white dark:bg-gray-900 text-red-600 border-b-2 border-red-500'
+                      : 'text-gray-500 hover:text-gray-700 hover:bg-white/50'
+                  }`}
+                >
+                  ▶ YouTube URL
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setVideoTab('upload')}
+                  className={`flex-1 py-2 text-xs font-medium flex items-center justify-center gap-1.5 transition-colors ${
+                    videoTab === 'upload'
+                      ? 'bg-white dark:bg-gray-900 text-blue-600 border-b-2 border-blue-500'
+                      : 'text-gray-500 hover:text-gray-700 hover:bg-white/50'
+                  }`}
+                >
+                  ⬆ Upload từ máy
+                </button>
+              </div>
+              <div className="p-3 space-y-3">
+                {videoTab === 'youtube' && (
+                  <div className="space-y-2">
+                    <p className="text-xs text-gray-500">
+                      Dán URL YouTube → hệ thống tự tải audio, phân tích, dịch VI, tạo IPA.
+                    </p>
+                    <div className="flex gap-2">
+                      <Input
+                        value={youtubeInputUrl}
+                        onChange={(e) => setYoutubeInputUrl(e.target.value)}
+                        placeholder="https://youtube.com/watch?v=..."
+                        className="flex-1 font-mono text-xs bg-white dark:bg-gray-900"
+                        disabled={analyzeStatus === 'submitting' || analyzeStatus === 'processing'}
+                      />
+                      <Button
+                        size="sm"
+                        onClick={analyzeYoutube}
+                        disabled={!youtubeInputUrl.trim() || analyzeStatus === 'submitting' || analyzeStatus === 'processing'}
+                        className="flex-shrink-0 bg-red-600 hover:bg-red-700 text-white text-xs gap-1"
+                      >
+                        {analyzeStatus === 'submitting' || analyzeStatus === 'processing'
+                          ? <>⏳ Xử lý...</>
+                          : <>▶ Phân tích</>}
+                      </Button>
+                    </div>
+                    {analyzeMessage && (
+                      <p
+                        className={`text-xs px-2 py-1.5 rounded-md ${
+                          analyzeStatus === 'done'
+                            ? 'text-green-700 bg-green-50 dark:bg-green-950 dark:text-green-300'
+                            : analyzeStatus === 'error'
+                              ? 'text-red-700 bg-red-50 dark:bg-red-950 dark:text-red-300'
+                              : 'text-blue-700 bg-blue-50 dark:bg-blue-950 dark:text-blue-300'
+                        }`}
+                      >
+                        {analyzeMessage}
+                      </p>
+                    )}
+                  </div>
+                )}
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="duration">Duration (minutes)</Label>
-                  <Input
-                    id="duration"
-                    type="number"
-                    value={formData.duration}
-                    onChange={(e) => setFormData({ ...formData, duration: e.target.value })}
-                    min="5"
-                    max="60"
-                  />
-                </div>
+                {videoTab === 'upload' && (
+                  <div className="space-y-2">
+                    <p className="text-xs text-gray-500">
+                      Upload file video/audio từ máy tính → tự động phân tích transcript.
+                    </p>
+                    <label
+                      className={`flex flex-col items-center justify-center gap-2 border-2 border-dashed rounded-lg p-4 cursor-pointer transition-colors ${
+                        uploadFile
+                          ? 'border-blue-400 bg-blue-50 dark:bg-blue-950'
+                          : 'border-gray-300 hover:border-blue-400 hover:bg-blue-50/50'
+                      }`}
+                    >
+                      <input
+                        type="file"
+                        accept="video/*,audio/*,.mp4,.mp3,.wav,.m4a,.webm,.mov"
+                        className="hidden"
+                        onChange={(e) => {
+                          const f = e.target.files?.[0];
+                          if (f) {
+                            setUploadFile(f);
+                            setUploadStatus('idle');
+                            setUploadMessage('');
+                            setUploadProgress(0);
+                          }
+                        }}
+                        disabled={uploadStatus === 'uploading' || uploadStatus === 'processing'}
+                      />
+                      {uploadFile ? (
+                        <>
+                          <span className="text-2xl">🎬</span>
+                          <p className="text-xs font-medium text-blue-700 text-center">{uploadFile.name}</p>
+                          <p className="text-xs text-gray-400">{(uploadFile.size / 1024 / 1024).toFixed(1)} MB</p>
+                        </>
+                      ) : (
+                        <>
+                          <span className="text-2xl text-gray-300">⬆</span>
+                          <p className="text-xs text-gray-500 text-center">
+                            Click để chọn file
+                            <br />
+                            <span className="text-gray-400">MP4, MP3, WAV, M4A, WebM...</span>
+                          </p>
+                        </>
+                      )}
+                    </label>
+                    {uploadFile && uploadStatus === 'idle' && (
+                      <Button
+                        size="sm"
+                        onClick={uploadAndTranscribe}
+                        className="w-full bg-blue-600 hover:bg-blue-700 text-white text-xs gap-1"
+                      >
+                        ⬆ Upload & Phân tích transcript
+                      </Button>
+                    )}
+                    {(uploadStatus === 'uploading' || uploadStatus === 'processing') && (
+                      <div className="space-y-1">
+                        <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-blue-500 transition-all duration-500 rounded-full"
+                            style={{ width: `${uploadProgress}%` }}
+                          />
+                        </div>
+                      </div>
+                    )}
+                    {uploadMessage && (
+                      <p
+                        className={`text-xs px-2 py-1.5 rounded-md ${
+                          uploadStatus === 'done'
+                            ? 'text-green-700 bg-green-50'
+                            : uploadStatus === 'error'
+                              ? 'text-red-700 bg-red-50'
+                              : 'text-blue-700 bg-blue-50'
+                        }`}
+                      >
+                        {uploadMessage}
+                      </p>
+                    )}
+                  </div>
+                )}
 
-                <div className="space-y-2">
-                  <Label htmlFor="xp">XP Reward</Label>
-                  <Input
-                    id="xp"
-                    type="number"
-                    value={formData.xp}
-                    onChange={(e) => setFormData({ ...formData, xp: e.target.value })}
-                    min="10"
-                    max="200"
-                  />
-                </div>
+                {scriptText && (
+                  (() => {
+                    let count = 0;
+                    try {
+                      count = JSON.parse(scriptText).length;
+                    } catch {
+                      /* ignore */
+                    }
+                    return (
+                      <div className="border-t border-blue-100 dark:border-blue-900 pt-2">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
+                            ✅ Script ({count} câu) — có thể chỉnh sửa thủ công
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setScriptText('')}
+                            className="text-xs text-red-400 hover:text-red-600"
+                          >
+                            Xóa
+                          </button>
+                        </div>
+                        <textarea
+                          value={scriptText}
+                          onChange={(e) => setScriptText(e.target.value)}
+                          className="w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 p-2 text-xs font-mono resize-none"
+                          rows={4}
+                          spellCheck={false}
+                        />
+                      </div>
+                    );
+                  })()
+                )}
               </div>
             </div>
 
-            {/* Video Lesson Content */}
-            <TabsContent value="video" className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="videoUrl">Video URL or Upload</Label>
-                <div className="flex gap-2">
-                  <Input
-                    id="videoUrl"
-                    value={videoUrl}
-                    onChange={(e) => setVideoUrl(e.target.value)}
-                    placeholder="https://youtube.com/... or upload file"
-                  />
-                  <Button type="button" variant="outline">
-                    <Upload className="w-4 h-4" />
-                  </Button>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <Label>Comprehension Questions</Label>
-                  <Button type="button" size="sm" onClick={addQuestion} variant="outline">
-                    <Plus className="w-4 h-4 mr-1" />
-                    Add Question
-                  </Button>
-                </div>
-                {questions.map((q, idx) => (
-                  <div key={q.id} className="border rounded-lg p-4 space-y-2">
-                    <Input
-                      placeholder={`Question ${idx + 1}`}
-                      value={q.question}
-                      onChange={(e) => {
-                        const newQuestions = [...questions];
-                        newQuestions[idx].question = e.target.value;
-                        setQuestions(newQuestions);
-                      }}
-                    />
-                    <div className="grid grid-cols-2 gap-2">
-                      {q.options.map((opt, optIdx) => (
-                        <Input
-                          key={optIdx}
-                          placeholder={`Option ${optIdx + 1}`}
-                          value={opt}
-                          onChange={(e) => {
-                            const newQuestions = [...questions];
-                            newQuestions[idx].options[optIdx] = e.target.value;
-                            setQuestions(newQuestions);
-                          }}
-                        />
-                      ))}
-                    </div>
-                    <Select
-                      value={q.correct.toString()}
-                      onValueChange={(v) => {
-                        const newQuestions = [...questions];
-                        newQuestions[idx].correct = parseInt(v);
-                        setQuestions(newQuestions);
-                      }}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Correct answer" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {q.options.map((_, i) => (
-                          <SelectItem key={i} value={i.toString()}>
-                            Option {i + 1}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                ))}
-              </div>
-            </TabsContent>
-
-            {/* Pronunciation Lesson Content */}
-            <TabsContent value="pronunciation" className="space-y-4">
-              <div className="flex items-center justify-between">
-                <Label>Words to Practice</Label>
-                <Button type="button" size="sm" onClick={addWord} variant="outline">
-                  <Plus className="w-4 h-4 mr-1" />
-                  Add Word
-                </Button>
-              </div>
-              {words.map((word, idx) => (
-                <div key={idx} className="grid grid-cols-3 gap-2 items-end">
-                  <div className="space-y-1">
-                    <Label className="text-xs">Word</Label>
-                    <Input
-                      placeholder="e.g., Restaurant"
-                      value={word.word}
-                      onChange={(e) => {
-                        const newWords = [...words];
-                        newWords[idx].word = e.target.value;
-                        setWords(newWords);
-                      }}
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs">Phonetic</Label>
-                    <Input
-                      placeholder="/ˈrestərɑːnt/"
-                      value={word.phonetic}
-                      onChange={(e) => {
-                        const newWords = [...words];
-                        newWords[idx].phonetic = e.target.value;
-                        setWords(newWords);
-                      }}
-                    />
-                  </div>
-                  <Select
-                    value={word.difficulty}
-                    onValueChange={(v) => {
-                      const newWords = [...words];
-                      newWords[idx].difficulty = v;
-                      setWords(newWords);
-                    }}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="easy">Easy</SelectItem>
-                      <SelectItem value="medium">Medium</SelectItem>
-                      <SelectItem value="hard">Hard</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              ))}
-            </TabsContent>
-
-            {/* AI Conversation Content */}
-            <TabsContent value="conversation" className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="scenario">Conversation Scenario</Label>
-                <Textarea
-                  id="scenario"
-                  value={scenario}
-                  onChange={(e) => setScenario(e.target.value)}
-                  placeholder="e.g., Booking a hotel room - Practice making a reservation"
-                  rows={3}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="targetTurns">Target Number of Turns</Label>
-                <Input
-                  id="targetTurns"
-                  type="number"
-                  value={targetTurns}
-                  onChange={(e) => setTargetTurns(e.target.value)}
-                  min="5"
-                  max="20"
-                />
-              </div>
-            </TabsContent>
-
-            {/* Flashcard Content */}
-            <TabsContent value="flashcard" className="space-y-4">
-              <div className="flex items-center justify-between">
-                <Label>Flashcards</Label>
-                <Button type="button" size="sm" onClick={addFlashcard} variant="outline">
-                  <Plus className="w-4 h-4 mr-1" />
-                  Add Card
-                </Button>
-              </div>
-              {flashcards.map((card, idx) => (
-                <div key={idx} className="border rounded-lg p-4 space-y-2">
-                  <div className="grid grid-cols-2 gap-2">
-                    <div className="space-y-1">
-                      <Label className="text-xs">English Word</Label>
-                      <Input
-                        placeholder="e.g., Reservation"
-                        value={card.word}
-                        onChange={(e) => {
-                          const newCards = [...flashcards];
-                          newCards[idx].word = e.target.value;
-                          setFlashcards(newCards);
-                        }}
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <Label className="text-xs">Translation</Label>
-                      <Input
-                        placeholder="e.g., Đặt chỗ"
-                        value={card.translation}
-                        onChange={(e) => {
-                          const newCards = [...flashcards];
-                          newCards[idx].translation = e.target.value;
-                          setFlashcards(newCards);
-                        }}
-                      />
-                    </div>
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs">Example Sentence</Label>
-                    <Input
-                      placeholder="e.g., I made a reservation at the restaurant."
-                      value={card.example}
-                      onChange={(e) => {
-                        const newCards = [...flashcards];
-                        newCards[idx].example = e.target.value;
-                        setFlashcards(newCards);
-                      }}
-                    />
-                  </div>
-                </div>
-              ))}
-            </TabsContent>
-          </Tabs>
-
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-              Cancel
-            </Button>
-            <Button type="submit" className="bg-green-600 hover:bg-green-700 text-white">
-              Create Lesson
-            </Button>
-          </DialogFooter>
-        </form>
+            <DialogFooter className="pt-4">
+              <Button type="button" variant="outline" onClick={() => setCreatedLessonId(null)}>
+                Quay lại
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => createdLessonId && saveVideoContent(createdLessonId)}
+                disabled={savingVideo || (!videoUrl.trim() && !scriptText.trim())}
+              >
+                {savingVideo ? 'Đang lưu...' : 'Lưu video'}
+              </Button>
+              <Button type="button" onClick={handleFinish} disabled={savingVideo}>
+                Hoàn tất
+              </Button>
+            </DialogFooter>
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );

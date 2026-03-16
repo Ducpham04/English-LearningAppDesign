@@ -113,6 +113,18 @@ public class TeacherClassController {
         }
     }
 
+    @GetMapping("/{classId}/assignment-stats")
+    public ResponseEntity<BaseResponse<List<AssignmentStatsDto>>> getAssignmentStats(@PathVariable Long classId, HttpServletRequest req) {
+        try {
+            return ResponseEntity.ok(BaseResponse.ok(teacherClassService.getAssignmentStats(classId), "OK", req.getRequestURI()));
+        } catch (RuntimeException e) {
+            if (e.getMessage() != null && e.getMessage().contains("not found")) {
+                return ResponseEntity.status(404).body(BaseResponse.error(e.getMessage(), "NOT_FOUND", req.getRequestURI()));
+            }
+            return ResponseEntity.status(403).body(BaseResponse.error(e.getMessage(), "FORBIDDEN", req.getRequestURI()));
+        }
+    }
+
     @PostMapping("/{classId}/assignments")
     public ResponseEntity<BaseResponse<AssignmentDto>> createAssignment(
             @PathVariable Long classId,
@@ -156,6 +168,46 @@ public class TeacherClassController {
                 return ResponseEntity.status(404).body(BaseResponse.error(e.getMessage(), "NOT_FOUND", req.getRequestURI()));
             }
             return ResponseEntity.status(403).body(BaseResponse.error(e.getMessage(), "FORBIDDEN", req.getRequestURI()));
+        }
+    }
+
+    @GetMapping("/{classId}/join-requests")
+    public ResponseEntity<BaseResponse<List<ClassJoinRequestDto>>> getJoinRequests(
+            @PathVariable Long classId,
+            HttpServletRequest req) {
+        try {
+            return ResponseEntity.ok(BaseResponse.ok(teacherClassService.getJoinRequests(classId), "OK", req.getRequestURI()));
+        } catch (RuntimeException e) {
+            if (e.getMessage() != null && e.getMessage().contains("not found")) {
+                return ResponseEntity.status(404).body(BaseResponse.error(e.getMessage(), "NOT_FOUND", req.getRequestURI()));
+            }
+            return ResponseEntity.status(403).body(BaseResponse.error(e.getMessage(), "FORBIDDEN", req.getRequestURI()));
+        }
+    }
+
+    @PostMapping("/{classId}/join-requests/{requestId}/approve")
+    public ResponseEntity<BaseResponse<Void>> approveJoinRequest(
+            @PathVariable Long classId,
+            @PathVariable Long requestId,
+            HttpServletRequest req) {
+        try {
+            teacherClassService.approveJoinRequest(classId, requestId);
+            return ResponseEntity.ok(BaseResponse.ok(null, "Đã duyệt yêu cầu", req.getRequestURI()));
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(400).body(BaseResponse.error(e.getMessage(), "BAD_REQUEST", req.getRequestURI()));
+        }
+    }
+
+    @PostMapping("/{classId}/join-requests/{requestId}/reject")
+    public ResponseEntity<BaseResponse<Void>> rejectJoinRequest(
+            @PathVariable Long classId,
+            @PathVariable Long requestId,
+            HttpServletRequest req) {
+        try {
+            teacherClassService.rejectJoinRequest(classId, requestId);
+            return ResponseEntity.ok(BaseResponse.ok(null, "Đã từ chối yêu cầu", req.getRequestURI()));
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(400).body(BaseResponse.error(e.getMessage(), "BAD_REQUEST", req.getRequestURI()));
         }
     }
 
