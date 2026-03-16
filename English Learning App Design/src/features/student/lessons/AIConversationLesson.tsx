@@ -1,15 +1,16 @@
 import { useState, useRef, useEffect } from 'react';
+import React from 'react';
 import { useNavigate, useParams } from 'react-router';
-import { Button } from '@/app/components/ui/button';
-import { Card } from '@/app/components/ui/card';
-import { Badge } from '@/app/components/ui/badge';
+import { Button } from '../../../app/components/ui/button';
+import { Card } from '../../../app/components/ui/card';
+import { Badge } from '../../../app/components/ui/badge';
 import { Mic, MicOff, Volume2, ArrowLeft, CheckCircle2, Bot, User, Send, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { Avatar, AvatarFallback } from '@/app/components/ui/avatar';
-import { Input } from '@/app/components/ui/input';
-import apiService from '@/services/apiService';
-import { useAppStore } from '@/store/appStore';
-import { RealtimeSpeechClient, type RealtimeClientState } from '@/services/realtimeSpeechClient';
+import { Avatar, AvatarFallback } from '../../../app/components/ui/avatar';
+import { Input } from '../../../app/components/ui/input';
+import apiService from '../../../services/apiService';
+import { useAppStore } from '../../../store/appStore';
+import { RealtimeSpeechClient, type RealtimeClientState } from '../../../services/realtimeSpeechClient';
 
 interface Message {
   id: number;
@@ -100,10 +101,21 @@ export function AIConversationLesson() {
           // placeholder assistant bubble
           setMessages((prev) => [...prev, { id: Date.now() + 1, sender: 'ai', text: '...', timestamp: new Date() }]);
         } else if (evt.role === 'assistant' && evt.isDelta) {
-          aiDraftRef.current = aiDraftRef.current
-            ? `${aiDraftRef.current} ${evt.text}`
-            : evt.text;
-          const t = aiDraftRef.current.trim();
+          const t = evt.text.trim();
+          if (!t) return;
+          setMessages((prev) => {
+            const next = [...prev];
+            for (let i = next.length - 1; i >= 0; i--) {
+              if (next[i].sender === 'ai') {
+                next[i] = { ...next[i], text: t };
+                return next;
+              }
+            }
+            next.push({ id: Date.now(), sender: 'ai', text: t, timestamp: new Date() });
+            return next;
+          });
+        } else if (evt.role === 'assistant' && evt.isFinal) {
+          const t = evt.text.trim();
           if (!t) return;
           setMessages((prev) => {
             const next = [...prev];
@@ -133,18 +145,14 @@ export function AIConversationLesson() {
       const title = lesson?.title ?? 'Luyện hội thoại';
       const desc = lesson?.description ?? '';
       const lessonContext = [title, desc].filter(Boolean).join('\n');
-      await rtRef.current?.start({ instructions: lessonContext });
+      try {
+        await rtRef.current?.start({ instructions: lessonContext });
 
-      // voice greeting once when starting
-      rtRef.current?.sendEvent({
-        type: 'conversation.item.create',
-        item: {
-          type: 'message',
-          role: 'user',
-          content: [{ type: 'input_text', text: `Start with a short greeting for this English conversation practice: ${title}.` }],
-        },
-      });
-      rtRef.current?.sendEvent({ type: 'response.create' });
+        // Removed auto response.create to avoid "response in progress" errors during realtime.
+      } catch (err: any) {
+        console.warn('Failed to start realtime mic', err);
+        toast.error(err?.message || 'Không thể bật micro. Kiểm tra quyền microphone hoặc kết nối WebSocket.');
+      }
     } else {
       rtRef.current?.stop();
     }

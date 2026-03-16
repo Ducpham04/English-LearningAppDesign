@@ -1,30 +1,31 @@
 version: '3.8'
-name: app-english-2
 services:
-  # --- Dịch vụ 1 : Database (PostgreSQL) ---
   db:
     image: postgres:16-alpine
-    container_name : lms_postgres_2
+    container_name: lms_postgres
     ports:
       - "5432:5432"
+    env_file:
+      - .env
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
-      POSTGRES_DB : learning_english2
+      POSTGRES_DB: learning_english2
     volumes:
-      - postgres_data:/var/lib/postgresql/data # nơi lưu trữ dữ liệu vĩnh viễn
-    restart: always                             # Tự động khởi động lại nếu bị crash
-    # --- Dịch vụ 2 : Cache (Redis ---)
+      - postgres_data:/var/lib/postgresql/data
+    restart: always
 
   redis:
     image: redis:7-alpine
-    container_name: lms_redis_2
+    container_name: lms_redis
     ports:
       - "6379:6379"
     restart: always
 
   zookeeper:
     image: confluentinc/cp-zookeeper:7.5.0
+    env_file:
+      - .env
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME: 2000
@@ -36,7 +37,9 @@ services:
     depends_on:
       - zookeeper
     ports:
-      - "9092:9092" # host access
+      - "9092:9092"
+    env_file:
+      - .env
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
@@ -45,13 +48,28 @@ services:
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_HEAP_OPTS: "-Xms256m -Xmx512m"
 
   ytdlp:
     image: alpine:3.20
-    container_name: langmaster-ytdlp_2
+    container_name: langmaster-ytdlp
     command: [ "sh", "-c", "set -e; apk add --no-cache python3 py3-pip py3-virtualenv ffmpeg ca-certificates >/dev/null 2>&1; python3 -m venv /opt/venv; /opt/venv/bin/pip install --no-cache-dir -U pip yt-dlp; /opt/venv/bin/yt-dlp --version; tail -f /dev/null" ]
+    env_file:
+      - .env
     volumes:
       - ./temp/youtube-audio:/data
+
+  app:
+    image: haidev257/langmaster-backend:0.0.3
+    container_name: appenglish_backend
+    env_file:
+      - .env
+    ports:
+      - "8080:8080"
+    depends_on:
+      - db
+      - redis
+      - kafka
 
 volumes:
   postgres_data:

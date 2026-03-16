@@ -42,13 +42,12 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
 
-        // Cho phép FE từ localhost (Vite dev server thường chạy port 5173)
-        configuration.setAllowedOrigins(Arrays.asList(
-                "http://localhost:5173",
-                "http://localhost:3000",
-                "http://127.0.0.1:5173",
-                "http://127.0.0.1:3000"
-        ));
+        // Cho phép FE từ danh sách cấu hình (dev + prod)
+        String corsOrigins = System.getenv().getOrDefault(
+                "APP_CORS_ORIGINS",
+                "http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173,http://127.0.0.1:3000"
+        );
+        configuration.setAllowedOrigins(Arrays.asList(corsOrigins.split("\\s*,\\s*")));
 
         // Cho phép các method HTTP cần thiết
         configuration.setAllowedMethods(Arrays.asList(

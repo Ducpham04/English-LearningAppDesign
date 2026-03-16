@@ -32,7 +32,11 @@ public class OpenAiRealtimeHandler extends TextWebSocketHandler {
 
     private final ObjectMapper objectMapper;
     private final Map<String, WebSocket> openAiWebSockets = new ConcurrentHashMap<>();
+    private final Map<String, Integer> audioBufferBytes = new ConcurrentHashMap<>();
+    private final Map<String, Boolean> speechActive = new ConcurrentHashMap<>();
+    private final Map<String, Boolean> responseActive = new ConcurrentHashMap<>();
     private final OkHttpClient okHttpClient = new OkHttpClient();
+
 
     @Value("${openai.api.key}")
     private String openAiApiKey;
@@ -45,6 +49,9 @@ public class OpenAiRealtimeHandler extends TextWebSocketHandler {
     @Override
     public void afterConnectionEstablished(WebSocketSession session) throws Exception {
         log.info("Browser client connected: {}", session.getId());
+        audioBufferBytes.put(session.getId(), 0);
+        speechActive.put(session.getId(), false);
+        responseActive.put(session.getId(), false);
 
         String url = OPENAI_REALTIME_BASE_URL + "?model=" + modelId;
         Request request = new Request.Builder()
@@ -57,12 +64,21 @@ public class OpenAiRealtimeHandler extends TextWebSocketHandler {
             @Override
             public void onOpen(@NotNull WebSocket webSocket, @NotNull Response response) {
                 log.info("Connected to OpenAI Realtime API for session: {}", session.getId());
+                audioBufferBytes.put(session.getId(), 0);
+                speechActive.put(session.getId(), false);
+                responseActive.put(session.getId(), false);
                 sendInitialSessionUpdate(webSocket);
             }
 
             @Override
             public void onMessage(@NotNull WebSocket webSocket, @NotNull String text) {
                 try {
+                    if (!session.isOpen()) {
+                        webSocket.close(1000, "Browser session closed");
+                        return;
+                    }
+
+                    log.debug("OpenAI event for session {}: {}", session.getId(), text);
                     JsonNode node = objectMapper.readTree(text);
                     String type = node.path("type").asText();
 
@@ -72,25 +88,53 @@ public class OpenAiRealtimeHandler extends TextWebSocketHandler {
                 if (session.isOpen()) {
                     session.sendMessage(new BinaryMessage(Base64.getDecoder().decode(base64Audio)));
                 }
-            } else if ("input_audio_buffer.speech_stopped".equals(type)) {
-                // Server VAD detected end of user turn. Trigger response automatically.
-                try {
-                    ObjectNode resp = objectMapper.createObjectNode();
-                    resp.put("type", "response.create");
-                    webSocket.send(objectMapper.writeValueAsString(resp));
-                } catch (Exception e) {
-                    log.warn("Failed to auto response.create on speech_stopped", e);
+            } else if ("response.error".equals(type)) {
+                // Mark response as inactive if OpenAI reports a response error.
+                responseActive.put(session.getId(), false);
+                if (session.isOpen()) {
+                    session.sendMessage(new TextMessage(text));
+                }
+            } else if ("response.cancelled".equals(type)) {
+                responseActive.put(session.getId(), false);
+                if (session.isOpen()) {
+                    session.sendMessage(new TextMessage(text));
+                }
+            } else if ("response.done".equals(type)) {
+                // Keep buffer management tied to speech events; just forward to client.
+                audioBufferBytes.put(session.getId(), 0);
+                speechActive.put(session.getId(), false);
+                responseActive.put(session.getId(), false);
+                if (session.isOpen()) {
+                    session.sendMessage(new TextMessage(text));
+                }
+            } else if ("response.created".equals(type)) {
+                responseActive.put(session.getId(), true);
+                if (session.isOpen()) {
+                    session.sendMessage(new TextMessage(text));
+                }
+            } else if ("input_audio_buffer.speech_started".equals(type)) {
+                speechActive.put(session.getId(), true);
+                if (responseActive.getOrDefault(session.getId(), false)) {
+                    try {
+                        ObjectNode cancel = objectMapper.createObjectNode();
+                        cancel.put("type", "response.cancel");
+                        webSocket.send(objectMapper.writeValueAsString(cancel));
+                    } catch (Exception e) {
+                        log.warn("Failed to send response.cancel on barge-in", e);
+                    }
                 }
                 if (session.isOpen()) {
                     session.sendMessage(new TextMessage(text));
                 }
+            } else if ("input_audio_buffer.speech_stopped".equals(type)) {
+                // Let OpenAI handle commit/response (turn_detection.create_response=true).
+                audioBufferBytes.put(session.getId(), 0);
+                if (session.isOpen()) {
+                    session.sendMessage(new TextMessage(text));
+                }
             } else if ("conversation.item.created".equals(type) ||
-                       "response.created".equals(type) ||
-                       "response.done".equals(type) ||
                        "response.audio_transcript.delta".equals(type) || 
                        "conversation.item.input_audio_transcription.completed".equals(type) ||
-                       "input_audio_buffer.speech_started".equals(type) ||
-                        "input_audio_buffer.speech_stopped".equals(type) ||
                        "error".equals(type)) {
                 if (session.isOpen()) {
                     session.sendMessage(new TextMessage(text));
@@ -147,6 +191,9 @@ public class OpenAiRealtimeHandler extends TextWebSocketHandler {
             turnDetection.put("threshold", 0.5);
             turnDetection.put("prefix_padding_ms", 300);
             turnDetection.put("silence_duration_ms", 800);
+            // Let OpenAI handle response creation + interruption automatically
+            turnDetection.put("create_response", true);
+            turnDetection.put("interrupt_response", true);
             sessionNode.set("turn_detection", turnDetection);
 
             webSocket.send(objectMapper.writeValueAsString(root));
@@ -160,6 +207,22 @@ public class OpenAiRealtimeHandler extends TextWebSocketHandler {
     protected void handleTextMessage(WebSocketSession session, TextMessage message) throws Exception {
         WebSocket openAiWs = openAiWebSockets.get(session.getId());
         if (openAiWs != null) {
+            try {
+                JsonNode node = objectMapper.readTree(message.getPayload());
+                String type = node.path("type").asText("");
+                if ("response.create".equals(type)) {
+                    boolean responding = responseActive.getOrDefault(session.getId(), false);
+                    if (responding) {
+                        log.debug("Skip response.create from client because response is active");
+                        return;
+                    }
+                    responseActive.put(session.getId(), true);
+                } else if ("response.cancel".equals(type)) {
+                    responseActive.put(session.getId(), false);
+                }
+            } catch (Exception e) {
+                log.debug("Failed to parse client event for response tracking", e);
+            }
             openAiWs.send(message.getPayload());
         }
     }
@@ -169,7 +232,12 @@ public class OpenAiRealtimeHandler extends TextWebSocketHandler {
         WebSocket openAiWs = openAiWebSockets.get(session.getId());
         if (openAiWs != null) {
             try {
-                String base64Audio = Base64.getEncoder().encodeToString(message.getPayload().array());
+                int size = message.getPayloadLength();
+                audioBufferBytes.merge(session.getId(), size, Integer::sum);
+
+                byte[] audioBytes = new byte[size];
+                message.getPayload().get(audioBytes);
+                String base64Audio = Base64.getEncoder().encodeToString(audioBytes);
                 ObjectNode root = objectMapper.createObjectNode();
                 root.put("type", "input_audio_buffer.append");
                 root.put("audio", base64Audio);
@@ -183,6 +251,9 @@ public class OpenAiRealtimeHandler extends TextWebSocketHandler {
     @Override
     public void afterConnectionClosed(WebSocketSession session, CloseStatus status) throws Exception {
         log.info("Browser connection closed: {}", session.getId());
+        audioBufferBytes.remove(session.getId());
+        speechActive.remove(session.getId());
+        responseActive.remove(session.getId());
         WebSocket ws = openAiWebSockets.remove(session.getId());
         if (ws != null) {
             ws.close(1000, "Client disconnected");

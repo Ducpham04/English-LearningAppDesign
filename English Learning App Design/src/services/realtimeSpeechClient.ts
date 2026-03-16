@@ -1,4 +1,4 @@
-import { API_BASE_URL } from '@/services/baseUrl';
+import { API_BASE_URL } from './baseUrl';
 
 export type RealtimeRole = 'user' | 'assistant';
 
@@ -49,7 +49,16 @@ export class RealtimeSpeechClient {
   private listeningEnabled = true;
   private outputSampleRate = 24000;
   private nextPlayTime = 0;
+  private activeSources: AudioBufferSourceNode[] = [];
   private closedByUser = false;
+  private lastAppendAt = 0;
+  private reconnectTimer: number | null = null;
+  private reconnectAttempt = 0;
+  private lastStartOpts: StartOptions | null = null;
+  private responseActive = false;
+  private assistantDraft = '';
+  private bargeInTimer: number | null = null;
+  private bargeInFrames = 0;
 
   constructor(events: RealtimeClientEvents = {}) {
     this.events = events;
@@ -73,27 +82,32 @@ export class RealtimeSpeechClient {
       return;
     }
     this.closedByUser = false;
+    this.lastStartOpts = opts;
     this.setState('connecting');
+
+    try {
+      await this.initAudio();
+    } catch (e: any) {
+      this.fail(e?.message || 'Failed to access microphone');
+      return;
+    }
 
     const wsUrl = opts.wsUrl ?? deriveWsUrlFromApiBase(API_BASE_URL);
     this.ws = new WebSocket(wsUrl);
     this.ws.binaryType = 'arraybuffer';
 
-    this.ws.onopen = async () => {
-      try {
-        // Optionally update instructions per lesson/context (backend forwards to OpenAI).
-        if (opts.instructions && opts.instructions.trim()) {
-          this.sendJson({
-            type: 'session.update',
-            session: { instructions: opts.instructions.trim() },
-          });
-        }
-
-        await this.initAudio();
-        this.setState('listening');
-      } catch (e: any) {
-        this.fail(e?.message || 'Failed to start audio');
+    this.ws.onopen = () => {
+      // Optionally update instructions per lesson/context (backend forwards to OpenAI).
+      if (opts.instructions && opts.instructions.trim()) {
+        this.sendJson({
+          type: 'session.update',
+          session: { instructions: opts.instructions.trim() },
+        });
       }
+
+      this.lastAppendAt = Date.now();
+      this.reconnectAttempt = 0;
+      this.setState('listening');
     };
 
     this.ws.onmessage = (ev) => {
@@ -104,15 +118,23 @@ export class RealtimeSpeechClient {
       }
     };
 
-    this.ws.onerror = () => {
-      if (!this.closedByUser) this.fail('WebSocket error');
+    this.ws.onerror = (ev) => {
+      console.warn('Realtime WS error', ev);
+      // Keep the socket alive; onclose will handle reconnect if needed.
     };
 
-    this.ws.onclose = () => {
+    this.ws.onclose = (ev) => {
+      console.warn('Realtime WS closed', {
+        code: ev.code,
+        reason: ev.reason,
+        wasClean: ev.wasClean,
+      });
       this.cleanupAudio();
       if (!this.closedByUser) {
         this.setState('idle');
+        this.scheduleReconnect();
       }
+      this.ws = null;
     };
   }
 
@@ -127,7 +149,30 @@ export class RealtimeSpeechClient {
       }
     }
     this.ws = null;
+    if (this.reconnectTimer) {
+      window.clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
     this.setState('idle');
+  }
+
+  /** Clear OpenAI input buffer (not used by default; server handles it). */
+  resetBuffer() {
+    const now = Date.now();
+    if (now - this.lastAppendAt < 120) return;
+    this.sendJson({ type: 'input_audio_buffer.clear' });
+  }
+
+  private scheduleReconnect() {
+    if (this.closedByUser || !this.lastStartOpts) return;
+    if (this.reconnectAttempt >= 5) return;
+    if (this.reconnectTimer) return;
+    const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempt), 8000);
+    this.reconnectTimer = window.setTimeout(() => {
+      this.reconnectTimer = null;
+      this.reconnectAttempt += 1;
+      this.start(this.lastStartOpts ?? {});
+    }, delay);
   }
 
   private setState(s: RealtimeClientState) {
@@ -139,6 +184,10 @@ export class RealtimeSpeechClient {
   private fail(message: string) {
     this.events.onError?.(message);
     this.setState('error');
+    if (!this.closedByUser) {
+      this.scheduleReconnect();
+      return;
+    }
     this.stop();
   }
 
@@ -148,6 +197,7 @@ export class RealtimeSpeechClient {
   }
 
   private async initAudio() {
+    if (this.audioCtx || this.micStream) return;
     // Capture mic
     this.micStream = await navigator.mediaDevices.getUserMedia({
       audio: {
@@ -160,6 +210,7 @@ export class RealtimeSpeechClient {
     // Playback + capture in one AudioContext
     this.audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
     this.nextPlayTime = this.audioCtx.currentTime;
+    this.activeSources = [];
 
     this.micSource = this.audioCtx.createMediaStreamSource(this.micStream);
     // ScriptProcessorNode is deprecated but widely supported; good enough for this app.
@@ -170,12 +221,28 @@ export class RealtimeSpeechClient {
       if (!this.listeningEnabled) return;
       if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
 
-      // If AI is speaking, pause sending mic to avoid echo.
-      if (this.state === 'ai_speaking') return;
+      // Allow barge-in: keep sending mic even while AI is speaking.
 
       const input = e.inputBuffer.getChannelData(0);
       const pcm16 = floatToPcm16(resampleFloat32(input, inputSampleRate, 16000));
-      this.ws.send(pcm16.buffer);
+      if (pcm16.length > 0) {
+        if (this.responseActive) {
+          const energy = rms(pcm16);
+          if (energy > 0.02) {
+            this.bargeInFrames += 1;
+          } else {
+            this.bargeInFrames = 0;
+          }
+          // Require sustained real speech energy before cutting AI audio.
+          if (this.bargeInFrames >= 12) {
+            this.sendJson({ type: 'response.cancel' });
+            this.stopAiPlayback();
+            this.bargeInFrames = 0;
+          }
+        }
+        this.ws.send(pcm16.buffer);
+        this.lastAppendAt = Date.now();
+      }
     };
 
     this.micSource.connect(this.micProcessor);
@@ -209,6 +276,7 @@ export class RealtimeSpeechClient {
       }
       this.audioCtx = null;
     }
+    this.activeSources = [];
   }
 
   private handleTextEvent(text: string) {
@@ -218,10 +286,27 @@ export class RealtimeSpeechClient {
 
       const type = String(evt?.type || '');
       if (type === 'response.created') {
+        this.responseActive = true;
+        this.assistantDraft = '';
         this.setState('ai_speaking');
       } else if (type === 'response.done') {
-        // Response finished -> resume listening
+        // Response finished -> resume listening (allow queued audio to finish).
+        this.responseActive = false;
+        this.assistantDraft = '';
+        this.bargeInFrames = 0;
         this.setState('listening');
+      } else if (type === 'response.cancelled') {
+        this.responseActive = false;
+        this.assistantDraft = '';
+        this.bargeInFrames = 0;
+        this.stopAiPlayback();
+        this.setState('listening');
+      } else if (type === 'input_audio_buffer.speech_started') {
+        if (this.responseActive) {
+          this.bargeInFrames = 0;
+        }
+      } else if (type === 'input_audio_buffer.speech_stopped') {
+        this.bargeInFrames = 0;
       } else if (type === 'conversation.item.input_audio_transcription.completed') {
         const t = String(evt?.transcript || evt?.text || evt?.item?.content?.[0]?.transcript || '').trim();
         if (t) {
@@ -230,10 +315,23 @@ export class RealtimeSpeechClient {
       } else if (type === 'response.audio_transcript.delta') {
         const delta = String(evt?.delta || '').trim();
         if (delta) {
-          this.events.onTranscript?.({ role: 'assistant', text: delta, isDelta: true, isFinal: false });
+          this.assistantDraft = this.assistantDraft
+            ? `${this.assistantDraft} ${delta}`
+            : delta;
+          this.events.onTranscript?.({ role: 'assistant', text: this.assistantDraft.trim(), isDelta: true, isFinal: false });
+        }
+      } else if (type === 'response.audio_transcript.done') {
+        const transcript = String(evt?.transcript || '').trim();
+        if (transcript) {
+          this.events.onTranscript?.({ role: 'assistant', text: transcript, isDelta: false, isFinal: true });
         }
       } else if (type === 'error') {
         const msg = String(evt?.error?.message || 'Realtime error');
+        // Ignore benign "buffer too small" commit errors so the session can continue.
+        if (msg.includes('buffer too small')) {
+          this.setState('listening');
+          return;
+        }
         this.fail(msg);
       }
     } catch {
@@ -245,9 +343,41 @@ export class RealtimeSpeechClient {
     if (!this.audioCtx) return;
     // Server forwards raw PCM16 bytes (little endian) at ~24kHz
     const float32 = pcm16ToFloat32(new Int16Array(buf));
-    playPcmFloat32(this.audioCtx, float32, this.outputSampleRate, (t) => {
-      this.nextPlayTime = t;
-    }, this.nextPlayTime);
+    playPcmFloat32(
+      this.audioCtx,
+      float32,
+      this.outputSampleRate,
+      (t) => {
+        this.nextPlayTime = t;
+      },
+      this.nextPlayTime,
+      (src) => {
+        this.activeSources.push(src);
+      }
+    );
+  }
+
+  private stopAiPlayback() {
+    if (this.bargeInTimer) {
+      window.clearTimeout(this.bargeInTimer);
+      this.bargeInTimer = null;
+    }
+    this.bargeInFrames = 0;
+    if (this.activeSources.length > 0) {
+      this.activeSources.forEach((src) => {
+        try {
+          src.stop();
+        } catch {
+          // ignore
+        }
+      });
+      this.activeSources = [];
+    }
+    if (this.audioCtx) {
+      this.nextPlayTime = this.audioCtx.currentTime;
+    } else {
+      this.nextPlayTime = 0;
+    }
   }
 }
 
@@ -257,15 +387,22 @@ function deriveWsUrlFromApiBase(apiBase: string): string {
   // - 'http://localhost:8080/api'
   // - 'https://domain.com/api'
   const path = '/v1/speaking/realtime';
-  if (apiBase.startsWith('http://')) {
-    return apiBase.replace('http://', 'ws://') + path;
+  const trimmed = apiBase.replace(/\/+$/, '');
+  const hasApi = trimmed.endsWith('/api');
+  const withoutApi = hasApi ? trimmed.slice(0, -4) : trimmed;
+  const wsPath = `${hasApi ? '/api' : ''}${path}`;
+  if (withoutApi.startsWith('http://')) {
+    return withoutApi.replace('http://', 'ws://') + wsPath;
   }
-  if (apiBase.startsWith('https://')) {
-    return apiBase.replace('https://', 'wss://') + path;
+  if (withoutApi.startsWith('https://')) {
+    return withoutApi.replace('https://', 'wss://') + wsPath;
   }
-  // Relative -> assume same origin
+  // Relative -> assume backend on :8080 (Vite dev server runs on :5173 and doesn't proxy WS by default)
   const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-  return `${proto}//${window.location.host}${apiBase}${path}`;
+  const host = window.location.hostname;
+  const port = window.location.port === '5173' ? '8080' : window.location.port;
+  const portPart = port ? `:${port}` : '';
+  return `${proto}//${host}${portPart}${wsPath}`;
 }
 
 function resampleFloat32(input: Float32Array, inRate: number, outRate: number): Float32Array {
@@ -300,15 +437,26 @@ function pcm16ToFloat32(input: Int16Array): Float32Array {
   return out;
 }
 
+function rms(input: Int16Array): number {
+  let sum = 0;
+  for (let i = 0; i < input.length; i++) {
+    const s = input[i] / 0x8000;
+    sum += s * s;
+  }
+  return Math.sqrt(sum / Math.max(1, input.length));
+}
+
 function playPcmFloat32(
   ctx: AudioContext,
   pcm: Float32Array,
   sampleRate: number,
   setNextTime: (t: number) => void,
-  nextTime: number
+  nextTime: number,
+  onSource?: (src: AudioBufferSourceNode) => void
 ) {
-  const buffer = ctx.createBuffer(1, pcm.length, sampleRate);
-  buffer.copyToChannel(pcm, 0);
+  const pcmData = new Float32Array(pcm) as Float32Array<ArrayBuffer>;
+  const buffer = ctx.createBuffer(1, pcmData.length, sampleRate);
+  buffer.copyToChannel(pcmData, 0);
   const src = ctx.createBufferSource();
   src.buffer = buffer;
   src.connect(ctx.destination);
@@ -316,5 +464,6 @@ function playPcmFloat32(
   const startAt = Math.max(ctx.currentTime, nextTime);
   src.start(startAt);
   setNextTime(startAt + buffer.duration);
+  onSource?.(src);
 }
 
