@@ -60,7 +60,7 @@ services:
       - ./temp/youtube-audio:/data
 
   app:
-    image: haidev257/langmaster-backend:0.0.4
+    image: haidev257/langmaster-backend:latest
     container_name: appenglish_backend
     env_file:
       - .env
