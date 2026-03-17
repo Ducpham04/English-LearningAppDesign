@@ -299,7 +299,7 @@ export function AIConversationLesson() {
               size="icon"
               variant={isRecording ? 'destructive' : 'outline'}
               onClick={toggleRecording}
-              disabled={rtState === 'ai_speaking' || isAITyping}
+              disabled={isAITyping}
               className={`flex-shrink-0 ${isRecording ? 'animate-pulse' : ''}`}
               title={isRecording ? 'Nhấn để dừng' : 'Nhấn để nói'}
             >

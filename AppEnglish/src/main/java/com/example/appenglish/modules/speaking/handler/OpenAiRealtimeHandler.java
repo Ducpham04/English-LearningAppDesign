@@ -127,8 +127,24 @@ public class OpenAiRealtimeHandler extends TextWebSocketHandler {
                     session.sendMessage(new TextMessage(text));
                 }
             } else if ("input_audio_buffer.speech_stopped".equals(type)) {
-                // Let OpenAI handle commit/response (turn_detection.create_response=true).
+                // User finished speaking -> commit and ask OpenAI to create a response now.
                 audioBufferBytes.put(session.getId(), 0);
+                try {
+                    ObjectNode commit = objectMapper.createObjectNode();
+                    commit.put("type", "input_audio_buffer.commit");
+                    webSocket.send(objectMapper.writeValueAsString(commit));
+
+                    ObjectNode create = objectMapper.createObjectNode();
+                    create.put("type", "response.create");
+                    webSocket.send(objectMapper.writeValueAsString(create));
+                } catch (Exception e) {
+                    log.warn("Failed to create response after speech_stopped", e);
+                }
+                if (session.isOpen()) {
+                    session.sendMessage(new TextMessage(text));
+                }
+            } else if ("input_audio_buffer.committed".equals(type)) {
+                // Forward commit acknowledgment
                 if (session.isOpen()) {
                     session.sendMessage(new TextMessage(text));
                 }
@@ -191,8 +207,8 @@ public class OpenAiRealtimeHandler extends TextWebSocketHandler {
             turnDetection.put("threshold", 0.5);
             turnDetection.put("prefix_padding_ms", 300);
             turnDetection.put("silence_duration_ms", 800);
-            // Let OpenAI handle response creation + interruption automatically
-            turnDetection.put("create_response", true);
+            // Let the server create responses only after user finishes speaking.
+            turnDetection.put("create_response", false);
             turnDetection.put("interrupt_response", true);
             sessionNode.set("turn_detection", turnDetection);
 

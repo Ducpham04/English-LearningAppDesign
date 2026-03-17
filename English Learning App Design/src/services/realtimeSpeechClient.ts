@@ -59,6 +59,8 @@ export class RealtimeSpeechClient {
   private assistantDraft = '';
   private bargeInTimer: number | null = null;
   private bargeInFrames = 0;
+  private pendingResponseCreate = false;
+  private suppressAiAudio = false;
 
   constructor(events: RealtimeClientEvents = {}) {
     this.events = events;
@@ -228,15 +230,20 @@ export class RealtimeSpeechClient {
       if (pcm16.length > 0) {
         if (this.responseActive) {
           const energy = rms(pcm16);
-          if (energy > 0.02) {
+          if (energy > 0.01) {
             this.bargeInFrames += 1;
           } else {
             this.bargeInFrames = 0;
           }
           // Require sustained real speech energy before cutting AI audio.
-          if (this.bargeInFrames >= 12) {
+          if (this.bargeInFrames >= 4) {
             this.sendJson({ type: 'response.cancel' });
+            this.sendJson({ type: 'input_audio_buffer.commit' });
             this.stopAiPlayback();
+            this.pendingResponseCreate = true;
+            // Wait for user to finish (server will create response on speech_stopped)
+            this.responseActive = false;
+            this.setState('listening');
             this.bargeInFrames = 0;
           }
         }
@@ -294,19 +301,36 @@ export class RealtimeSpeechClient {
         this.responseActive = false;
         this.assistantDraft = '';
         this.bargeInFrames = 0;
+        this.pendingResponseCreate = false;
+        this.suppressAiAudio = false;
         this.setState('listening');
       } else if (type === 'response.cancelled') {
         this.responseActive = false;
         this.assistantDraft = '';
         this.bargeInFrames = 0;
+        this.pendingResponseCreate = false;
+        this.suppressAiAudio = false;
         this.stopAiPlayback();
         this.setState('listening');
       } else if (type === 'input_audio_buffer.speech_started') {
         if (this.responseActive) {
           this.bargeInFrames = 0;
+          this.sendJson({ type: 'response.cancel' });
+          this.sendJson({ type: 'input_audio_buffer.commit' });
+          this.stopAiPlayback();
+          this.pendingResponseCreate = true;
+          this.suppressAiAudio = true;
+          this.responseActive = false;
+          this.setState('listening');
         }
       } else if (type === 'input_audio_buffer.speech_stopped') {
         this.bargeInFrames = 0;
+        if (this.pendingResponseCreate) {
+          this.pendingResponseCreate = false;
+          this.suppressAiAudio = false;
+          this.sendJson({ type: 'input_audio_buffer.commit' });
+          this.sendJson({ type: 'response.create' });
+        }
       } else if (type === 'conversation.item.input_audio_transcription.completed') {
         const t = String(evt?.transcript || evt?.text || evt?.item?.content?.[0]?.transcript || '').trim();
         if (t) {
@@ -341,6 +365,7 @@ export class RealtimeSpeechClient {
 
   private handleAudioDelta(buf: ArrayBuffer) {
     if (!this.audioCtx) return;
+    if (this.suppressAiAudio) return;
     // Server forwards raw PCM16 bytes (little endian) at ~24kHz
     const float32 = pcm16ToFloat32(new Int16Array(buf));
     playPcmFloat32(
