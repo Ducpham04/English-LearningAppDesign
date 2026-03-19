@@ -5,12 +5,11 @@ services:
     container_name: lms_postgres
     ports:
       - "5432:5432"
-    env_file:
-      - .env
+
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: learning_english2
+      POSTGRES_DB: learning_english
     volumes:
       - postgres_data:/var/lib/postgresql/data
     restart: always
@@ -24,8 +23,7 @@ services:
 
   zookeeper:
     image: confluentinc/cp-zookeeper:7.5.0
-    env_file:
-      - .env
+
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME: 2000
@@ -38,8 +36,7 @@ services:
       - zookeeper
     ports:
       - "9092:9092"
-    env_file:
-      - .env
+
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
@@ -54,16 +51,14 @@ services:
     image: alpine:3.20
     container_name: langmaster-ytdlp
     command: [ "sh", "-c", "set -e; apk add --no-cache python3 py3-pip py3-virtualenv ffmpeg ca-certificates >/dev/null 2>&1; python3 -m venv /opt/venv; /opt/venv/bin/pip install --no-cache-dir -U pip yt-dlp; /opt/venv/bin/yt-dlp --version; tail -f /dev/null" ]
-    env_file:
-      - .env
+
     volumes:
       - ./temp/youtube-audio:/data
 
   app:
     image: haidev257/langmaster-backend:latest
     container_name: appenglish_backend
-    env_file:
-      - .env
+
     ports:
       - "8080:8080"
     depends_on:
