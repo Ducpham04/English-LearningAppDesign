@@ -1,0 +1,8 @@
+# Env local (có thể chứa URL nội bộ; không commit)
+.env
+.env.local
+.env.*.local
+.env.production.local
+
+# Build
+dist

@@ -190,6 +190,29 @@
 
 	<build>
 		<plugins>
+			<!-- Bắt buộc JDK 21 khi build — tránh Lombok/javac lỗi khi nhầm JDK 23+ -->
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-enforcer-plugin</artifactId>
+				<version>3.5.0</version>
+				<executions>
+					<execution>
+						<id>enforce-java-21</id>
+						<phase>validate</phase>
+						<goals>
+							<goal>enforce</goal>
+						</goals>
+						<configuration>
+							<rules>
+								<requireJavaVersion>
+									<version>[21,22)</version>
+									<message>Dự án AppEnglish cần JDK 21 để compile (Lombok + Spring Boot). Kiểm tra: mvn -v và JAVA_HOME. macOS ví dụ: export JAVA_HOME=$(/usr/libexec/java_home -v 21)</message>
+								</requireJavaVersion>
+							</rules>
+						</configuration>
+					</execution>
+				</executions>
+			</plugin>
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-compiler-plugin</artifactId>
