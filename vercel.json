@@ -1,0 +1,7 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "installCommand": "npm install --prefix \"./English Learning App Design\"",
+  "buildCommand": "npm run build --prefix \"./English Learning App Design\"",
+  "outputDirectory": "English Learning App Design/dist",
+  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
+}
