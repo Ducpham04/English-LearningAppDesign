@@ -20,47 +20,42 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/app/components/ui/dropdown-menu';
+import apiService from '@/services/apiService';
+import { toast } from 'sonner';
+import { useEffect, useMemo, useState } from 'react';
 
 export function AdminClassesManagement() {
-  const classes = [
-    {
-      id: '1',
-      name: 'Class 10A - English Fundamentals',
-      teacher: 'Teacher Trần Thị B',
-      students: 28,
-      maxStudents: 30,
-      progress: 72,
-      status: 'active',
-      schedule: ['Mon 8:00 AM', 'Wed 8:00 AM', 'Fri 8:00 AM'],
-    },
-    {
-      id: '2',
-      name: 'Class 10B - English Fundamentals',
-      teacher: 'Teacher Nguyễn Văn C',
-      students: 25,
-      maxStudents: 30,
-      progress: 68,
-      status: 'active',
-      schedule: ['Tue 10:00 AM', 'Thu 10:00 AM'],
-    },
-    {
-      id: '3',
-      name: 'Class 11A - Advanced English',
-      teacher: 'Teacher Lê Thị D',
-      students: 22,
-      maxStudents: 25,
-      progress: 78,
-      status: 'active',
-      schedule: ['Mon 2:00 PM', 'Wed 2:00 PM', 'Fri 2:00 PM'],
-    },
-  ];
+  const [loading, setLoading] = useState(true);
+  const [classList, setClassList] = useState<any[]>([]);
 
-  const stats = {
-    total: classes.length,
-    active: classes.filter((c) => c.status === 'active').length,
-    students: classes.reduce((sum, c) => sum + c.students, 0),
-    avgProgress: Math.round(classes.reduce((sum, c) => sum + c.progress, 0) / classes.length),
-  };
+  useEffect(() => {
+    let cancelled = false;
+    apiService.classroom.getAll()
+      .then((res) => {
+        if (cancelled) return;
+        const data = res.data?.data ?? res.data ?? [];
+        setClassList(Array.isArray(data) ? data : []);
+      })
+      .catch((err: any) => {
+        const msg = err?.response?.data?.message ?? err?.message ?? 'Không tải được danh sách lớp';
+        toast.error(msg);
+        setClassList([]);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, []);
+
+  const stats = useMemo(() => {
+    const total = classList.length;
+    const active = classList.filter((c: any) => String(c?.status || '').toUpperCase() === 'ACTIVE').length;
+    const students = classList.reduce((sum: number, c: any) => sum + (c?.studentCount ?? 0), 0);
+    // Backend chưa có progress %, tạm hiển thị theo tỉ lệ assignments per student (xấp xỉ) để tránh số giả.
+    const totalAssignments = classList.reduce((sum: number, c: any) => sum + (c?.assignmentCount ?? 0), 0);
+    const avgProgress = total ? Math.round((totalAssignments / Math.max(students, 1)) * 10) : 0;
+    return { total, active, students, avgProgress };
+  }, [classList]);
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950 pb-20 md:pb-6">
@@ -125,7 +120,11 @@ export function AdminClassesManagement() {
 
       <div className="max-w-7xl mx-auto p-4 md:p-6">
         <div className="grid gap-4">
-          {classes.map((classItem) => (
+          {loading ? (
+            <Card className="p-6">
+              <div className="text-sm text-muted-foreground">Đang tải danh sách lớp...</div>
+            </Card>
+          ) : classList.map((classItem: any) => (
             <Card key={classItem.id} className="p-6 hover:shadow-lg transition-all duration-300">
               <div className="flex flex-col lg:flex-row gap-6">
                 <div className="flex-1">
@@ -135,15 +134,27 @@ export function AdminClassesManagement() {
                         {classItem.name}
                       </h3>
                       <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
-                        Teacher: {classItem.teacher}
+                        Teacher: {classItem.teacherName ?? classItem.teacherId ?? '–'}
                       </p>
                       <div className="flex flex-wrap gap-2">
-                        {classItem.schedule.map((time, index) => (
-                          <Badge key={index} variant="outline" className="gap-1">
-                            <Calendar className="h-3 w-3" />
-                            {time}
+                        {classItem.courseTitle && (
+                          <Badge variant="outline" className="gap-1">
+                            <BookOpen className="h-3 w-3" />
+                            {classItem.courseTitle}
                           </Badge>
-                        ))}
+                        )}
+                        {classItem.startDate && (
+                          <Badge variant="outline" className="gap-1">
+                            <Calendar className="h-3 w-3" />
+                            {String(classItem.startDate)}
+                          </Badge>
+                        )}
+                        {classItem.endDate && (
+                          <Badge variant="outline" className="gap-1">
+                            <Calendar className="h-3 w-3" />
+                            {String(classItem.endDate)}
+                          </Badge>
+                        )}
                       </div>
                     </div>
                     <DropdownMenu>
@@ -177,20 +188,20 @@ export function AdminClassesManagement() {
                       <span className="text-xs text-gray-500 dark:text-gray-400">Students</span>
                     </div>
                     <div className="text-2xl font-bold text-gray-900 dark:text-white">
-                      {classItem.students}/{classItem.maxStudents}
+                      {classItem.studentCount ?? 0}
                     </div>
-                    <Progress value={(classItem.students / classItem.maxStudents) * 100} className="mt-2" />
+                    <Progress value={Math.min(100, ((classItem.studentCount ?? 0) / 30) * 100)} className="mt-2" />
                   </div>
 
                   <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-2xl">
                     <div className="flex items-center gap-2 mb-2">
                       <BookOpen className="h-4 w-4 text-purple-500" />
-                      <span className="text-xs text-gray-500 dark:text-gray-400">Progress</span>
+                      <span className="text-xs text-gray-500 dark:text-gray-400">Assignments</span>
                     </div>
                     <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">
-                      {classItem.progress}%
+                      {classItem.assignmentCount ?? 0}
                     </div>
-                    <Progress value={classItem.progress} className="mt-2" />
+                    <Progress value={Math.min(100, ((classItem.assignmentCount ?? 0) / 10) * 100)} className="mt-2" />
                   </div>
 
                   <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-2xl">
@@ -199,7 +210,7 @@ export function AdminClassesManagement() {
                       <span className="text-xs text-gray-500 dark:text-gray-400">Status</span>
                     </div>
                     <Badge className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
-                      {classItem.status.charAt(0).toUpperCase() + classItem.status.slice(1)}
+                      {String(classItem.status ?? '–')}
                     </Badge>
                   </div>
                 </div>

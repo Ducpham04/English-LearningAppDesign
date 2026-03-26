@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { Card } from '@/app/components/ui/card';
 import { Button } from '@/app/components/ui/button';
 import { Input } from '@/app/components/ui/input';
@@ -42,6 +42,8 @@ interface Content {
   createdAt: string;
   status: 'published' | 'draft';
   thumbnail?: string;
+  videoUrl?: string;
+  youtubeUrl?: string;
 }
 
 function mapLessonTypeToContentType(backendType: string): Content['type'] {
@@ -57,6 +59,7 @@ export function ContentLibrary() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedType, setSelectedType] = useState<'all' | Content['type']>('all');
   const [selectedLevel, setSelectedLevel] = useState<'all' | Content['level']>('all');
+  const [scope, setScope] = useState<'all' | 'mine'>('all');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [selectedContent, setSelectedContent] = useState<string | null>(null);
@@ -65,8 +68,9 @@ export function ContentLibrary() {
 
   const fetchLessons = () => {
     setLoading(true);
-    apiService.lesson
-      .getAll()
+    const request = scope === 'mine' ? apiService.teacher.getLessons() : apiService.lesson.getAll();
+
+    request
       .then((res) => {
         const list = (res.data?.data ?? []) as any[];
         const arr = Array.isArray(list) ? list : [];
@@ -81,12 +85,16 @@ export function ContentLibrary() {
             uses: 0,
             createdAt: l.createdAt ? new Date(l.createdAt).toISOString().slice(0, 10) : '',
             status: 'published',
-            thumbnail: l.thumbnailUrl,
+            // Backend LessonDto currently exposes videoUrl/youtubeUrl, not thumbnailUrl.
+            // Use videoUrl as a thumbnail source when available; otherwise fallback to icon.
+            thumbnail: l.thumbnailUrl || l.videoUrl || undefined,
+            videoUrl: l.videoUrl || undefined,
+            youtubeUrl: l.youtubeUrl || undefined,
           }))
         );
       })
       .catch(() => {
-        toast.error('Không tải được danh sách bài học');
+        toast.error(scope === 'mine' ? 'Không tải được bài học của tôi' : 'Không tải được danh sách bài học');
         setContents([]);
       })
       .finally(() => setLoading(false));
@@ -94,7 +102,7 @@ export function ContentLibrary() {
 
   useEffect(() => {
     fetchLessons();
-  }, []);
+  }, [scope]);
 
   const types = [
     { id: 'all' as const, label: 'All', icon: BookOpen },
@@ -141,14 +149,14 @@ export function ContentLibrary() {
     return matchesSearch && matchesType && matchesLevel;
   });
 
-  const stats = {
+  const stats = useMemo(() => ({
     total: contents.length,
     published: contents.filter((c) => c.status === 'published').length,
     avgRating:
       contents.filter((c) => c.rating > 0).reduce((sum, c) => sum + c.rating, 0) /
       (contents.filter((c) => c.rating > 0).length || 1),
     totalUses: contents.reduce((sum, c) => sum + c.uses, 0),
-  };
+  }), [contents]);
 
   if (loading) {
     return (
@@ -226,6 +234,24 @@ export function ContentLibrary() {
         {/* Filters */}
         <Card className="p-4 mb-6">
           <div className="flex flex-col gap-4">
+            <div className="flex flex-wrap gap-2">
+              <Button
+                variant={scope === 'all' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setScope('all')}
+                className={scope === 'all' ? 'bg-indigo-500 hover:bg-indigo-600' : ''}
+              >
+                All lessons
+              </Button>
+              <Button
+                variant={scope === 'mine' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setScope('mine')}
+                className={scope === 'mine' ? 'bg-indigo-500 hover:bg-indigo-600' : ''}
+              >
+                My lessons
+              </Button>
+            </div>
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
               <Input
@@ -279,8 +305,22 @@ export function ContentLibrary() {
                 className="overflow-hidden hover:shadow-lg transition-all duration-300"
               >
                 {/* Thumbnail */}
-                <div className="bg-gradient-to-br from-indigo-100 to-indigo-200 dark:from-indigo-900/30 dark:to-indigo-800/30 h-40 flex items-center justify-center">
-                  <TypeIcon className="h-16 w-16 text-indigo-500 dark:text-indigo-400" />
+                <div className="relative bg-gradient-to-br from-indigo-100 to-indigo-200 dark:from-indigo-900/30 dark:to-indigo-800/30 h-40 flex items-center justify-center overflow-hidden">
+                  {content.thumbnail ? (
+                    <img
+                      src={content.thumbnail}
+                      alt={content.title}
+                      className="absolute inset-0 h-full w-full object-cover"
+                      loading="lazy"
+                      onError={(e) => {
+                        // Hide broken image, show fallback icon.
+                        (e.currentTarget as HTMLImageElement).style.display = 'none';
+                      }}
+                    />
+                  ) : null}
+                  <div className="relative z-10 bg-white/70 dark:bg-black/30 backdrop-blur-sm rounded-2xl p-3">
+                    <TypeIcon className="h-10 w-10 text-indigo-600 dark:text-indigo-300" />
+                  </div>
                 </div>
 
                 {/* Content */}
@@ -348,7 +388,13 @@ export function ContentLibrary() {
                   </div>
 
                   <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-800">
-                    <Button className="w-full bg-indigo-500 hover:bg-indigo-600 gap-2">
+                    <Button
+                      className="w-full bg-indigo-500 hover:bg-indigo-600 gap-2"
+                      onClick={() => {
+                        setSelectedContent(content.id);
+                        setShowAssignModal(true);
+                      }}
+                    >
                       <Play className="h-4 w-4" />
                       Use in Lesson
                     </Button>

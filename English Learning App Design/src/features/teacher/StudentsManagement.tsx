@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card } from '@/app/components/ui/card';
 import { Button } from '@/app/components/ui/button';
@@ -26,6 +26,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/app/components/ui/dropdown-menu';
+import apiService from '@/services/apiService';
+import { toast } from 'sonner';
 
 interface Student {
   id: string;
@@ -47,97 +49,94 @@ export function StudentsManagement() {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedClass, setSelectedClass] = useState<string>('all');
+  const [loading, setLoading] = useState(true);
+  const [classes, setClasses] = useState<Array<{ id: string; name: string }>>([]);
+  const [students, setStudents] = useState<Student[]>([]);
 
-  const students: Student[] = [
-    {
-      id: '1',
-      name: 'Nguyễn Văn A',
-      email: 'nguyenvana@email.com',
-      level: 8,
-      xp: 2450,
-      class: 'Class 10A',
-      progress: 75,
-      streak: 12,
-      accuracy: 87,
-      lastActive: '2026-01-16',
-      status: 'active',
-      trend: 'up',
-    },
-    {
-      id: '2',
-      name: 'Trần Thị B',
-      email: 'tranthib@email.com',
-      level: 6,
-      xp: 1820,
-      class: 'Class 10A',
-      progress: 62,
-      streak: 5,
-      accuracy: 92,
-      lastActive: '2026-01-15',
-      status: 'active',
-      trend: 'up',
-    },
-    {
-      id: '3',
-      name: 'Lê Văn C',
-      email: 'levanc@email.com',
-      level: 4,
-      xp: 980,
-      class: 'Class 10B',
-      progress: 35,
-      streak: 0,
-      accuracy: 68,
-      lastActive: '2026-01-10',
-      status: 'at-risk',
-      trend: 'down',
-    },
-    {
-      id: '4',
-      name: 'Phạm Thị D',
-      email: 'phamthid@email.com',
-      level: 10,
-      xp: 3200,
-      class: 'Class 10A',
-      progress: 88,
-      streak: 25,
-      accuracy: 95,
-      lastActive: '2026-01-16',
-      status: 'active',
-      trend: 'up',
-    },
-    {
-      id: '5',
-      name: 'Hoàng Văn E',
-      email: 'hoangvane@email.com',
-      level: 5,
-      xp: 1450,
-      class: 'Class 10B',
-      progress: 48,
-      streak: 2,
-      accuracy: 75,
-      lastActive: '2026-01-14',
-      status: 'inactive',
-      trend: 'stable',
-    },
-  ];
+  // Load real data:
+  // 1) GET /v1/teacher/classes (own classes)
+  // 2) For each class: GET /v1/teacher/classes/{id}/students
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      try {
+        setLoading(true);
+        const classRes = await apiService.teacherClasses.getAll();
+        const classPayload = classRes.data?.data ?? classRes.data ?? [];
+        const classArr = Array.isArray(classPayload) ? classPayload : [];
 
-  const classes = ['all', 'Class 10A', 'Class 10B', 'Class 11A'];
+        const classOptions = classArr.map((c: any) => ({
+          id: String(c.id),
+          name: c.name || `Lớp ${c.id}`,
+        }));
+        if (!cancelled) setClasses(classOptions);
 
-  const filteredStudents = students.filter((student) => {
-    const matchesSearch =
-      student.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      student.email.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesClass = selectedClass === 'all' || student.class === selectedClass;
-    return matchesSearch && matchesClass;
-  });
+        const perClassStudents = await Promise.all(
+          classOptions.map(async (cls) => {
+            try {
+              const res = await apiService.teacherClasses.getStudents(Number(cls.id));
+              const payload = res.data?.data ?? res.data ?? [];
+              const arr = Array.isArray(payload) ? payload : [];
+              return arr.map((s: any) => ({
+                id: String(s.studentId),
+                name: s.fullName || s.email || `Student ${s.studentId}`,
+                email: s.email || '—',
+                avatar: s.avatarUrl || undefined,
+                level: 0,
+                xp: 0,
+                class: cls.name,
+                progress: 0,
+                streak: 0,
+                accuracy: 0,
+                lastActive: s.joinedAt ? String(s.joinedAt) : '—',
+                status: 'active' as const,
+                trend: 'stable' as const,
+              }));
+            } catch {
+              return [];
+            }
+          })
+        );
+
+        const merged = perClassStudents.flat();
+        if (!cancelled) setStudents(merged);
+      } catch (err: any) {
+        const msg = err?.response?.data?.message ?? err?.message ?? 'Không tải được danh sách học viên';
+        toast.error(msg);
+        if (!cancelled) {
+          setClasses([]);
+          setStudents([]);
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const classFilters = useMemo(() => ['all', ...classes.map((c) => c.name)], [classes]);
+
+  const filteredStudents = useMemo(() => {
+    return students.filter((student) => {
+      const matchesSearch =
+        student.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        student.email.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesClass = selectedClass === 'all' || student.class === selectedClass;
+      return matchesSearch && matchesClass;
+    });
+  }, [students, searchQuery, selectedClass]);
 
   const stats = {
     total: students.length,
     active: students.filter((s) => s.status === 'active').length,
     atRisk: students.filter((s) => s.status === 'at-risk').length,
-    avgProgress: Math.round(
-      students.reduce((sum, s) => sum + s.progress, 0) / students.length
-    ),
+    avgProgress: students.length
+      ? Math.round(students.reduce((sum, s) => sum + s.progress, 0) / students.length)
+      : 0,
   };
 
   const statusColors = {
@@ -235,7 +234,7 @@ export function StudentsManagement() {
               />
             </div>
             <div className="flex gap-2">
-              {classes.map((className) => (
+              {classFilters.map((className) => (
                 <Button
                   key={className}
                   variant={selectedClass === className ? 'default' : 'outline'}
@@ -253,6 +252,11 @@ export function StudentsManagement() {
 
         {/* Students List */}
         <div className="grid gap-4">
+          {loading && (
+            <Card className="p-6">
+              <div className="text-sm text-muted-foreground">Đang tải học viên...</div>
+            </Card>
+          )}
           {filteredStudents.map((student) => (
             <Card key={student.id} className="p-6 hover:shadow-lg transition-all duration-300">
               <div className="flex flex-col md:flex-row gap-6">

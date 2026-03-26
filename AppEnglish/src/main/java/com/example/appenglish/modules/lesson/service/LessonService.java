@@ -2,16 +2,22 @@ package com.example.appenglish.modules.lesson.service;
 
 import com.example.appenglish.entity.Lesson;
 import com.example.appenglish.entity.LessonVideo;
+import com.example.appenglish.entity.LessonVocabulary;
+import com.example.appenglish.entity.Vocabulary;
 import com.example.appenglish.enums.LessonType;
 import com.example.appenglish.common.exception.ApiException;
 import com.example.appenglish.common.exception.ConstraintMessageHelper;
 import com.example.appenglish.modules.lesson.dto.LessonCreateRequest;
 import com.example.appenglish.modules.lesson.dto.LessonDto;
+import com.example.appenglish.modules.lesson.dto.LessonVocabularyUpsertRequest;
 import com.example.appenglish.modules.lesson.dto.LessonVideoRequest;
 import com.example.appenglish.modules.transcribe.service.transcript.EspeakIpaService;
 import com.example.appenglish.modules.transcribe.service.s3.StorageService;
+import com.example.appenglish.modules.vocabulary.service.VocabularyService;
 import com.example.appenglish.repository.LessonRepository;
 import com.example.appenglish.repository.LessonVideoRepository;
+import com.example.appenglish.repository.LessonVocabularyRepository;
+import com.example.appenglish.repository.VocabularyRepository;
 import com.example.appenglish.repository.SessionRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -21,6 +27,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -33,6 +40,9 @@ public class LessonService {
     private final LessonVideoRepository lessonVideoRepository;
     private final EspeakIpaService espeakIpaService;
     private final StorageService storageService;
+    private final VocabularyService vocabularyService;
+    private final VocabularyRepository vocabularyRepository;
+    private final LessonVocabularyRepository lessonVocabularyRepository;
 
     public List<LessonDto> getAll() {
         return lessonRepository.findAll().stream().map(this::toDto).collect(Collectors.toList());
@@ -94,6 +104,74 @@ public class LessonService {
             catch (IllegalArgumentException ignored) {}
         }
         return toDto(lessonRepository.save(lesson));
+    }
+
+    @Transactional
+    public List<Map<String, Object>> upsertVocabularies(Long lessonId, List<LessonVocabularyUpsertRequest> items) {
+        Lesson lesson = lessonRepository.findById(lessonId)
+                .orElseThrow(() -> new RuntimeException("Lesson not found: " + lessonId));
+        if (items == null || items.isEmpty()) {
+            return List.of();
+        }
+        // Ensure lesson type is VOCAB when adding vocab content
+        if (lesson.getType() == null || lesson.getType() != LessonType.VOCAB) {
+            lesson.setType(LessonType.VOCAB);
+            lessonRepository.save(lesson);
+        }
+
+        int idx = 0;
+        for (LessonVocabularyUpsertRequest req : items) {
+            if (req == null) continue;
+            Integer orderIndex = req.getOrderIndex() != null ? req.getOrderIndex() : idx;
+
+            Long vocabId = req.getVocabularyId();
+            Vocabulary vocab;
+            if (vocabId != null) {
+                vocab = vocabularyRepository.findById(vocabId)
+                        .orElseThrow(() -> new RuntimeException("Vocabulary not found: " + vocabId));
+            } else {
+                vocab = vocabularyService.findOrCreate(
+                        req.getWord(),
+                        req.getPhonetic(),
+                        req.getMeaning(),
+                        req.getExample(),
+                        lessonId
+                );
+            }
+
+            // Ensure link exists (in case vocabularyId path used)
+            if (!lessonVocabularyRepository.existsByLesson_IdAndVocabulary_Id(lessonId, vocab.getId())) {
+                LessonVocabulary lv = new LessonVocabulary();
+                lv.setId(new LessonVocabulary.LessonVocabularyId(lessonId, vocab.getId()));
+                lv.setLesson(lesson);
+                lv.setVocabulary(vocab);
+                lv.setOrderIndex(orderIndex);
+                lessonVocabularyRepository.save(lv);
+            }
+            idx++;
+        }
+
+        return getLessonVocabularies(lessonId);
+    }
+
+    @Transactional(readOnly = true)
+    public List<Map<String, Object>> getLessonVocabularies(Long lessonId) {
+        if (!lessonRepository.existsById(lessonId)) {
+            throw new RuntimeException("Lesson not found: " + lessonId);
+        }
+        return lessonVocabularyRepository.findByLesson_IdOrderByOrderIndexAsc(lessonId).stream()
+                .map(lv -> {
+                    Vocabulary v = lv.getVocabulary();
+                    return Map.<String, Object>of(
+                            "vocabularyId", v.getId(),
+                            "word", v.getWord(),
+                            "phonetic", v.getPhonetic(),
+                            "meanings", v.getMeanings(),
+                            "orderIndex", lv.getOrderIndex() == null ? 0 : lv.getOrderIndex()
+                    );
+                })
+                .filter(Objects::nonNull)
+                .collect(Collectors.toList());
     }
 
     public void delete(Long id) {

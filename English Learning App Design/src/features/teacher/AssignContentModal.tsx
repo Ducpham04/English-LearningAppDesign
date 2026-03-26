@@ -1,13 +1,14 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/app/components/ui/dialog';
 import { Button } from '@/app/components/ui/button';
 import { Label } from '@/app/components/ui/label';
 import { Checkbox } from '@/app/components/ui/checkbox';
 import { Calendar } from '@/app/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/app/components/ui/popover';
-import { CalendarIcon, Users, BookOpen } from 'lucide-react';
+import { CalendarIcon, Users } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
+import apiService from '@/services/apiService';
 
 interface AssignContentModalProps {
   open: boolean;
@@ -25,46 +26,88 @@ export function AssignContentModal({
   onSuccess 
 }: AssignContentModalProps) {
   const [selectedClasses, setSelectedClasses] = useState<string[]>([]);
-  const [selectedStudents, setSelectedStudents] = useState<string[]>([]);
   const [dueDate, setDueDate] = useState<Date>();
-  const [assignTo, setAssignTo] = useState<'classes' | 'students'>('classes');
+  // Only classes assignment is implemented with real API right now.
 
-  const classes = [
-    { id: '1', name: 'Beginner A1', students: 25 },
-    { id: '2', name: 'Intermediate B1', students: 18 },
-    { id: '3', name: 'Advanced C1', students: 12 },
-  ];
+  const [classes, setClasses] = useState<Array<{ id: string; name: string; students: number }>>([]);
+  const [submitting, setSubmitting] = useState(false);
+  const [loadingClasses, setLoadingClasses] = useState(false);
 
-  const students = [
-    { id: '1', name: 'John Smith', email: 'john@email.com', class: 'Beginner A1' },
-    { id: '2', name: 'Sarah Johnson', email: 'sarah@email.com', class: 'Beginner A1' },
-    { id: '3', name: 'Mike Brown', email: 'mike@email.com', class: 'Intermediate B1' },
-    { id: '4', name: 'Emily Davis', email: 'emily@email.com', class: 'Intermediate B1' },
-    { id: '5', name: 'David Wilson', email: 'david@email.com', class: 'Advanced C1' },
-  ];
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    setLoadingClasses(true);
+    apiService.teacherClasses.getAll()
+      .then((res) => {
+        const payload = res.data?.data ?? res.data ?? [];
+        const arr = Array.isArray(payload) ? payload : [];
+        if (cancelled) return;
+        setClasses(arr.map((c: any) => ({
+          id: String(c.id),
+          name: c.name || `Lớp ${c.id}`,
+          students: c.studentCount ?? 0,
+        })));
+      })
+      .catch((err: any) => {
+        const msg = err?.response?.data?.message ?? err?.message ?? 'Không tải được danh sách lớp';
+        toast.error(msg);
+        setClasses([]);
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingClasses(false);
+      });
+    return () => { cancelled = true; };
+  }, [open]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const totalRecipients = useMemo(() => {
+    return selectedClasses.reduce((sum, classId) => {
+      const cls = classes.find(c => c.id === classId);
+      return sum + (cls?.students || 0);
+    }, 0);
+  }, [selectedClasses, classes]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (assignTo === 'classes' && selectedClasses.length === 0) {
+    if (selectedClasses.length === 0) {
       toast.error('Please select at least one class');
       return;
     }
-    
-    if (assignTo === 'students' && selectedStudents.length === 0) {
-      toast.error('Please select at least one student');
+
+    if (!contentId) {
+      toast.error('Missing contentId');
+      return;
+    }
+    if (contentType !== 'lesson') {
+      toast.error('Only lesson assignment is supported right now');
+      return;
+    }
+    const lessonId = Number(contentId);
+    if (Number.isNaN(lessonId)) {
+      toast.error('Invalid lessonId');
       return;
     }
 
-    const count = assignTo === 'classes' 
-      ? selectedClasses.reduce((sum, classId) => {
-          const cls = classes.find(c => c.id === classId);
-          return sum + (cls?.students || 0);
-        }, 0)
-      : selectedStudents.length;
+    try {
+      setSubmitting(true);
+      await Promise.all(
+        selectedClasses.map((classId) =>
+          apiService.teacherClasses.createAssignment(Number(classId), {
+            lessonId,
+            dueAt: dueDate ? dueDate.toISOString() : undefined,
+          })
+        )
+      );
+    } catch (err: any) {
+      const msg = err?.response?.data?.message ?? err?.message ?? 'Assign failed';
+      toast.error(msg);
+      return;
+    } finally {
+      setSubmitting(false);
+    }
 
     toast.success(
-      `${contentType.charAt(0).toUpperCase() + contentType.slice(1)} assigned to ${count} student${count > 1 ? 's' : ''} successfully! 🎉`
+      `${contentType.charAt(0).toUpperCase() + contentType.slice(1)} assigned to ${totalRecipients} student${totalRecipients > 1 ? 's' : ''} successfully!`
     );
     
     onOpenChange(false);
@@ -74,9 +117,7 @@ export function AssignContentModal({
 
   const resetForm = () => {
     setSelectedClasses([]);
-    setSelectedStudents([]);
     setDueDate(undefined);
-    setAssignTo('classes');
   };
 
   const toggleClass = (classId: string) => {
@@ -84,14 +125,6 @@ export function AssignContentModal({
       prev.includes(classId)
         ? prev.filter(id => id !== classId)
         : [...prev, classId]
-    );
-  };
-
-  const toggleStudent = (studentId: string) => {
-    setSelectedStudents(prev =>
-      prev.includes(studentId)
-        ? prev.filter(id => id !== studentId)
-        : [...prev, studentId]
     );
   };
 
@@ -108,100 +141,44 @@ export function AssignContentModal({
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Assign To Toggle */}
-          <div className="flex gap-2">
-            <Button
-              type="button"
-              variant={assignTo === 'classes' ? 'default' : 'outline'}
-              onClick={() => setAssignTo('classes')}
-              className="flex-1 gap-2"
-            >
-              <Users className="w-4 h-4" />
-              Assign to Classes
-            </Button>
-            <Button
-              type="button"
-              variant={assignTo === 'students' ? 'default' : 'outline'}
-              onClick={() => setAssignTo('students')}
-              className="flex-1 gap-2"
-            >
-              <BookOpen className="w-4 h-4" />
-              Assign to Students
-            </Button>
-          </div>
-
           {/* Classes Selection */}
-          {assignTo === 'classes' && (
-            <div className="space-y-3">
-              <Label>Select Classes</Label>
-              <div className="border rounded-lg divide-y max-h-64 overflow-y-auto">
-                {classes.map((cls) => (
-                  <div
-                    key={cls.id}
-                    className="flex items-center gap-3 p-3 hover:bg-gray-50 dark:hover:bg-gray-800"
+          <div className="space-y-3">
+            <Label>Select Classes</Label>
+            <div className="border rounded-lg divide-y max-h-64 overflow-y-auto">
+              {loadingClasses && (
+                <div className="p-3 text-sm text-muted-foreground">Loading classes...</div>
+              )}
+              {classes.map((cls) => (
+                <div
+                  key={cls.id}
+                  className="flex items-center gap-3 p-3 hover:bg-gray-50 dark:hover:bg-gray-800"
+                >
+                  <Checkbox
+                    id={`class-${cls.id}`}
+                    checked={selectedClasses.includes(cls.id)}
+                    onCheckedChange={() => toggleClass(cls.id)}
+                  />
+                  <label
+                    htmlFor={`class-${cls.id}`}
+                    className="flex-1 cursor-pointer"
                   >
-                    <Checkbox
-                      id={`class-${cls.id}`}
-                      checked={selectedClasses.includes(cls.id)}
-                      onCheckedChange={() => toggleClass(cls.id)}
-                    />
-                    <label
-                      htmlFor={`class-${cls.id}`}
-                      className="flex-1 cursor-pointer"
-                    >
-                      <p className="font-medium">{cls.name}</p>
-                      <p className="text-sm text-gray-500">
-                        {cls.students} students
-                      </p>
-                    </label>
-                  </div>
-                ))}
-              </div>
-              {selectedClasses.length > 0 && (
-                <p className="text-sm text-green-600 dark:text-green-400">
-                  {selectedClasses.reduce((sum, classId) => {
-                    const cls = classes.find(c => c.id === classId);
-                    return sum + (cls?.students || 0);
-                  }, 0)} students will receive this {contentType}
-                </p>
+                    <p className="font-medium">{cls.name}</p>
+                    <p className="text-sm text-gray-500">
+                      {cls.students} students
+                    </p>
+                  </label>
+                </div>
+              ))}
+              {!loadingClasses && classes.length === 0 && (
+                <div className="p-3 text-sm text-muted-foreground">No classes found</div>
               )}
             </div>
-          )}
-
-          {/* Students Selection */}
-          {assignTo === 'students' && (
-            <div className="space-y-3">
-              <Label>Select Students</Label>
-              <div className="border rounded-lg divide-y max-h-64 overflow-y-auto">
-                {students.map((student) => (
-                  <div
-                    key={student.id}
-                    className="flex items-center gap-3 p-3 hover:bg-gray-50 dark:hover:bg-gray-800"
-                  >
-                    <Checkbox
-                      id={`student-${student.id}`}
-                      checked={selectedStudents.includes(student.id)}
-                      onCheckedChange={() => toggleStudent(student.id)}
-                    />
-                    <label
-                      htmlFor={`student-${student.id}`}
-                      className="flex-1 cursor-pointer"
-                    >
-                      <p className="font-medium">{student.name}</p>
-                      <p className="text-sm text-gray-500">
-                        {student.email} • {student.class}
-                      </p>
-                    </label>
-                  </div>
-                ))}
-              </div>
-              {selectedStudents.length > 0 && (
-                <p className="text-sm text-green-600 dark:text-green-400">
-                  {selectedStudents.length} student{selectedStudents.length > 1 ? 's' : ''} selected
-                </p>
-              )}
-            </div>
-          )}
+            {selectedClasses.length > 0 && (
+              <p className="text-sm text-green-600 dark:text-green-400">
+                {totalRecipients} students will receive this {contentType}
+              </p>
+            )}
+          </div>
 
           {/* Due Date */}
           <div className="space-y-2">
@@ -236,10 +213,7 @@ export function AssignContentModal({
               </li>
               <li>
                 • Assigned to: <strong>
-                  {assignTo === 'classes' 
-                    ? `${selectedClasses.length} class${selectedClasses.length !== 1 ? 'es' : ''}`
-                    : `${selectedStudents.length} student${selectedStudents.length !== 1 ? 's' : ''}`
-                  }
+                  {`${selectedClasses.length} class${selectedClasses.length !== 1 ? 'es' : ''}`}
                 </strong>
               </li>
               {dueDate && (
@@ -258,11 +232,11 @@ export function AssignContentModal({
               type="submit" 
               className="bg-green-600 hover:bg-green-700 text-white"
               disabled={
-                (assignTo === 'classes' && selectedClasses.length === 0) ||
-                (assignTo === 'students' && selectedStudents.length === 0)
+                submitting ||
+                selectedClasses.length === 0
               }
             >
-              Assign {contentType.charAt(0).toUpperCase() + contentType.slice(1)}
+              {submitting ? 'Assigning...' : `Assign ${contentType.charAt(0).toUpperCase() + contentType.slice(1)}`}
             </Button>
           </DialogFooter>
         </form>

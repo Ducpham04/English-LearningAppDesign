@@ -12,6 +12,7 @@ import com.example.appenglish.modules.lesson.service.LessonService;
 import com.example.appenglish.modules.student.dto.SessionProgressDto;
 import com.example.appenglish.modules.student.dto.StudentAssignmentDto;
 import com.example.appenglish.modules.student.dto.StudentDashboardDto;
+import com.example.appenglish.modules.student.dto.StudentProgressAnalyticsDto;
 import com.example.appenglish.modules.userDetail.dto.UserDataDto;
 import com.example.appenglish.modules.vocabulary.dto.AddToMyVocabularyRequest;
 import com.example.appenglish.modules.vocabulary.dto.AddToMyVocabularyResponseDto;
@@ -32,10 +33,17 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.DayOfWeek;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.format.TextStyle;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
+import java.util.TreeMap;
 import java.util.stream.Collectors;
 
 @Service
@@ -280,6 +288,86 @@ public class StudentService {
                             .build();
                 })
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * Analytics cho màn Progress (FE): XP theo ngày + thời gian học (phút) theo ngày, dựa trên UserLessonProgress.
+     */
+    public StudentProgressAnalyticsDto getProgressAnalytics(String range) {
+        User user = getCurrentUser();
+        String r = (range == null || range.isBlank()) ? "week" : range.trim().toLowerCase();
+        int days = r.equals("month") ? 30 : r.equals("year") ? 365 : 7;
+
+        LocalDate today = LocalDate.now();
+        LocalDate start = today.minusDays(days - 1L);
+
+        List<UserLessonProgress> progressList = userLessonProgressRepository.findByUser_Id(user.getId());
+
+        Map<LocalDate, Long> xpByDate = new TreeMap<>();
+        Map<LocalDate, Long> minutesByDate = new TreeMap<>();
+        for (int i = 0; i < days; i++) {
+            LocalDate d = start.plusDays(i);
+            xpByDate.put(d, 0L);
+            minutesByDate.put(d, 0L);
+        }
+
+        for (UserLessonProgress p : progressList) {
+            if (p.getCompletedAt() == null) continue;
+            LocalDate d = p.getCompletedAt().toLocalDate();
+            if (d.isBefore(start) || d.isAfter(today)) continue;
+
+            Integer score = p.getScore();
+            long xpEarned = (score != null) ? Math.max(1, score / 10) : 10;
+
+            int dur = 0;
+            try {
+                dur = p.getLesson() != null && p.getLesson().getDurationMinutes() != null ? p.getLesson().getDurationMinutes() : 0;
+            } catch (Exception ignored) {
+                dur = 0;
+            }
+
+            xpByDate.put(d, xpByDate.getOrDefault(d, 0L) + xpEarned);
+            minutesByDate.put(d, minutesByDate.getOrDefault(d, 0L) + Math.max(0, dur));
+        }
+
+        List<StudentProgressAnalyticsDto.SeriesPointDto> xpSeries = xpByDate.entrySet().stream()
+                .map(e -> StudentProgressAnalyticsDto.SeriesPointDto.builder()
+                        .label(formatLabel(e.getKey(), r))
+                        .value(e.getValue())
+                        .build())
+                .collect(Collectors.toList());
+
+        List<StudentProgressAnalyticsDto.SeriesPointDto> minutesSeries = minutesByDate.entrySet().stream()
+                .map(e -> StudentProgressAnalyticsDto.SeriesPointDto.builder()
+                        .label(formatLabel(e.getKey(), r))
+                        .value(e.getValue())
+                        .build())
+                .collect(Collectors.toList());
+
+        List<StudentProgressAnalyticsDto.AchievementDto> achievements = new ArrayList<>();
+        int streak = user.getStreak() != null ? user.getStreak() : 0;
+        int level = user.getLevel() != null ? user.getLevel() : 1;
+        int lessonsCompleted = user.getTotalLessonsCompleted() != null ? user.getTotalLessonsCompleted() : 0;
+        if (streak >= 7) achievements.add(StudentProgressAnalyticsDto.AchievementDto.builder().type("streak").title("7 Day Streak").build());
+        if (streak >= 30) achievements.add(StudentProgressAnalyticsDto.AchievementDto.builder().type("streak").title("30 Day Streak").build());
+        if (level >= 5) achievements.add(StudentProgressAnalyticsDto.AchievementDto.builder().type("level").title("Level " + level + " Reached").build());
+        if (lessonsCompleted >= 10) achievements.add(StudentProgressAnalyticsDto.AchievementDto.builder().type("lessons").title(lessonsCompleted + " Lessons Completed").build());
+        achievements.sort(Comparator.comparing(StudentProgressAnalyticsDto.AchievementDto::getType));
+
+        return StudentProgressAnalyticsDto.builder()
+                .range(r)
+                .xpSeries(xpSeries)
+                .minutesSeries(minutesSeries)
+                .achievements(achievements)
+                .build();
+    }
+
+    private String formatLabel(LocalDate d, String range) {
+        if (!"week".equals(range)) {
+            return d.toString();
+        }
+        DayOfWeek dow = d.getDayOfWeek();
+        return dow.getDisplayName(TextStyle.SHORT, Locale.ENGLISH);
     }
 
     public AddToMyVocabularyResponseDto addToMyVocabulary(AddToMyVocabularyRequest request) {

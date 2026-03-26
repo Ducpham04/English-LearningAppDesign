@@ -48,6 +48,20 @@ interface LessonInfo {
   sessionId: number;
 }
 
+interface VocabFormRow {
+  vocabularyId?: number;
+  word: string;
+  meaning: string;
+  phonetic: string;
+  example: string;
+}
+
+function firstMeaningText(meanings: unknown): string {
+  if (!Array.isArray(meanings) || meanings.length === 0) return '';
+  const m = meanings[0] as Record<string, string>;
+  return String(m?.def ?? m?.definition ?? '').trim();
+}
+
 interface TopicSession {
   id: number;
   title: string;
@@ -157,6 +171,11 @@ export default function AdminTopicManagement() {
   const [uploadMessage, setUploadMessage] = useState('');
   const [uploadProgress, setUploadProgress] = useState(0);
 
+  const [vocabItems, setVocabItems] = useState<VocabFormRow[]>([
+    { word: '', meaning: '', phonetic: '', example: '' },
+  ]);
+  const [savingVocab, setSavingVocab] = useState(false);
+
   useEffect(() => {
     loadTopics();
   }, []);
@@ -226,6 +245,7 @@ export default function AdminTopicManagement() {
     setEditingLesson(null);
     setSelectedSessionForLesson(session);
     setLessonForm({ title: '', description: '', type: 'VOCAB', durationMinutes: 5, orderIndex: (sessionLessons[session.id]?.length ?? 0) + 1 });
+    setVocabItems([{ word: '', meaning: '', phonetic: '', example: '' }]);
     setLessonDialog(true);
   };
 
@@ -255,6 +275,11 @@ export default function AdminTopicManagement() {
       try { setScriptText(JSON.stringify((lesson as any).transcriptJson, null, 2)); } catch { setScriptText(''); }
     }
     setLessonDialog(true);
+    if ((lesson.type ?? 'VOCAB') === 'VOCAB') {
+      void loadLessonVocabForEdit(lesson.id);
+    } else {
+      setVocabItems([{ word: '', meaning: '', phonetic: '', example: '' }]);
+    }
   };
 
   const saveVideoContent = async (lessonId: number) => {
@@ -284,6 +309,58 @@ export default function AdminTopicManagement() {
     setSessionLessons((prev) => ({ ...prev, [sessionId]: Array.isArray(list) ? list : [] }));
   };
 
+  const loadLessonVocabForEdit = async (lessonId: number) => {
+    try {
+      const res = await apiService.lesson.getVocabularies(lessonId);
+      const list = res.data?.data ?? res.data ?? [];
+      const arr = Array.isArray(list) ? list : [];
+      if (arr.length === 0) {
+        setVocabItems([{ word: '', meaning: '', phonetic: '', example: '' }]);
+        return;
+      }
+      setVocabItems(
+        arr.map((row: any) => ({
+          vocabularyId: row.vocabularyId != null ? Number(row.vocabularyId) : undefined,
+          word: String(row.word ?? ''),
+          meaning: firstMeaningText(row.meanings),
+          phonetic: row.phonetic != null ? String(row.phonetic) : '',
+          example: '',
+        }))
+      );
+    } catch {
+      setVocabItems([{ word: '', meaning: '', phonetic: '', example: '' }]);
+    }
+  };
+
+  const saveVocabContent = async (lessonId: number): Promise<boolean> => {
+    const items = vocabItems
+      .map((it, idx) => ({
+        vocabularyId: it.vocabularyId,
+        word: it.word?.trim(),
+        meaning: it.meaning?.trim(),
+        phonetic: it.phonetic?.trim() || undefined,
+        example: it.example?.trim() || undefined,
+        orderIndex: idx,
+      }))
+      .filter((it) => it.vocabularyId != null || (!!it.word && !!it.meaning));
+
+    if (items.length === 0) {
+      toast.error('Bài từ vựng: nhập ít nhất 1 dòng (tiếng Anh + nghĩa).');
+      return false;
+    }
+    setSavingVocab(true);
+    try {
+      await apiService.lesson.upsertVocabularies(lessonId, items as any);
+      toast.success(`Đã lưu ${items.length} từ vựng`);
+      return true;
+    } catch (err: any) {
+      toast.error('Không lưu được từ vựng', { description: err?.response?.data?.message ?? err?.message });
+      return false;
+    } finally {
+      setSavingVocab(false);
+    }
+  };
+
   const saveLesson = async () => {
     if (!lessonForm.title.trim()) return;
     try {
@@ -291,13 +368,39 @@ export default function AdminTopicManagement() {
       if (editingLesson) {
         await apiService.lesson.update(editingLesson.id, lessonForm);
         if (lessonForm.type === 'VIDEO') await saveVideoContent(editingLesson.id);
+        if (lessonForm.type === 'VOCAB') {
+          const ok = await saveVocabContent(editingLesson.id);
+          if (!ok) return;
+        }
         toast.success('Đã cập nhật bài học');
         setLessonDialog(false);
         await reloadSessionLessons(editingLesson.sessionId);
       } else if (selectedSessionForLesson) {
         const res = await apiService.lesson.create({ ...lessonForm, sessionId: selectedSessionForLesson.id });
         const created = res.data?.data ?? res.data;
-        if (lessonForm.type === 'VIDEO' && created?.id) await saveVideoContent(created.id);
+        const newId = created?.id != null ? Number(created.id) : null;
+        if (lessonForm.type === 'VIDEO' && newId) await saveVideoContent(newId);
+        if (lessonForm.type === 'VOCAB' && newId) {
+          const ok = await saveVocabContent(newId);
+          if (!ok) {
+            setEditingLesson({
+              id: newId,
+              title: lessonForm.title,
+              description: lessonForm.description,
+              type: lessonForm.type,
+              orderIndex: lessonForm.orderIndex,
+              durationMinutes: lessonForm.durationMinutes,
+              sessionId: selectedSessionForLesson.id,
+            });
+            setSelectedSessionForLesson(null);
+            toast.warning('Bài học đã tạo nhưng chưa lưu được từ vựng', {
+              description: 'Điền word + nghĩa cho mỗi dòng rồi bấm Cập nhật.',
+            });
+            await reloadSessionLessons(selectedSessionForLesson.id);
+            loadTopics();
+            return;
+          }
+        }
         toast.success('Đã thêm bài học');
         setLessonDialog(false);
         await reloadSessionLessons(selectedSessionForLesson.id);
@@ -964,7 +1067,16 @@ export default function AdminTopicManagement() {
       </Dialog>
 
       {/* Lesson Dialog */}
-      <Dialog open={lessonDialog} onOpenChange={(open) => { if (!open) { stopPolling(); setAnalyzeStatus('idle'); setUploadStatus('idle'); setUploadFile(null); } setLessonDialog(open); }}>
+      <Dialog open={lessonDialog} onOpenChange={(open) => {
+        if (!open) {
+          stopPolling();
+          setAnalyzeStatus('idle');
+          setUploadStatus('idle');
+          setUploadFile(null);
+          setVocabItems([{ word: '', meaning: '', phonetic: '', example: '' }]);
+        }
+        setLessonDialog(open);
+      }}>
         <DialogContent className="w-[95vw] max-w-none max-h-[82vh] overflow-y-auto" aria-describedby={undefined}>
           <DialogHeader>
             <DialogTitle>
@@ -1002,6 +1114,85 @@ export default function AdminTopicManagement() {
                   <Input type="number" value={lessonForm.orderIndex} onChange={(e) => setLessonForm({ ...lessonForm, orderIndex: Number(e.target.value) })} className="mt-1" min={1} />
                 </div>
               </div>
+
+              {lessonForm.type === 'VOCAB' && (
+                <div className="border rounded-lg overflow-hidden bg-orange-50 dark:bg-orange-950/30 border-orange-100 dark:border-orange-900">
+                  <div className="px-3 py-2 flex items-center gap-2 border-b border-orange-100 dark:border-orange-900">
+                    <Brain className="w-4 h-4 text-orange-600" />
+                    <span className="text-sm font-semibold text-orange-800 dark:text-orange-200">Danh sách từ vựng</span>
+                  </div>
+                  <div className="p-3 space-y-2">
+                    <p className="text-xs text-muted-foreground">
+                      Mỗi dòng: <b>từ tiếng Anh</b> + <b>nghĩa</b> (bắt buộc). IPA và ví dụ là tùy chọn.
+                    </p>
+                    {vocabItems.map((it, idx) => (
+                      <div key={idx} className="rounded-md border border-orange-100 dark:border-orange-800 bg-white dark:bg-gray-900 p-2 space-y-2">
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <label className="text-xs text-muted-foreground">Word *</label>
+                            <Input
+                              value={it.word}
+                              onChange={(e) => setVocabItems((prev) => prev.map((x, i) => (i === idx ? { ...x, word: e.target.value } : x)))}
+                              placeholder="restaurant"
+                              className="mt-0.5 h-8 text-sm"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-xs text-muted-foreground">Nghĩa *</label>
+                            <Input
+                              value={it.meaning}
+                              onChange={(e) => setVocabItems((prev) => prev.map((x, i) => (i === idx ? { ...x, meaning: e.target.value } : x)))}
+                              placeholder="nhà hàng"
+                              className="mt-0.5 h-8 text-sm"
+                            />
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <label className="text-xs text-muted-foreground">Phonetic</label>
+                            <Input
+                              value={it.phonetic}
+                              onChange={(e) => setVocabItems((prev) => prev.map((x, i) => (i === idx ? { ...x, phonetic: e.target.value } : x)))}
+                              placeholder="/ˈres.tɚ.ɑːnt/"
+                              className="mt-0.5 h-8 text-sm"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-xs text-muted-foreground">Ví dụ</label>
+                            <Input
+                              value={it.example}
+                              onChange={(e) => setVocabItems((prev) => prev.map((x, i) => (i === idx ? { ...x, example: e.target.value } : x)))}
+                              placeholder="We ate at a restaurant."
+                              className="mt-0.5 h-8 text-sm"
+                            />
+                          </div>
+                        </div>
+                        <div className="flex justify-end">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="h-7 text-xs"
+                            disabled={vocabItems.length <= 1}
+                            onClick={() => setVocabItems((prev) => (prev.length <= 1 ? prev : prev.filter((_, i) => i !== idx)))}
+                          >
+                            Xóa dòng
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="w-full"
+                      onClick={() => setVocabItems((prev) => [...prev, { word: '', meaning: '', phonetic: '', example: '' }])}
+                    >
+                      + Thêm từ
+                    </Button>
+                  </div>
+                </div>
+              )}
 
               {/* Video fields - only show when type is VIDEO */}
               {lessonForm.type === 'VIDEO' && (
@@ -1156,7 +1347,12 @@ export default function AdminTopicManagement() {
             </div>
 
             <div className="border border-blue-100 dark:border-blue-900 rounded-lg bg-white/70 dark:bg-gray-900/50 p-3">
-              {scriptText ? (() => {
+              {lessonForm.type === 'VOCAB' ? (
+                <div className="h-full min-h-[200px] flex flex-col items-center justify-center text-center text-xs text-muted-foreground px-4">
+                  <Brain className="h-10 w-10 text-orange-300 mb-2" />
+                  <p>Nội dung từ vựng nằm ở cột trái. Bấm <b>Thêm / Cập nhật</b> để lưu vào bài học.</p>
+                </div>
+              ) : scriptText ? (() => {
                 let count = 0;
                 let transcriptItems: any[] = [];
                 try {
@@ -1253,8 +1449,8 @@ export default function AdminTopicManagement() {
 
           <div className="flex justify-end gap-2 pt-2">
             <Button variant="outline" onClick={() => setLessonDialog(false)} disabled={saving || savingVideo}>Hủy</Button>
-            <Button onClick={saveLesson} disabled={!lessonForm.title.trim() || saving || savingVideo}>
-              {saving || savingVideo ? 'Đang lưu...' : editingLesson ? 'Cập nhật' : 'Thêm bài học'}
+            <Button onClick={saveLesson} disabled={!lessonForm.title.trim() || saving || savingVideo || savingVocab}>
+              {saving || savingVideo || savingVocab ? 'Đang lưu...' : editingLesson ? 'Cập nhật' : 'Thêm bài học'}
             </Button>
           </div>
         </DialogContent>

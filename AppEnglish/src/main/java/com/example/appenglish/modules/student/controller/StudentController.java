@@ -4,6 +4,7 @@ import com.example.appenglish.common.dto.BaseResponse;
 import com.example.appenglish.modules.curriculum.dto.CurriculumDto;
 import com.example.appenglish.modules.student.dto.SessionProgressDto;
 import com.example.appenglish.modules.student.dto.StudentDashboardDto;
+import com.example.appenglish.modules.student.dto.StudentProgressAnalyticsDto;
 import com.example.appenglish.modules.student.service.StudentService;
 import com.example.appenglish.modules.userDetail.dto.UserDataDto;
 import com.example.appenglish.modules.vocabulary.dto.AddToMyVocabularyRequest;
@@ -79,6 +80,17 @@ public class StudentController {
     public ResponseEntity<BaseResponse<List<SessionProgressDto>>> getParticipatedSessions(HttpServletRequest req) {
         try {
             return ResponseEntity.ok(BaseResponse.ok(studentService.getParticipatedSessions(), "OK", req.getRequestURI()));
+        } catch (Exception e) {
+            return ResponseEntity.status(401).body(BaseResponse.error(e.getMessage(), "UNAUTHORIZED", req.getRequestURI()));
+        }
+    }
+
+    @GetMapping("/progress/analytics")
+    public ResponseEntity<BaseResponse<StudentProgressAnalyticsDto>> getProgressAnalytics(
+            @RequestParam(value = "range", required = false, defaultValue = "week") String range,
+            HttpServletRequest req) {
+        try {
+            return ResponseEntity.ok(BaseResponse.ok(studentService.getProgressAnalytics(range), "OK", req.getRequestURI()));
         } catch (Exception e) {
             return ResponseEntity.status(401).body(BaseResponse.error(e.getMessage(), "UNAUTHORIZED", req.getRequestURI()));
         }

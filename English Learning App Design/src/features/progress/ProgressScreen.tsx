@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Card } from '@/app/components/ui/card';
 import { Button } from '@/app/components/ui/button';
 import { Progress } from '@/app/components/ui/progress';
@@ -6,7 +6,6 @@ import { Badge } from '@/app/components/ui/badge';
 import {
   TrendingUp,
   Target,
-  Calendar,
   Flame,
   Trophy,
   BarChart3,
@@ -15,6 +14,7 @@ import {
   Star,
   Award,
   Zap,
+  Loader2,
 } from 'lucide-react';
 import {
   LineChart,
@@ -32,49 +32,109 @@ import {
   PolarRadiusAxis,
   Radar,
 } from 'recharts';
+import apiService from '@/services/apiService';
+import { toast } from 'sonner';
 
 export function ProgressScreen() {
   const [timeRange, setTimeRange] = useState<'week' | 'month' | 'year'>('week');
+  const [loading, setLoading] = useState(true);
+  const [dashboard, setDashboard] = useState<any>(null);
+  const [analytics, setAnalytics] = useState<any>(null);
 
-  const weeklyData = [
-    { day: 'Mon', xp: 120, minutes: 30 },
-    { day: 'Tue', xp: 150, minutes: 45 },
-    { day: 'Wed', xp: 80, minutes: 20 },
-    { day: 'Thu', xp: 200, minutes: 60 },
-    { day: 'Fri', xp: 180, minutes: 50 },
-    { day: 'Sat', xp: 250, minutes: 70 },
-    { day: 'Sun', xp: 100, minutes: 25 },
-  ];
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      try {
+        setLoading(true);
+        const [dRes, aRes] = await Promise.all([
+          apiService.student.getDashboard(),
+          apiService.student.getProgressAnalytics(timeRange),
+        ]);
+        const d = dRes.data?.data ?? dRes.data;
+        const a = aRes.data?.data ?? aRes.data;
+        if (cancelled) return;
+        setDashboard(d ?? null);
+        setAnalytics(a ?? null);
+      } catch (err: any) {
+        const msg = err?.response?.data?.message ?? err?.message ?? 'Không tải được tiến độ học tập';
+        toast.error(msg);
+        if (!cancelled) {
+          setDashboard(null);
+          setAnalytics(null);
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+    load();
+    return () => { cancelled = true; };
+  }, [timeRange]);
 
-  const skillsData = [
-    { skill: 'Listening', score: 85 },
-    { skill: 'Speaking', score: 72 },
-    { skill: 'Pronunciation', score: 78 },
-    { skill: 'Vocabulary', score: 90 },
-    { skill: 'Grammar', score: 68 },
-  ];
+  const weeklyData = useMemo(() => {
+    const xpSeries = analytics?.xpSeries ?? [];
+    const minutesSeries = analytics?.minutesSeries ?? [];
+    // Merge by label
+    const minutesMap = new Map<string, number>();
+    (Array.isArray(minutesSeries) ? minutesSeries : []).forEach((p: any) => minutesMap.set(String(p.label), Number(p.value ?? 0)));
+    return (Array.isArray(xpSeries) ? xpSeries : []).map((p: any) => ({
+      day: String(p.label),
+      xp: Number(p.value ?? 0),
+      minutes: minutesMap.get(String(p.label)) ?? 0,
+    }));
+  }, [analytics]);
 
-  const stats = {
-    currentStreak: 12,
-    longestStreak: 28,
-    totalXP: 15420,
-    level: 8,
-    lessonsCompleted: 124,
-    studyTime: 2340, // minutes
-    accuracy: 84,
-  };
+  const stats = useMemo(() => {
+    const s = dashboard?.stats ?? {};
+    return {
+      currentStreak: s.streak ?? 0,
+      totalXP: s.totalXP ?? 0,
+      level: s.currentLevel ?? 1,
+      lessonsCompleted: s.lessonsCompleted ?? 0,
+      studyTime: weeklyData.reduce((sum: number, d: any) => sum + (d.minutes ?? 0), 0),
+      accuracy: 0,
+    };
+  }, [dashboard, weeklyData]);
 
-  const weeklyGoal = {
-    current: 1080,
-    target: 1500,
-    percentage: 72,
-  };
+  const weeklyGoal = useMemo(() => {
+    // Goal = XP needed to next level (from dashboard); current = XP earned in selected range.
+    const currentEarned = weeklyData.reduce((sum: number, d: any) => sum + (d.xp ?? 0), 0);
+    const targetDelta = dashboard?.stats?.xpToNextLevel ?? 0;
+    const percent = targetDelta > 0 ? Math.round((currentEarned / targetDelta) * 100) : 0;
+    return {
+      current: currentEarned,
+      target: Math.max(0, targetDelta),
+      percentage: Math.max(0, Math.min(100, percent)),
+    };
+  }, [dashboard, weeklyData, stats.totalXP]);
 
-  const recentAchievements = [
-    { id: 1, title: '7 Day Streak', icon: Flame, color: 'text-orange-500' },
-    { id: 2, title: 'Level 8 Reached', icon: Star, color: 'text-yellow-500' },
-    { id: 3, title: '100 Lessons', icon: Trophy, color: 'text-green-500' },
-  ];
+  const skillsData = useMemo(() => {
+    // Backend chưa có skill breakdown → hiển thị placeholder 0 để tránh mock điểm.
+    return [
+      { skill: 'Listening', score: 0 },
+      { skill: 'Speaking', score: 0 },
+      { skill: 'Pronunciation', score: 0 },
+      { skill: 'Vocabulary', score: 0 },
+      { skill: 'Grammar', score: 0 },
+    ];
+  }, []);
+
+  const recentAchievements = useMemo(() => {
+    const list = Array.isArray(analytics?.achievements) ? analytics.achievements : [];
+    return list.map((a: any, idx: number) => ({
+      id: idx + 1,
+      title: String(a.title ?? 'Achievement'),
+      icon: a.type === 'streak' ? Flame : a.type === 'level' ? Star : Trophy,
+      color: a.type === 'streak' ? 'text-orange-500' : a.type === 'level' ? 'text-yellow-500' : 'text-green-500',
+    }));
+  }, [analytics]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex items-center justify-center">
+        <Loader2 className="h-10 w-10 animate-spin text-purple-500" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950 pb-20 md:pb-6">

@@ -40,6 +40,12 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             return;
         }
 
+        // Preflight CORS — không xử lý JWT để response OPTIONS luôn có header CORS đúng.
+        if ("OPTIONS".equalsIgnoreCase(request.getMethod())) {
+            filterChain.doFilter(request, response);
+            return;
+        }
+
         String token = resolveToken(request);
         if (token != null && jwtUtils.validate(token)) {
             String email = jwtUtils.getSubject(token);

@@ -3,6 +3,7 @@ package com.example.appenglish.common.exception;
 import com.example.appenglish.common.dto.BaseResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.core.env.Environment;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
@@ -19,6 +20,12 @@ import java.util.Map;
 @RestControllerAdvice
 @Slf4j
 public class GlobalExceptionHandler {
+
+    private final Environment environment;
+
+    public GlobalExceptionHandler(Environment environment) {
+        this.environment = environment;
+    }
 
     // 1. Xử lý lỗi logic API
     @ExceptionHandler(ApiException.class)
@@ -133,7 +140,22 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(Exception.class)
     public ResponseEntity<BaseResponse<Void>> handleGeneric(Exception ex, HttpServletRequest request) {
         log.error("Unhandled exception", ex);
+
+        // In local/dev, include a short root-cause message to speed up debugging.
+        // In production, keep generic "Internal server error".
+        boolean isProd = environment != null && environment.acceptsProfiles(org.springframework.core.env.Profiles.of("prod"));
+        String message;
+        if (isProd) {
+            message = "Internal server error";
+        } else {
+            Throwable root = ex;
+            while (root.getCause() != null && root.getCause() != root) {
+                root = root.getCause();
+            }
+            String rootMsg = root.getMessage() != null ? root.getMessage() : root.getClass().getSimpleName();
+            message = "Internal server error: " + rootMsg;
+        }
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(BaseResponse.error("Internal server error", "INTERNAL_ERROR", request.getRequestURI()));
+                .body(BaseResponse.error(message, "INTERNAL_ERROR", request.getRequestURI()));
     }
 }

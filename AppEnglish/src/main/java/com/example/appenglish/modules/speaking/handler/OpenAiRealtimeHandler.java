@@ -44,6 +44,19 @@ public class OpenAiRealtimeHandler extends TextWebSocketHandler {
     @Value("${openai.realtime.model:gpt-4o-realtime-preview-2024-10-01}")
     private String modelId;
 
+    /** Higher = less sensitive to background noise (fewer false speech starts). Typical 0.45–0.7 */
+    @Value("${openai.realtime.vad.threshold:0.58}")
+    private double vadThreshold;
+
+    @Value("${openai.realtime.vad.silence-duration-ms:950}")
+    private int vadSilenceDurationMs;
+
+    @Value("${openai.realtime.vad.prefix-padding-ms:400}")
+    private int vadPrefixPaddingMs;
+
+    @Value("${openai.realtime.transcription.model:whisper-1}")
+    private String transcriptionModel;
+
     private static final String OPENAI_REALTIME_BASE_URL = "wss://api.openai.com/v1/realtime";
 
     @Override
@@ -199,14 +212,14 @@ public class OpenAiRealtimeHandler extends TextWebSocketHandler {
             
             // Enable user transcriptions
             ObjectNode transcription = objectMapper.createObjectNode();
-            transcription.put("model", "whisper-1");
+            transcription.put("model", transcriptionModel);
             sessionNode.set("input_audio_transcription", transcription);
             
             ObjectNode turnDetection = objectMapper.createObjectNode();
             turnDetection.put("type", "server_vad");
-            turnDetection.put("threshold", 0.5);
-            turnDetection.put("prefix_padding_ms", 300);
-            turnDetection.put("silence_duration_ms", 800);
+            turnDetection.put("threshold", vadThreshold);
+            turnDetection.put("prefix_padding_ms", vadPrefixPaddingMs);
+            turnDetection.put("silence_duration_ms", vadSilenceDurationMs);
             // Let the server create responses only after user finishes speaking.
             turnDetection.put("create_response", false);
             turnDetection.put("interrupt_response", true);

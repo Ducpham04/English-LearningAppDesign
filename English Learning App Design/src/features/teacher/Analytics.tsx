@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Card } from '@/app/components/ui/card';
 import {
   Select,
@@ -14,6 +14,8 @@ import {
   Target,
   Activity,
   Loader2,
+  TrendingUp,
+  TrendingDown,
 } from 'lucide-react';
 import apiService from '@/services/apiService';
 import { toast } from 'sonner';
@@ -25,6 +27,7 @@ export function TeacherAnalytics() {
   const [loading, setLoading] = useState(true);
 
   const [classList, setClassList] = useState<any[]>([]);
+  const [assignmentStats, setAssignmentStats] = useState<any[]>([]);
 
   useEffect(() => {
     apiService.teacherClasses.getAll()
@@ -44,6 +47,35 @@ export function TeacherAnalytics() {
       .finally(() => setLoading(false));
   }, []);
 
+  // Fetch real assignment statistics for class(es) to build analytics tables.
+  useEffect(() => {
+    const fetchAssignmentStats = async () => {
+      if (!classList || classList.length === 0) return;
+
+      const classIds =
+        selectedClass === 'all'
+          ? classList.map((c) => Number(c.id))
+          : [Number(selectedClass)];
+
+      try {
+        const lists = await Promise.all(
+          classIds.map((classId) =>
+            apiService.teacherClasses
+              .getAssignmentStats(classId)
+              .then((res) => res.data?.data ?? res.data ?? [])
+              .catch(() => [])
+          )
+        );
+        setAssignmentStats(lists.flat());
+      } catch {
+        toast.error('Không tải được thống kê bài tập');
+        setAssignmentStats([]);
+      }
+    };
+
+    fetchAssignmentStats();
+  }, [selectedClass, classList]);
+
   const totalStudents = classList.reduce((sum, c) => sum + (c.studentCount ?? 0), 0);
   const totalAssignments = classList.reduce((sum, c) => sum + (c.assignmentCount ?? 0), 0);
   const stats = {
@@ -56,27 +88,162 @@ export function TeacherAnalytics() {
     improvement: 0,
   };
 
-  const studentProgress = classList.slice(0, 5).map((c: any) => ({
-    name: c.name,
-    completed: c.assignmentCount ?? 0,
-    total: Math.max(c.assignmentCount ?? 0, 1),
-    avgScore: 0,
-  }));
+  const filteredAssignmentStats = useMemo(() => {
+    if (!assignmentStats || assignmentStats.length === 0) return [];
 
-  const scoreDistribution = [
-    { range: '90-100', count: 0 },
-    { range: '80-89', count: 0 },
-    { range: '70-79', count: 0 },
-    { range: '60-69', count: 0 },
-    { range: '0-59', count: 0 },
-  ];
+    const now = new Date();
+    const dayMs = 24 * 60 * 60 * 1000;
+    const days =
+      timeRange === 'week' ? 7 : timeRange === 'month' ? 30 : 90;
+    const start = new Date(now.getTime() - days * dayMs);
 
-  const weeklyData = [
-    { week: 'Tuần 1', score: stats.totalClasses * 10, completion: stats.totalClasses ? Math.min(80, 50 + stats.totalClasses * 5) : 0 },
-    { week: 'Tuần 2', score: stats.totalClasses * 12, completion: stats.totalClasses ? Math.min(85, 55 + stats.totalClasses * 5) : 0 },
-    { week: 'Tuần 3', score: stats.totalClasses * 14, completion: stats.totalClasses ? Math.min(90, 60 + stats.totalClasses * 5) : 0 },
-    { week: 'Tuần 4', score: stats.totalClasses * 15, completion: stats.totalClasses ? Math.min(95, 65 + stats.totalClasses * 5) : 0 },
-  ].map((d) => ({ ...d, score: Math.min(100, d.score) }));
+    return assignmentStats.filter((a: any) => {
+      if (!a?.dueAt) return true;
+      const due = new Date(a.dueAt);
+      if (Number.isNaN(due.getTime())) return true;
+      return due >= start && due <= now;
+    });
+  }, [assignmentStats, timeRange]);
+
+  const studentProgress = useMemo(() => {
+    const assignmentsCount = filteredAssignmentStats.length;
+    const studentMap = new Map<
+      string,
+      { studentId: string; studentName: string; completed: number; scoreSum: number; scoreCount: number }
+    >();
+
+    filteredAssignmentStats.forEach((a: any) => {
+      const list = Array.isArray(a?.students) ? a.students : [];
+      list.forEach((s: any) => {
+        const id = s?.studentId != null ? String(s.studentId) : '';
+        if (!id) return;
+
+        const prev =
+          studentMap.get(id) ??
+          { studentId: id, studentName: s?.studentName ?? 'Unknown', completed: 0, scoreSum: 0, scoreCount: 0 };
+
+        if (s?.completed) {
+          prev.completed += 1;
+          if (typeof s?.score === 'number' && !Number.isNaN(s.score)) {
+            prev.scoreSum += s.score;
+            prev.scoreCount += 1;
+          }
+        }
+
+        studentMap.set(id, prev);
+      });
+    });
+
+    const rows = Array.from(studentMap.values()).map((r) => {
+      const avgScore = r.scoreCount > 0 ? Math.round(r.scoreSum / r.scoreCount) : 0;
+      return {
+        studentId: r.studentId,
+        name: r.studentName,
+        completed: r.completed,
+        total: Math.max(assignmentsCount, 1),
+        avgScore,
+      };
+    });
+
+    rows.sort(
+      (a, b) =>
+        b.completed / b.total - a.completed / a.total ||
+        b.avgScore - a.avgScore
+    );
+
+    return rows.slice(0, 5);
+  }, [filteredAssignmentStats]);
+
+  const scoreDistribution = useMemo(() => {
+    const dist = new Map<string, number>([
+      ['90-100', 0],
+      ['80-89', 0],
+      ['70-79', 0],
+      ['60-69', 0],
+      ['0-59', 0],
+    ]);
+
+    filteredAssignmentStats.forEach((a: any) => {
+      const list = Array.isArray(a?.students) ? a.students : [];
+      list.forEach((s: any) => {
+        if (!s?.completed) return;
+        if (typeof s?.score !== 'number' || Number.isNaN(s.score)) return;
+        const score = s.score;
+        if (score >= 90) dist.set('90-100', (dist.get('90-100') ?? 0) + 1);
+        else if (score >= 80) dist.set('80-89', (dist.get('80-89') ?? 0) + 1);
+        else if (score >= 70) dist.set('70-79', (dist.get('70-79') ?? 0) + 1);
+        else if (score >= 60) dist.set('60-69', (dist.get('60-69') ?? 0) + 1);
+        else dist.set('0-59', (dist.get('0-59') ?? 0) + 1);
+      });
+    });
+
+    return [
+      { range: '90-100', count: dist.get('90-100') ?? 0 },
+      { range: '80-89', count: dist.get('80-89') ?? 0 },
+      { range: '70-79', count: dist.get('70-79') ?? 0 },
+      { range: '60-69', count: dist.get('60-69') ?? 0 },
+      { range: '0-59', count: dist.get('0-59') ?? 0 },
+    ];
+  }, [filteredAssignmentStats]);
+
+  const uniqueStudentsCount = useMemo(() => {
+    const ids = new Set<string>();
+    filteredAssignmentStats.forEach((a: any) => {
+      const list = Array.isArray(a?.students) ? a.students : [];
+      list.forEach((s: any) => {
+        const id = s?.studentId != null ? String(s.studentId) : '';
+        if (id) ids.add(id);
+      });
+    });
+    return ids.size;
+  }, [filteredAssignmentStats]);
+
+  const weeklyData = useMemo(() => {
+    const assignmentsCount = filteredAssignmentStats.length;
+    if (assignmentsCount === 0) {
+      return [
+        { week: 'Tuần 1', score: 0, completion: 0 },
+        { week: 'Tuần 2', score: 0, completion: 0 },
+        { week: 'Tuần 3', score: 0, completion: 0 },
+        { week: 'Tuần 4', score: 0, completion: 0 },
+      ];
+    }
+
+    // Derive overall completion + avg score from assignmentStats
+    let completedItems = 0;
+    let scoreSum = 0;
+    let scoreCount = 0;
+    const studentIdSet = new Set<string>();
+
+    filteredAssignmentStats.forEach((a: any) => {
+      const list = Array.isArray(a?.students) ? a.students : [];
+      list.forEach((s: any) => {
+        const id = s?.studentId != null ? String(s.studentId) : '';
+        if (!id) return;
+        studentIdSet.add(id);
+        if (s?.completed) {
+          completedItems += 1;
+          if (typeof s?.score === 'number' && !Number.isNaN(s.score)) {
+            scoreSum += s.score;
+            scoreCount += 1;
+          }
+        }
+      });
+    });
+
+    const uniqueStudents = Math.max(studentIdSet.size, 1);
+    const overallCompletion = Math.round((completedItems / (uniqueStudents * assignmentsCount)) * 100);
+    const overallAvgScore = scoreCount > 0 ? Math.round(scoreSum / scoreCount) : 0;
+    const completionClamped = Math.max(0, Math.min(100, overallCompletion));
+    const scoreClamped = Math.max(0, Math.min(100, overallAvgScore));
+
+    return [
+      { week: 'Tuần 1', score: scoreClamped, completion: completionClamped },
+      { week: 'Tuần 2', score: scoreClamped, completion: completionClamped },
+      { week: 'Tuần 3', score: scoreClamped, completion: completionClamped },
+      { week: 'Tuần 4', score: scoreClamped, completion: completionClamped },
+    ];
+  }, [filteredAssignmentStats]);
 
   if (loading) {
     return (
@@ -279,56 +446,38 @@ export function TeacherAnalytics() {
           </div>
         </Card>
 
-        {/* Lesson Type Distribution */}
+        {/* Real analytics summary (no mock data) */}
         <div className="grid md:grid-cols-2 gap-6">
-          <Card className="p-6">
-            <h3 className="text-xl font-bold mb-4">Lesson Type Distribution</h3>
+          <Card className="p-6 md:col-span-2">
+            <h3 className="text-xl font-bold mb-4">Analytics summary</h3>
             <div className="space-y-3">
-              {[
-                { name: 'Video', value: 35, color: 'bg-blue-500' },
-                { name: 'Pronunciation', value: 25, color: 'bg-purple-500' },
-                { name: 'AI Chat', value: 20, color: 'bg-green-500' },
-                { name: 'Flashcard', value: 20, color: 'bg-orange-500' },
-              ].map((type, index) => (
-                <div key={index}>
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-sm font-medium">{type.name}</span>
-                    <span className="text-sm font-bold">{type.value}%</span>
-                  </div>
-                  <div className="bg-gray-200 dark:bg-gray-700 rounded-full h-3">
-                    <div
-                      className={`${type.color} h-3 rounded-full`}
-                      style={{ width: `${type.value}%` }}
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </Card>
-
-          <Card className="p-6">
-            <h3 className="text-xl font-bold mb-4">Activity Overview</h3>
-            <div className="space-y-4">
               <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
                 <div>
-                  <div className="font-semibold">Total Lessons</div>
-                  <div className="text-sm text-gray-500">This week</div>
+                  <div className="font-semibold">Assignments in range</div>
+                  <div className="text-sm text-gray-500">Filtered by dueAt</div>
                 </div>
-                <div className="text-2xl font-bold text-cyan-600 dark:text-cyan-400">247</div>
+                <div className="text-2xl font-bold text-cyan-600 dark:text-cyan-400">{filteredAssignmentStats.length}</div>
               </div>
               <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
                 <div>
-                  <div className="font-semibold">Tests Completed</div>
-                  <div className="text-sm text-gray-500">This week</div>
+                  <div className="font-semibold">Unique students</div>
+                  <div className="text-sm text-gray-500">Based on assignment-stats</div>
                 </div>
-                <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">45</div>
+                <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">{uniqueStudentsCount}</div>
               </div>
               <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
                 <div>
-                  <div className="font-semibold">Study Hours</div>
-                  <div className="text-sm text-gray-500">This week</div>
+                  <div className="font-semibold">Overall completion</div>
+                  <div className="text-sm text-gray-500">Completed / (students * assignments)</div>
                 </div>
-                <div className="text-2xl font-bold text-green-600 dark:text-green-400">156h</div>
+                <div className="text-2xl font-bold text-green-600 dark:text-green-400">{weeklyData?.[0]?.completion ?? 0}%</div>
+              </div>
+              <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                <div>
+                  <div className="font-semibold">Overall avg score</div>
+                  <div className="text-sm text-gray-500">Avg of completed scores</div>
+                </div>
+                <div className="text-2xl font-bold text-yellow-600 dark:text-yellow-400">{weeklyData?.[0]?.score ?? 0}%</div>
               </div>
             </div>
           </Card>

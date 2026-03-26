@@ -20,6 +20,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import apiService from '@/services/apiService';
 import { toast } from 'sonner';
 import { RealtimeSpeechClient, type RealtimeClientState } from '@/services/realtimeSpeechClient';
+import { refineVoiceTranscript } from '@/services/transcriptRefine';
 
 interface Message {
   id: string;
@@ -48,6 +49,11 @@ export function AIConversation() {
   const aiDraftRef = useRef<string>('');
 
   const lessonContext = lesson ? [lesson.title, lesson.description].filter(Boolean).join('\n') : '';
+  const lessonContextRef = useRef('');
+
+  useEffect(() => {
+    lessonContextRef.current = lessonContext;
+  }, [lessonContext]);
 
   // Load lesson and initial AI greeting
   useEffect(() => {
@@ -86,10 +92,12 @@ export function AIConversation() {
       },
       onTranscript: (evt) => {
         if (evt.role === 'user' && evt.isFinal) {
+          const raw = evt.text?.trim() ?? '';
+          const userId = `user-${Date.now()}`;
           const userMessage: Message = {
-            id: `user-${Date.now()}`,
+            id: userId,
             role: 'user',
-            text: evt.text,
+            text: raw,
             timestamp: new Date(),
           };
           setMessages((prev) => [
@@ -99,6 +107,12 @@ export function AIConversation() {
           ]);
           setTurnCount((prev) => prev + 1);
           aiDraftRef.current = '';
+          if (raw) {
+            void refineVoiceTranscript(raw, lessonContextRef.current).then((fixed) => {
+              if (!fixed || fixed === raw) return;
+              setMessages((prev) => prev.map((m) => (m.id === userId ? { ...m, text: fixed } : m)));
+            });
+          }
         } else if (evt.role === 'assistant' && evt.isDelta) {
           aiDraftRef.current = aiDraftRef.current
             ? `${aiDraftRef.current} ${evt.text}`
@@ -161,7 +175,6 @@ export function AIConversation() {
     };
     setMessages((prev) => [...prev, userMessage]);
     setInputText('');
-    setRecordingTime(0);
     setTurnCount((prev) => prev + 1);
     setIsAITyping(true);
 

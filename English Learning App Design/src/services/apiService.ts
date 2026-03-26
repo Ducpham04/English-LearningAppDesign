@@ -126,9 +126,11 @@ const apiService = {
       formData.append('file', file);
       formData.append('lessonId', lessonId.toString());
       formData.append('languageCode', languageCode);
+      // Upload video lớn: timeout dài; lỗi 413 thường do Nginx client_max_body_size (xem AppEnglish/docs/NGINX_LARGE_UPLOAD.md)
       return axiosInstance.post<BaseResponse<string>>(
         '/v1/upload/transcribe',
-        formData
+        formData,
+        { timeout: 600_000 }
       );
     },
   },
@@ -278,6 +280,25 @@ const apiService = {
 
     regenerateIpa: (id: number) =>
       axiosInstance.post<BaseResponse<any>>(`/v1/lessons/${id}/ipa/regenerate`),
+
+    getVocabularies: (id: number) =>
+      axiosInstance.get<BaseResponse<Array<{
+        vocabularyId: number;
+        word: string;
+        phonetic?: string | null;
+        meanings?: any[];
+        orderIndex?: number;
+      }>>>(`/v1/lessons/${id}/vocabularies`),
+
+    upsertVocabularies: (id: number, items: Array<{
+      vocabularyId?: number;
+      word?: string;
+      phonetic?: string;
+      meaning?: string;
+      example?: string;
+      orderIndex?: number;
+    }>) =>
+      axiosInstance.post<BaseResponse<any>>(`/v1/lessons/${id}/vocabularies`, items),
   },
 
   // --- TEST MODULE ---
@@ -457,6 +478,15 @@ const apiService = {
         xp?: number;
         totalLessonsCompleted?: number;
       }>>(`/v1/student/lessons/${lessonId}/complete`, { score }),
+
+    /** Analytics for Progress screen (xp by day, minutes by day, achievements). */
+    getProgressAnalytics: (range: 'week' | 'month' | 'year' = 'week') =>
+      axiosInstance.get<BaseResponse<{
+        range: string;
+        xpSeries: Array<{ label: string; value: number }>;
+        minutesSeries: Array<{ label: string; value: number }>;
+        achievements: Array<{ title: string; type: string }>;
+      }>>(`/v1/student/progress/analytics?range=${encodeURIComponent(range)}`),
 
     getCompletedLessonIds: () =>
       axiosInstance.get<BaseResponse<number[]>>('/v1/student/progress/completed-lesson-ids'),

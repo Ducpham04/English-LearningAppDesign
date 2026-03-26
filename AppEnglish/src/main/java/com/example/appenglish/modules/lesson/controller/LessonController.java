@@ -3,6 +3,7 @@ package com.example.appenglish.modules.lesson.controller;
 import com.example.appenglish.common.dto.BaseResponse;
 import com.example.appenglish.modules.lesson.dto.LessonCreateRequest;
 import com.example.appenglish.modules.lesson.dto.LessonDto;
+import com.example.appenglish.modules.lesson.dto.LessonVocabularyUpsertRequest;
 import com.example.appenglish.modules.lesson.dto.LessonVideoRequest;
 import com.example.appenglish.modules.lesson.service.LessonService;
 import com.example.appenglish.modules.transcribe.service.s3.StorageService;
@@ -16,6 +17,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/v1/lessons")
@@ -114,6 +116,26 @@ public class LessonController {
             return ResponseEntity.ok(BaseResponse.ok(lessonService.saveVideo(id, body), "Video saved", req.getRequestURI()));
         } catch (RuntimeException e) {
             return ResponseEntity.status(404).body(BaseResponse.error(e.getMessage(), "NOT_FOUND", req.getRequestURI()));
+        }
+    }
+
+    @GetMapping("/{id}/vocabularies")
+    public ResponseEntity<BaseResponse<List<Map<String, Object>>>> getVocabularies(@PathVariable Long id, HttpServletRequest req) {
+        try {
+            return ResponseEntity.ok(BaseResponse.ok(lessonService.getLessonVocabularies(id), "OK", req.getRequestURI()));
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(404).body(BaseResponse.error(e.getMessage(), "NOT_FOUND", req.getRequestURI()));
+        }
+    }
+
+    @PostMapping("/{id}/vocabularies")
+    public ResponseEntity<BaseResponse<List<Map<String, Object>>>> upsertVocabularies(@PathVariable Long id,
+                                                                                      @RequestBody List<LessonVocabularyUpsertRequest> body,
+                                                                                      HttpServletRequest req) {
+        try {
+            return ResponseEntity.ok(BaseResponse.ok(lessonService.upsertVocabularies(id, body), "OK", req.getRequestURI()));
+        } catch (Exception e) {
+            return ResponseEntity.status(400).body(BaseResponse.error(e.getMessage(), "BAD_REQUEST", req.getRequestURI()));
         }
     }
 

@@ -4,7 +4,7 @@ import { Button } from '@/app/components/ui/button';
 import { Input } from '@/app/components/ui/input';
 import { Label } from '@/app/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/app/components/ui/select';
-import { Video } from 'lucide-react';
+import { FileText, Video } from 'lucide-react';
 import { toast } from 'sonner';
 import apiService from '@/services/apiService';
 import { useAuthStore } from '@/store/authStore';
@@ -31,6 +31,12 @@ export function CreateLessonModal({ open, onOpenChange, onSuccess }: CreateLesso
   const [createdLessonId, setCreatedLessonId] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
   const [savingVideo, setSavingVideo] = useState(false);
+  const [lessonType, setLessonType] = useState<'VIDEO' | 'VOCAB'>('VIDEO');
+
+  const [vocabItems, setVocabItems] = useState<Array<{ word: string; meaning: string; phonetic?: string; example?: string }>>([
+    { word: '', meaning: '', phonetic: '', example: '' },
+  ]);
+  const [savingVocab, setSavingVocab] = useState(false);
 
   const [youtubeInputUrl, setYoutubeInputUrl] = useState('');
   const [scriptText, setScriptText] = useState('');
@@ -52,6 +58,7 @@ export function CreateLessonModal({ open, onOpenChange, onSuccess }: CreateLesso
       setSelectedSessionId('');
       setSessions([]);
       setLessonForm({ title: '', description: '', durationMinutes: 5, orderIndex: 1 });
+      setLessonType('VIDEO');
       setYoutubeInputUrl('');
       setScriptText('');
       setVideoUrl('');
@@ -60,6 +67,7 @@ export function CreateLessonModal({ open, onOpenChange, onSuccess }: CreateLesso
       setUploadStatus('idle');
       setAnalyzeStatus('idle');
       setScriptView('preview');
+      setVocabItems([{ word: '', meaning: '', phonetic: '', example: '' }]);
       const teacherId = useAuthStore.getState().user?.id;
       Promise.all([
         teacherId ? apiService.curriculum.getByTeacher(String(teacherId)) : Promise.resolve({ data: { data: [] } }),
@@ -162,14 +170,16 @@ export function CreateLessonModal({ open, onOpenChange, onSuccess }: CreateLesso
     try {
       const res = await apiService.lesson.create({
         ...lessonForm,
-        type: 'VIDEO',
+        type: lessonType,
         sessionId,
       });
       const created = res.data?.data ?? res.data;
       const id = created?.id != null ? Number(created.id) : null;
       if (id) {
         setCreatedLessonId(id);
-        toast.success('Đã tạo bài học. Bạn có thể thêm link YouTube hoặc upload video.');
+        toast.success(lessonType === 'VIDEO'
+          ? 'Đã tạo bài học. Bạn có thể thêm link YouTube hoặc upload video.'
+          : 'Đã tạo bài học. Bây giờ hãy thêm danh sách từ vựng vào bài.');
       } else {
         toast.error('Tạo bài học xong nhưng không lấy được ID.');
       }
@@ -177,6 +187,34 @@ export function CreateLessonModal({ open, onOpenChange, onSuccess }: CreateLesso
       toast.error(err?.response?.data?.message || 'Không thể tạo bài học');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const saveVocabContent = async (lessonId: number): Promise<boolean> => {
+    const items = vocabItems
+      .map((it, idx) => ({
+        word: it.word?.trim(),
+        meaning: it.meaning?.trim(),
+        phonetic: it.phonetic?.trim() || undefined,
+        example: it.example?.trim() || undefined,
+        orderIndex: idx,
+      }))
+      .filter((it) => !!it.word && !!it.meaning);
+
+    if (items.length === 0) {
+      toast.error('Nhập ít nhất 1 từ (word + meaning).');
+      return false;
+    }
+    setSavingVocab(true);
+    try {
+      await apiService.lesson.upsertVocabularies(lessonId, items);
+      toast.success(`Đã lưu ${items.length} từ vựng vào bài học`);
+      return true;
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Lưu từ vựng thất bại');
+      return false;
+    } finally {
+      setSavingVocab(false);
     }
   };
 
@@ -280,8 +318,14 @@ export function CreateLessonModal({ open, onOpenChange, onSuccess }: CreateLesso
   };
 
   const handleFinish = async () => {
-    if (createdLessonId && (videoUrl.trim() || scriptText.trim())) {
-      await saveVideoContent(createdLessonId);
+    if (createdLessonId) {
+      if (lessonType === 'VIDEO' && (videoUrl.trim() || scriptText.trim())) {
+        await saveVideoContent(createdLessonId);
+      }
+      if (lessonType === 'VOCAB') {
+        const ok = await saveVocabContent(createdLessonId);
+        if (!ok) return;
+      }
     }
     onSuccess?.();
     handleClose(false);
@@ -292,12 +336,16 @@ export function CreateLessonModal({ open, onOpenChange, onSuccess }: CreateLesso
       <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto" aria-describedby={undefined}>
         <DialogHeader>
           <DialogTitle>
-            {createdLessonId ? 'Thêm nội dung Video' : 'Tạo bài học Video'}
+            {createdLessonId
+              ? (lessonType === 'VIDEO' ? 'Thêm nội dung Video' : 'Thêm nội dung Từ vựng')
+              : 'Tạo bài học'}
           </DialogTitle>
           <DialogDescription>
             {createdLessonId
-              ? 'Thêm link YouTube hoặc upload file video để tự động phân tích transcript.'
-              : 'Chọn khóa học và session, sau đó tạo bài học. Chỉ hỗ trợ loại Video (giống quản trị).'}
+              ? (lessonType === 'VIDEO'
+                ? 'Thêm link YouTube hoặc upload file video để tự động phân tích transcript.'
+                : 'Nhập danh sách từ vựng để lưu vào bài học.')
+              : 'Chọn khóa học và session, sau đó tạo bài học.'}
           </DialogDescription>
         </DialogHeader>
 
@@ -328,6 +376,18 @@ export function CreateLessonModal({ open, onOpenChange, onSuccess }: CreateLesso
                   {sessions.map((s) => (
                     <SelectItem key={s.id} value={String(s.id)}>{s.title || `Session ${s.id}`}</SelectItem>
                   ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Loại bài học *</Label>
+              <Select value={lessonType} onValueChange={(v) => setLessonType(v as any)}>
+                <SelectTrigger className="mt-1">
+                  <SelectValue placeholder="Chọn loại bài học" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="VIDEO">Video</SelectItem>
+                  <SelectItem value="VOCAB">Vocabulary</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -382,36 +442,37 @@ export function CreateLessonModal({ open, onOpenChange, onSuccess }: CreateLesso
           </form>
         ) : (
           <div className="space-y-4 mt-2">
-            <div className="border rounded-lg overflow-hidden bg-blue-50 dark:bg-blue-950/30">
-              <div className="px-3 py-2 flex items-center gap-2 border-b border-blue-100 dark:border-blue-900">
-                <Video className="w-4 h-4 text-blue-600" />
-                <span className="text-sm font-semibold text-blue-700 dark:text-blue-300">Nội dung Video</span>
-              </div>
-              <div className="flex border-b border-blue-100 dark:border-blue-900">
-                <button
-                  type="button"
-                  onClick={() => setVideoTab('youtube')}
-                  className={`flex-1 py-2 text-xs font-medium flex items-center justify-center gap-1.5 transition-colors ${
-                    videoTab === 'youtube'
-                      ? 'bg-white dark:bg-gray-900 text-red-600 border-b-2 border-red-500'
-                      : 'text-gray-500 hover:text-gray-700 hover:bg-white/50'
-                  }`}
-                >
-                  ▶ YouTube URL
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setVideoTab('upload')}
-                  className={`flex-1 py-2 text-xs font-medium flex items-center justify-center gap-1.5 transition-colors ${
-                    videoTab === 'upload'
-                      ? 'bg-white dark:bg-gray-900 text-blue-600 border-b-2 border-blue-500'
-                      : 'text-gray-500 hover:text-gray-700 hover:bg-white/50'
-                  }`}
-                >
-                  ⬆ Upload từ máy
-                </button>
-              </div>
-              <div className="p-3 space-y-3">
+            {lessonType === 'VIDEO' ? (
+              <div className="border rounded-lg overflow-hidden bg-blue-50 dark:bg-blue-950/30">
+                <div className="px-3 py-2 flex items-center gap-2 border-b border-blue-100 dark:border-blue-900">
+                  <Video className="w-4 h-4 text-blue-600" />
+                  <span className="text-sm font-semibold text-blue-700 dark:text-blue-300">Nội dung Video</span>
+                </div>
+                <div className="flex border-b border-blue-100 dark:border-blue-900">
+                  <button
+                    type="button"
+                    onClick={() => setVideoTab('youtube')}
+                    className={`flex-1 py-2 text-xs font-medium flex items-center justify-center gap-1.5 transition-colors ${
+                      videoTab === 'youtube'
+                        ? 'bg-white dark:bg-gray-900 text-red-600 border-b-2 border-red-500'
+                        : 'text-gray-500 hover:text-gray-700 hover:bg-white/50'
+                    }`}
+                  >
+                    ▶ YouTube URL
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setVideoTab('upload')}
+                    className={`flex-1 py-2 text-xs font-medium flex items-center justify-center gap-1.5 transition-colors ${
+                      videoTab === 'upload'
+                        ? 'bg-white dark:bg-gray-900 text-blue-600 border-b-2 border-blue-500'
+                        : 'text-gray-500 hover:text-gray-700 hover:bg-white/50'
+                    }`}
+                  >
+                    ⬆ Upload từ máy
+                  </button>
+                </div>
+                <div className="p-3 space-y-3">
                 {videoTab === 'youtube' && (
                   <div className="space-y-2">
                     <p className="text-xs text-gray-500">
@@ -625,22 +686,114 @@ export function CreateLessonModal({ open, onOpenChange, onSuccess }: CreateLesso
                     );
                   })()
                 )}
+                </div>
               </div>
-            </div>
+            ) : (
+              <div className="border rounded-lg overflow-hidden bg-orange-50 dark:bg-orange-950/30">
+                <div className="px-3 py-2 flex items-center gap-2 border-b border-orange-100 dark:border-orange-900">
+                  <FileText className="w-4 h-4 text-orange-600" />
+                  <span className="text-sm font-semibold text-orange-700 dark:text-orange-300">Nội dung Từ vựng</span>
+                </div>
+                <div className="p-3 space-y-3">
+                  <p className="text-xs text-gray-500">
+                    Nhập <b>word</b> và <b>meaning</b>. Có thể thêm phonetic (IPA) và example.
+                  </p>
+
+                  <div className="space-y-2">
+                    {vocabItems.map((it, idx) => (
+                      <div key={idx} className="rounded-md border border-orange-100 dark:border-orange-900 bg-white dark:bg-gray-900 p-2 space-y-2">
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <Label className="text-xs">Word *</Label>
+                            <Input
+                              value={it.word}
+                              onChange={(e) => setVocabItems((prev) => prev.map((x, i) => i === idx ? ({ ...x, word: e.target.value }) : x))}
+                              placeholder="restaurant"
+                              className="mt-1"
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-xs">Meaning *</Label>
+                            <Input
+                              value={it.meaning}
+                              onChange={(e) => setVocabItems((prev) => prev.map((x, i) => i === idx ? ({ ...x, meaning: e.target.value }) : x))}
+                              placeholder="nhà hàng"
+                              className="mt-1"
+                            />
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <Label className="text-xs">Phonetic</Label>
+                            <Input
+                              value={it.phonetic || ''}
+                              onChange={(e) => setVocabItems((prev) => prev.map((x, i) => i === idx ? ({ ...x, phonetic: e.target.value }) : x))}
+                              placeholder="/ˈres.tɚ.ɑːnt/"
+                              className="mt-1"
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-xs">Example</Label>
+                            <Input
+                              value={it.example || ''}
+                              onChange={(e) => setVocabItems((prev) => prev.map((x, i) => i === idx ? ({ ...x, example: e.target.value }) : x))}
+                              placeholder="We ate at a restaurant. — Chúng tôi ăn ở nhà hàng."
+                              className="mt-1"
+                            />
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-[11px] text-gray-400">#{idx + 1}</span>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setVocabItems((prev) => prev.length <= 1 ? prev : prev.filter((_, i) => i !== idx))}
+                            disabled={vocabItems.length <= 1}
+                          >
+                            Xóa
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setVocabItems((prev) => [...prev, { word: '', meaning: '', phonetic: '', example: '' }])}
+                  >
+                    + Thêm từ
+                  </Button>
+                </div>
+              </div>
+            )}
 
             <DialogFooter className="pt-4">
               <Button type="button" variant="outline" onClick={() => setCreatedLessonId(null)}>
                 Quay lại
               </Button>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => createdLessonId && saveVideoContent(createdLessonId)}
-                disabled={savingVideo || (!videoUrl.trim() && !scriptText.trim())}
-              >
-                {savingVideo ? 'Đang lưu...' : 'Lưu video'}
-              </Button>
-              <Button type="button" onClick={handleFinish} disabled={savingVideo}>
+              {lessonType === 'VIDEO' && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => createdLessonId && saveVideoContent(createdLessonId)}
+                  disabled={savingVideo || (!videoUrl.trim() && !scriptText.trim())}
+                >
+                  {savingVideo ? 'Đang lưu...' : 'Lưu video'}
+                </Button>
+              )}
+              {lessonType === 'VOCAB' && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => createdLessonId && saveVocabContent(createdLessonId)}
+                  disabled={savingVocab}
+                >
+                  {savingVocab ? 'Đang lưu...' : 'Lưu từ vựng'}
+                </Button>
+              )}
+              <Button type="button" onClick={handleFinish} disabled={savingVideo || savingVocab}>
                 Hoàn tất
               </Button>
             </DialogFooter>

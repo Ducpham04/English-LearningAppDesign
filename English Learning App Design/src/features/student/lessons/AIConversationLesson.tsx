@@ -11,6 +11,7 @@ import { Input } from '../../../app/components/ui/input';
 import apiService from '../../../services/apiService';
 import { useAppStore } from '../../../store/appStore';
 import { RealtimeSpeechClient, type RealtimeClientState } from '../../../services/realtimeSpeechClient';
+import { refineVoiceTranscript } from '../../../services/transcriptRefine';
 
 interface Message {
   id: number;
@@ -51,6 +52,13 @@ export function AIConversationLesson() {
   const [turnCount, setTurnCount] = useState(0);
   const rtRef = useRef<RealtimeSpeechClient | null>(null);
   const aiDraftRef = useRef<string>('');
+  const lessonContextRef = useRef('');
+
+  useEffect(() => {
+    const title = lesson?.title ?? '';
+    const desc = lesson?.description ?? '';
+    lessonContextRef.current = [title, desc].filter(Boolean).join('\n');
+  }, [lesson]);
 
   useEffect(() => {
     if (!lessonId) return;
@@ -94,12 +102,20 @@ export function AIConversationLesson() {
       },
       onTranscript: (evt) => {
         if (evt.role === 'user' && evt.isFinal) {
-          const userMsg: Message = { id: Date.now(), sender: 'user', text: evt.text, timestamp: new Date() };
+          const raw = evt.text?.trim() ?? '';
+          const userId = Date.now();
+          const userMsg: Message = { id: userId, sender: 'user', text: raw, timestamp: new Date() };
           setMessages((prev) => [...prev, userMsg]);
           setTurnCount((prev) => prev + 1);
           aiDraftRef.current = '';
           // placeholder assistant bubble
           setMessages((prev) => [...prev, { id: Date.now() + 1, sender: 'ai', text: '...', timestamp: new Date() }]);
+          if (raw) {
+            void refineVoiceTranscript(raw, lessonContextRef.current).then((fixed) => {
+              if (!fixed || fixed === raw) return;
+              setMessages((prev) => prev.map((m) => (m.id === userId ? { ...m, text: fixed } : m)));
+            });
+          }
         } else if (evt.role === 'assistant' && evt.isDelta) {
           const t = evt.text.trim();
           if (!t) return;
