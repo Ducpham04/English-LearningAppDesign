@@ -1,6 +1,8 @@
 HELP.md
 .env
 .env.local
+# Key AWS demo local (Spring đọc khi chạy từ thư mục AppEnglish)
+config/application.properties
 target/
 .mvn/wrapper/maven-wrapper.jar
 !**/src/main/**/target/

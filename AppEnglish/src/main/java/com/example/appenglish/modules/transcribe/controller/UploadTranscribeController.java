@@ -3,6 +3,7 @@ package com.example.appenglish.modules.transcribe.controller;
 import com.example.appenglish.common.dto.BaseResponse;
 import com.example.appenglish.modules.transcribe.service.kafka.producer.UploadTranscribeProducer;
 import com.example.appenglish.modules.transcribe.service.s3.StorageService;
+import com.example.appenglish.modules.transcribe.service.transcript.LessonVideoTranscriptPersistenceService;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
@@ -23,6 +24,7 @@ public class UploadTranscribeController {
 
     StorageService storageService;
     UploadTranscribeProducer uploadTranscribeProducer;
+    LessonVideoTranscriptPersistenceService lessonVideoTranscriptPersistenceService;
 
     @PostMapping(
             value = "/transcribe",
@@ -37,6 +39,8 @@ public class UploadTranscribeController {
 
         String key = "user-uploads/" + lessonId + "/" + file.getOriginalFilename();
         String s3Uri = storageService.uploadMultipartFile(file, key);
+
+        lessonVideoTranscriptPersistenceService.markUploadReceived(lessonId, s3Uri);
 
         UUID transactionId = uploadTranscribeProducer.sendTranscriptionRequest(lessonId, s3Uri, languageCode);
 

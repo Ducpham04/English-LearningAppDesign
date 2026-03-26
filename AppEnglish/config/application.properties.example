@@ -1,0 +1,5 @@
+# Sao chép thành application.properties (file đó đã gitignore) và điền key thật.
+aws.accessKey=
+aws.secretKey=
+aws.region=ap-southeast-1
+aws.s3.bucket=learning-english-bucket

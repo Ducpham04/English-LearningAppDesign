@@ -28,6 +28,23 @@ public class LessonVideoTranscriptPersistenceService {
     LessonRepository lessonRepository;
     LessonVideoRepository lessonVideoRepository;
 
+    /**
+     * Gọi ngay sau khi upload file lên S3 thành công (trước khi consumer Kafka chạy),
+     * để đã có dòng {@code lesson_videos} và {@code video_url} — poll GET transcript thấy {@code s3Url} thay vì null.
+     */
+    @Transactional
+    public void markUploadReceived(Long lessonId, String s3Uri) {
+        LessonVideo lessonVideo = getOrCreateLessonVideoLocked(lessonId);
+
+        if (lessonVideo.getTranscriptJson() != null && !lessonVideo.getTranscriptJson().isEmpty()) {
+            log.info("Skip markUploadReceived: transcript already exists for lessonId={}", lessonId);
+            return;
+        }
+
+        lessonVideo.setVideoUrl(s3Uri);
+        log.info("Upload received: lessonId={}, videoUrl persisted before async transcribe", lessonId);
+    }
+
     @Transactional
     public void markProcessing(Long lessonId, String youtubeUrl, String s3Uri) {
         LessonVideo lessonVideo = getOrCreateLessonVideoLocked(lessonId);
